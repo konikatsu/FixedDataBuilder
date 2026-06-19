@@ -17,7 +17,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "FixedDataBuilder";
+        Text = $"FixedDataBuilder v{Application.ProductVersion}";
         StartPosition = FormStartPosition.CenterScreen;
         Width = 1100;
         Height = 700;
@@ -33,7 +33,7 @@ public sealed class MainForm : Form
         Controls.Add(toolStrip);
         Controls.Add(statusStrip);
 
-        LoadSampleDefinition();
+        statusLabel.Text = "定義読込から CSV を選択してください。";
     }
 
     private void BuildToolStrip()
@@ -75,26 +75,6 @@ public sealed class MainForm : Form
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         grid.EnableHeadersVisualStyles = false;
         grid.CellEndEdit += (_, e) => UpdateRecordValue(e.RowIndex, e.ColumnIndex);
-    }
-
-    private void LoadSampleDefinition()
-    {
-        fields.Clear();
-        fields.AddRange(
-        [
-            new FieldDefinition("名前", FieldDataType.FullWidthText, 10, "N(10)"),
-            new FieldDefinition("英名", FieldDataType.Text, 10, "X(10)"),
-            new FieldDefinition("年齢", FieldDataType.PlainNumber, 3, "9(2V1)", DecimalScale: 1),
-            new FieldDefinition("体重", FieldDataType.SignedNumber, 5, "S9(3V2)", DecimalScale: 2),
-            new FieldDefinition("攻撃力", FieldDataType.PackedSigned, 9, "S9(9) COMP-3")
-        ]);
-
-        records.Clear();
-        records.Add(["ジナン", "JINAN", "7", "6.7", "100"]);
-        records.Add(["キナコ", "KINAKO", "3", "3.8", "50"]);
-        records.Add(["オジュン", "OJUN", "18", "45.1", "999999999"]);
-        RefreshGrid();
-        statusLabel.Text = "サンプル定義を読み込みました。";
     }
 
     private void OpenDefinition()
