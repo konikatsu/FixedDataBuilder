@@ -20,6 +20,10 @@ public static class NumericValueFormatter
             negative = true;
             value = value[1..];
         }
+        else if (value.StartsWith('+'))
+        {
+            value = value[1..];
+        }
 
         if (negative && !signed)
         {
@@ -69,6 +73,27 @@ public static class NumericValueFormatter
             return false;
         }
 
+        return true;
+    }
+
+    public static bool TryFormatDisplayValue(string value, FieldDefinition field, bool signed, out string displayValue, out string error)
+    {
+        displayValue = value;
+        if (!TryFormatDigits(value, field, signed, out var digits, out var negative, out error))
+        {
+            return false;
+        }
+
+        var sign = signed ? negative ? "-" : "+" : string.Empty;
+        if (field.DecimalScale == 0)
+        {
+            displayValue = sign + digits;
+            return true;
+        }
+
+        var integerPart = digits[..field.IntegerDigitLength];
+        var decimalPart = digits[field.IntegerDigitLength..];
+        displayValue = $"{sign}{integerPart}.{decimalPart}";
         return true;
     }
 }

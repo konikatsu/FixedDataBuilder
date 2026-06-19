@@ -92,7 +92,7 @@ public sealed class MainForm : Form
         records.Clear();
         records.Add(["ジナン", "JINAN", "7", "6.7", "100"]);
         records.Add(["キナコ", "KINAKO", "3", "3.8", "50"]);
-        records.Add(["オジュン", "OJUN", "18", "49", "999999999"]);
+        records.Add(["オジュン", "OJUN", "18", "45.1", "999999999"]);
         RefreshGrid();
         statusLabel.Text = "サンプル定義を読み込みました。";
     }
@@ -129,7 +129,7 @@ public sealed class MainForm : Form
     {
         return fields.Select(field => field.Type switch
         {
-            FieldDataType.PlainNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned => "0",
+            FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned => "0",
             _ => string.Empty
         }).ToList();
     }
@@ -248,7 +248,10 @@ public sealed class MainForm : Form
                 return;
             }
 
-            records[columnIndex - 2][rowIndex] = grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty;
+            var recordIndex = columnIndex - 2;
+            var formattedValue = FormatValueForDisplay(fields[rowIndex], grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
+            records[recordIndex][rowIndex] = formattedValue;
+            grid[columnIndex, rowIndex].Value = formattedValue;
             return;
         }
 
@@ -257,7 +260,10 @@ public sealed class MainForm : Form
             return;
         }
 
-        records[rowIndex][columnIndex - 1] = grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty;
+        var fieldIndex = columnIndex - 1;
+        var recordRowsFormattedValue = FormatValueForDisplay(fields[fieldIndex], grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
+        records[rowIndex][fieldIndex] = recordRowsFormattedValue;
+        grid[columnIndex, rowIndex].Value = recordRowsFormattedValue;
     }
 
     private int CurrentRecordIndex()
@@ -326,7 +332,7 @@ public sealed class MainForm : Form
 
             for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
             {
-                row.Cells[recordIndex + 2].Value = records[recordIndex][fieldIndex];
+                row.Cells[recordIndex + 2].Value = FormatValueForDisplay(field, records[recordIndex][fieldIndex]);
             }
         }
     }
@@ -354,7 +360,7 @@ public sealed class MainForm : Form
 
             for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
             {
-                row.Cells[fieldIndex + 1].Value = records[recordIndex][fieldIndex];
+                row.Cells[fieldIndex + 1].Value = FormatValueForDisplay(fields[fieldIndex], records[recordIndex][fieldIndex]);
             }
         }
     }
@@ -393,6 +399,18 @@ public sealed class MainForm : Form
     {
         column.DefaultCellStyle.BackColor = DefinitionBackColor;
         column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
+    }
+
+    private static string FormatValueForDisplay(FieldDefinition field, string value)
+    {
+        return field.Type switch
+        {
+            FieldDataType.PlainNumber or FieldDataType.PackedUnsigned =>
+                NumericValueFormatter.TryFormatDisplayValue(value, field, signed: false, out var displayValue, out _) ? displayValue : value,
+            FieldDataType.SignedNumber or FieldDataType.PackedSigned =>
+                NumericValueFormatter.TryFormatDisplayValue(value, field, signed: true, out var displayValue, out _) ? displayValue : value,
+            _ => value
+        };
     }
 
     private enum GridLayout
