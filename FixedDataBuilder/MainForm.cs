@@ -2,12 +2,18 @@ namespace FixedDataBuilder;
 
 public sealed class MainForm : Form
 {
+    private static readonly Color DefinitionBackColor = Color.FromArgb(226, 242, 226);
+    private static readonly Color DefinitionHeaderBackColor = Color.FromArgb(204, 232, 204);
+
     private readonly DataGridView grid = new();
     private readonly ToolStrip toolStrip = new();
     private readonly StatusStrip statusStrip = new();
     private readonly ToolStripStatusLabel statusLabel = new();
+    private readonly ToolStripButton fieldRowsButton;
+    private readonly ToolStripButton recordRowsButton;
     private readonly List<FieldDefinition> fields = [];
     private readonly List<List<string>> records = [];
+    private GridLayout layout = GridLayout.FieldRows;
 
     public MainForm()
     {
@@ -15,6 +21,9 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Width = 1100;
         Height = 700;
+
+        fieldRowsButton = CreateButton("表示: 項目縦", (_, _) => ChangeLayout(GridLayout.FieldRows));
+        recordRowsButton = CreateButton("表示: レコード縦", (_, _) => ChangeLayout(GridLayout.RecordRows));
 
         BuildToolStrip();
         BuildGrid();
@@ -35,6 +44,9 @@ public sealed class MainForm : Form
         toolStrip.Items.Add(CreateButton("追加", (_, _) => AddRecord()));
         toolStrip.Items.Add(CreateButton("複製", (_, _) => DuplicateRecord()));
         toolStrip.Items.Add(CreateButton("削除", (_, _) => DeleteRecord()));
+        toolStrip.Items.Add(new ToolStripSeparator());
+        toolStrip.Items.Add(fieldRowsButton);
+        toolStrip.Items.Add(recordRowsButton);
         toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(CreateButton("検証", (_, _) => ValidateRecords(showSuccess: true)));
         toolStrip.Items.Add(CreateButton("保存", (_, _) => SaveData()));
@@ -61,13 +73,8 @@ public sealed class MainForm : Form
         grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
         grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-        grid.CellEndEdit += (_, e) =>
-        {
-            if (e.RowIndex >= 0 && e.ColumnIndex >= 3)
-            {
-                records[e.ColumnIndex - 3][e.RowIndex] = grid[e.ColumnIndex, e.RowIndex].Value?.ToString() ?? string.Empty;
-            }
-        };
+        grid.EnableHeadersVisualStyles = false;
+        grid.CellEndEdit += (_, e) => UpdateRecordValue(e.RowIndex, e.ColumnIndex);
     }
 
     private void LoadSampleDefinition()
@@ -75,13 +82,17 @@ public sealed class MainForm : Form
         fields.Clear();
         fields.AddRange(
         [
-            new FieldDefinition("顧客番号", FieldDataType.PlainNumber, 8),
-            new FieldDefinition("氏名", FieldDataType.FullWidthText, 20),
-            new FieldDefinition("金額", FieldDataType.PackedSigned, 9)
+            new FieldDefinition("名前", FieldDataType.FullWidthText, 10, "N(10)"),
+            new FieldDefinition("英名", FieldDataType.Text, 10, "X(10)"),
+            new FieldDefinition("年齢", FieldDataType.PlainNumber, 3, "9(2V1)", DecimalScale: 1),
+            new FieldDefinition("体重", FieldDataType.SignedNumber, 5, "S9(3V2)", DecimalScale: 2),
+            new FieldDefinition("攻撃力", FieldDataType.PackedSigned, 9, "S9(9) COMP-3")
         ]);
 
         records.Clear();
-        records.Add(CreateEmptyRecord());
+        records.Add(["ジナン", "JINAN", "7", "6.7", "100"]);
+        records.Add(["キナコ", "KINAKO", "3", "3.8", "50"]);
+        records.Add(["オジュン", "OJUN", "18", "49", "999999999"]);
         RefreshGrid();
         statusLabel.Text = "サンプル定義を読み込みました。";
     }
@@ -211,39 +222,98 @@ public sealed class MainForm : Form
         return false;
     }
 
-    private int CurrentRecordIndex()
+    private void ChangeLayout(GridLayout nextLayout)
     {
-        return grid.CurrentCell is { ColumnIndex: >= 3 } cell ? cell.ColumnIndex - 3 : records.Count - 1;
-    }
-
-    private void SelectRecord(int recordIndex)
-    {
-        if (recordIndex < 0 || fields.Count == 0)
+        if (layout == nextLayout)
         {
             return;
         }
 
-        grid.CurrentCell = grid[recordIndex + 3, 0];
+        grid.EndEdit();
+        layout = nextLayout;
+        RefreshGrid();
+    }
+
+    private void UpdateRecordValue(int rowIndex, int columnIndex)
+    {
+        if (rowIndex < 0 || columnIndex < 0)
+        {
+            return;
+        }
+
+        if (layout == GridLayout.FieldRows)
+        {
+            if (columnIndex < 2)
+            {
+                return;
+            }
+
+            records[columnIndex - 2][rowIndex] = grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty;
+            return;
+        }
+
+        if (columnIndex < 1)
+        {
+            return;
+        }
+
+        records[rowIndex][columnIndex - 1] = grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty;
+    }
+
+    private int CurrentRecordIndex()
+    {
+        if (grid.CurrentCell is null)
+        {
+            return records.Count - 1;
+        }
+
+        return layout == GridLayout.FieldRows
+            ? grid.CurrentCell.ColumnIndex >= 2 ? grid.CurrentCell.ColumnIndex - 2 : records.Count - 1
+            : grid.CurrentCell.RowIndex;
+    }
+
+    private void SelectRecord(int recordIndex)
+    {
+        if (recordIndex < 0 || fields.Count == 0 || records.Count == 0)
+        {
+            return;
+        }
+
+        grid.CurrentCell = layout == GridLayout.FieldRows
+            ? grid[recordIndex + 2, 0]
+            : grid[1, recordIndex];
     }
 
     private void RefreshGrid()
     {
         grid.Columns.Clear();
         grid.Rows.Clear();
+        UpdateLayoutButtons();
 
-        grid.Columns.Add(CreateReadOnlyColumn("Name", "項目名", 180));
-        grid.Columns.Add(CreateReadOnlyColumn("Type", "型", 120));
-        grid.Columns.Add(CreateReadOnlyColumn("Length", "桁数", 70));
+        if (layout == GridLayout.FieldRows)
+        {
+            RefreshFieldRowsGrid();
+        }
+        else
+        {
+            RefreshRecordRowsGrid();
+        }
+
+        statusLabel.Text = $"{fields.Count} 項目 / {records.Count} レコード";
+    }
+
+    private void RefreshFieldRowsGrid()
+    {
+        grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+        grid.ColumnHeadersHeight = 28;
+        grid.Columns.Add(CreateReadOnlyColumn("Name", "項目名", 180, frozen: true));
+        grid.Columns.Add(CreateReadOnlyColumn("Definition", "定義", 150, frozen: true));
+        ApplyDefinitionColumnStyle(grid.Columns[0]);
+        ApplyDefinitionColumnStyle(grid.Columns[1]);
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
         {
-            grid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = $"Record{recordIndex + 1}",
-                HeaderText = $"Rec {recordIndex + 1}",
-                Width = 140,
-                SortMode = DataGridViewColumnSortMode.NotSortable
-            });
+            grid.Columns.Add(CreateEditableColumn($"Record{recordIndex + 1}", $"Rec {recordIndex + 1}", 140));
         }
 
         for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
@@ -252,19 +322,50 @@ public sealed class MainForm : Form
             var rowIndex = grid.Rows.Add();
             var row = grid.Rows[rowIndex];
             row.Cells[0].Value = field.Name;
-            row.Cells[1].Value = DisplayType(field.Type);
-            row.Cells[2].Value = field.Length;
+            row.Cells[1].Value = field.DisplayDefinition;
 
             for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
             {
-                row.Cells[recordIndex + 3].Value = records[recordIndex][fieldIndex];
+                row.Cells[recordIndex + 2].Value = records[recordIndex][fieldIndex];
             }
         }
-
-        statusLabel.Text = $"{fields.Count} 項目 / {records.Count} レコード";
     }
 
-    private static DataGridViewTextBoxColumn CreateReadOnlyColumn(string name, string header, int width)
+    private void RefreshRecordRowsGrid()
+    {
+        grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
+        grid.ColumnHeadersHeight = 46;
+        grid.Columns.Add(CreateReadOnlyColumn("Record", "レコード", 90, frozen: true));
+        ApplyDefinitionColumnStyle(grid.Columns[0]);
+
+        for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+        {
+            var field = fields[fieldIndex];
+            var column = CreateEditableColumn($"Field{fieldIndex + 1}", $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}", 170);
+            column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
+            grid.Columns.Add(column);
+        }
+
+        for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
+        {
+            var rowIndex = grid.Rows.Add();
+            var row = grid.Rows[rowIndex];
+            row.Cells[0].Value = $"Rec {recordIndex + 1}";
+
+            for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+            {
+                row.Cells[fieldIndex + 1].Value = records[recordIndex][fieldIndex];
+            }
+        }
+    }
+
+    private void UpdateLayoutButtons()
+    {
+        fieldRowsButton.Checked = layout == GridLayout.FieldRows;
+        recordRowsButton.Checked = layout == GridLayout.RecordRows;
+    }
+
+    private static DataGridViewTextBoxColumn CreateReadOnlyColumn(string name, string header, int width, bool frozen)
     {
         return new DataGridViewTextBoxColumn
         {
@@ -272,18 +373,31 @@ public sealed class MainForm : Form
             HeaderText = header,
             Width = width,
             ReadOnly = true,
-            Frozen = true,
+            Frozen = frozen,
             SortMode = DataGridViewColumnSortMode.NotSortable
         };
     }
 
-    private static string DisplayType(FieldDataType type) => type switch
+    private static DataGridViewTextBoxColumn CreateEditableColumn(string name, string header, int width)
     {
-        FieldDataType.PlainNumber => "平数字",
-        FieldDataType.PackedUnsigned => "PAC_符号なし",
-        FieldDataType.PackedSigned => "PAC_符号あり",
-        FieldDataType.HalfWidthText => "文字_半角",
-        FieldDataType.FullWidthText => "文字_全角",
-        _ => type.ToString()
-    };
+        return new DataGridViewTextBoxColumn
+        {
+            Name = name,
+            HeaderText = header,
+            Width = width,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        };
+    }
+
+    private static void ApplyDefinitionColumnStyle(DataGridViewColumn column)
+    {
+        column.DefaultCellStyle.BackColor = DefinitionBackColor;
+        column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
+    }
+
+    private enum GridLayout
+    {
+        FieldRows,
+        RecordRows
+    }
 }

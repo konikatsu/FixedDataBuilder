@@ -2,17 +2,13 @@ namespace FixedDataBuilder;
 
 public static class PackedDecimal
 {
-    public static byte[] Encode(string value, int digitLength, bool signed)
+    public static byte[] EncodeDigits(string digits, bool signed, bool negative)
     {
-        var negative = signed && value.StartsWith('-');
-        var digits = negative ? value[1..] : value;
-
-        if (digits.Length > digitLength)
+        if (digits.Length == 0 || !digits.All(char.IsDigit))
         {
-            throw new InvalidDataException($"{value} は桁数 {digitLength} を超えています。");
+            throw new InvalidDataException("PAC には数値のみ指定できます。");
         }
 
-        digits = digits.PadLeft(digitLength, '0');
         var nibbles = signed
             ? digits.Select(ToNibble).Append(negative ? 0x0D : 0x0C).ToList()
             : digits.Select(ToNibble).ToList();

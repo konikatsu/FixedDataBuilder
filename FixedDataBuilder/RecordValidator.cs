@@ -6,6 +6,8 @@ public static class RecordValidator
 {
     public static IReadOnlyList<string> Validate(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<List<string>> records)
     {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        var shiftJis = Encoding.GetEncoding(932);
         var errors = new List<string>();
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
@@ -21,25 +23,18 @@ public static class RecordValidator
                 {
                     case FieldDataType.PlainNumber:
                     case FieldDataType.PackedUnsigned:
-                        if (!value.All(char.IsDigit))
-                        {
-                            errors.Add($"{location}: 0以上の数値を入力してください。");
-                        }
-                        if (value.Length > field.Length)
-                        {
-                            errors.Add($"{location}: 桁数 {field.Length} を超えています。");
-                        }
+                        ValidateNumber(errors, location, value, field, signed: false);
                         break;
 
+                    case FieldDataType.SignedNumber:
                     case FieldDataType.PackedSigned:
-                        var numeric = value.StartsWith('-') ? value[1..] : value;
-                        if (numeric.Length == 0 || !numeric.All(char.IsDigit))
+                        ValidateNumber(errors, location, value, field, signed: true);
+                        break;
+
+                    case FieldDataType.Text:
+                        if (shiftJis.GetByteCount(value) > field.Length)
                         {
-                            errors.Add($"{location}: 符号付き数値を入力してください。");
-                        }
-                        if (numeric.Length > field.Length)
-                        {
-                            errors.Add($"{location}: 桁数 {field.Length} を超えています。");
+                            errors.Add($"{location}: Shift_JIS バイト長 {field.Length} を超えています。");
                         }
                         break;
 
@@ -65,5 +60,13 @@ public static class RecordValidator
         }
 
         return errors;
+    }
+
+    private static void ValidateNumber(List<string> errors, string location, string value, FieldDefinition field, bool signed)
+    {
+        if (!NumericValueFormatter.TryFormatDigits(value, field, signed, out _, out _, out var error))
+        {
+            errors.Add($"{location}: {error}");
+        }
     }
 }

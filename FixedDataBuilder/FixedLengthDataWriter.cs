@@ -17,10 +17,11 @@ public static class FixedLengthDataWriter
                 var value = record[index].Trim();
                 var bytes = field.Type switch
                 {
-                    FieldDataType.PlainNumber => EncodePlainNumber(value, field.Length, encoding),
-                    FieldDataType.PackedUnsigned => PackedDecimal.Encode(value, field.Length, signed: false),
-                    FieldDataType.PackedSigned => PackedDecimal.Encode(value, field.Length, signed: true),
-                    FieldDataType.HalfWidthText or FieldDataType.FullWidthText => EncodeText(value, field.StorageByteLength, encoding),
+                    FieldDataType.PlainNumber => EncodeDisplayNumber(value, field, signed: false, encoding),
+                    FieldDataType.SignedNumber => EncodeDisplayNumber(value, field, signed: true, encoding),
+                    FieldDataType.PackedUnsigned => EncodePackedNumber(value, field, signed: false),
+                    FieldDataType.PackedSigned => EncodePackedNumber(value, field, signed: true),
+                    FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText => EncodeText(value, field.StorageByteLength, encoding),
                     _ => throw new InvalidOperationException($"未対応の型です: {field.Type}")
                 };
 
@@ -32,10 +33,29 @@ public static class FixedLengthDataWriter
         }
     }
 
-    private static byte[] EncodePlainNumber(string value, int length, Encoding encoding)
+    private static byte[] EncodeDisplayNumber(string value, FieldDefinition field, bool signed, Encoding encoding)
     {
-        var padded = value.PadLeft(length, '0');
-        return encoding.GetBytes(padded);
+        if (!NumericValueFormatter.TryFormatDigits(value, field, signed, out var digits, out var negative, out var error))
+        {
+            throw new InvalidDataException($"{field.Name}: {error}");
+        }
+
+        if (negative)
+        {
+            throw new InvalidDataException($"{field.Name}: 符号付き表示数値の負値保存ルールは未設定です。");
+        }
+
+        return encoding.GetBytes(digits);
+    }
+
+    private static byte[] EncodePackedNumber(string value, FieldDefinition field, bool signed)
+    {
+        if (!NumericValueFormatter.TryFormatDigits(value, field, signed, out var digits, out var negative, out var error))
+        {
+            throw new InvalidDataException($"{field.Name}: {error}");
+        }
+
+        return PackedDecimal.EncodeDigits(digits, signed, negative);
     }
 
     private static byte[] EncodeText(string value, int byteLength, Encoding encoding)
