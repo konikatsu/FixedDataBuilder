@@ -10,6 +10,12 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 項目縦表示とレコード縦表示を切り替えできます。
 
+## ダウンロード
+
+最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
+
+zip を展開して `FixedDataBuilder.exe` を実行してください。
+
 ## 定義書 CSV
 
 UTF-8 CSV を想定しています。基本形式は `項目名,定義` の 2 列です。
