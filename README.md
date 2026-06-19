@@ -6,7 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-cobol-sample.png)
 
 項目縦表示:
 
