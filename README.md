@@ -14,7 +14,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
 
-zip を展開して `FixedDataBuilder.exe` を実行してください。
+zip を展開して `release/FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv` と `samples/sample-records.csv` も同梱しています。
 
 ## 定義書 CSV
 
@@ -38,8 +38,6 @@ UTF-8 CSV を想定しています。基本形式は `項目名,定義` の 2 �
 - `S9(nVm)`: 小数桁つき符号あり数字
 - `S9(n) COMP-3`: PAC_符号あり
 - `9(n) COMP-3`: PAC_符号なし
-
-`samples/definition.csv` にサンプル定義書、`samples/sample-records.csv` に画面入力値のサンプルがあります。
 
 ## 現在の MVP
 
