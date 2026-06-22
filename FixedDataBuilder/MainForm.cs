@@ -1,4 +1,5 @@
 using System.Text;
+using System.Diagnostics;
 
 namespace FixedDataBuilder;
 
@@ -748,6 +749,7 @@ public sealed class MainForm : Form
         try
         {
             ExcelExporter.Write(dialog.FileName, layoutName, BuildExcelRows());
+            OpenGeneratedFile(dialog.FileName);
             SetStatus($"Excelへ出力しました: {Path.GetFileName(dialog.FileName)}");
         }
         catch (Exception ex)
@@ -789,6 +791,15 @@ public sealed class MainForm : Form
         return layout == GridLayout.FieldRows
             ? columnIndex < 2
             : columnIndex == 0;
+    }
+
+    private static void OpenGeneratedFile(string path)
+    {
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = path,
+            UseShellExecute = true
+        });
     }
 
     private bool ValidateBeforeSave()
