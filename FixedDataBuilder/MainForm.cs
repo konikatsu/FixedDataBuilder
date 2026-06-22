@@ -173,7 +173,8 @@ public sealed class MainForm : Form
         toolStrip.Items.Add(CreateButton("複製", (_, _) => DuplicateRecord()));
         toolStrip.Items.Add(CreateButton("削除", (_, _) => DeleteRecord()));
         toolStrip.Items.Add(new ToolStripSeparator());
-        toolStrip.Items.Add(CreateButton("定義作成", (_, _) => CreateDefinition()));
+        toolStrip.Items.Add(CreateButton("定義作成", (_, _) => CreateDefinition(editCurrent: false)));
+        toolStrip.Items.Add(CreateButton("定義修正", (_, _) => CreateDefinition(editCurrent: true)));
         toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(fieldRowsButton);
         toolStrip.Items.Add(recordRowsButton);
@@ -569,9 +570,15 @@ public sealed class MainForm : Form
         }).ToList();
     }
 
-    private void CreateDefinition()
+    private void CreateDefinition(bool editCurrent)
     {
-        using var form = new DefinitionEditorForm(fields);
+        if (editCurrent && fields.Count == 0)
+        {
+            MessageBox.Show(this, "修正する定義ファイルを先に読み込んでください。", "定義修正", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var form = new DefinitionEditorForm(editCurrent ? fields : []);
         if (form.ShowDialog(this) != DialogResult.OK || string.IsNullOrWhiteSpace(form.SavedPath))
         {
             return;
@@ -585,7 +592,7 @@ public sealed class MainForm : Form
             records.Clear();
             records.Add(CreateEmptyRecord());
             RefreshGrid();
-            SetStatus("定義ファイルを作成して読み込みました。");
+            SetStatus(editCurrent ? "定義ファイルを修正して読み込みました。" : "定義ファイルを作成して読み込みました。");
         }
         catch (Exception ex)
         {

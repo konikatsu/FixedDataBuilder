@@ -126,11 +126,6 @@ public sealed class DefinitionEditorForm : Form
     {
         if (initialFields.Count == 0)
         {
-            AddDefinitionRow("名前", TypeFullWidthText, "10", "", false);
-            AddDefinitionRow("英名", TypeHalfWidthText, "10", "", false);
-            AddDefinitionRow("年齢", TypeNumber, "2", "1", false);
-            AddDefinitionRow("体重", TypeSignedNumber, "3", "2", false);
-            AddDefinitionRow("攻撃力", TypeSignedNumber, "9", "", true);
             return;
         }
 
