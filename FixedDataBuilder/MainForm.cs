@@ -178,6 +178,8 @@ public sealed class MainForm : Form
         toolStrip.Items.Add(CreateButton("検証", (_, _) => ValidateRecords(showSuccess: true)));
         toolStrip.Items.Add(CreateButton("上書き保存", (_, _) => SaveDataOverwrite()));
         toolStrip.Items.Add(CreateButton("名前を付けて保存", (_, _) => SaveDataAs()));
+        toolStrip.Items.Add(new ToolStripSeparator());
+        toolStrip.Items.Add(CreateButton("Excel出力", (_, _) => ExportExcel()));
     }
 
     private static ToolStripButton CreateButton(string text, EventHandler onClick)
@@ -646,6 +648,74 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(this, ex.Message, "保存エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private void ExportExcel()
+    {
+        grid.EndEdit();
+        if (fields.Count == 0 || records.Count == 0)
+        {
+            MessageBox.Show(this, "出力するデータがありません。", "Excel出力", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var layoutName = layout == GridLayout.FieldRows ? "項目縦" : "レコード縦";
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "Excel ブック (*.xlsx)|*.xlsx",
+            Title = "Excelへ出力",
+            FileName = $"FixedDataBuilder_{layoutName}.xlsx"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            ExcelExporter.Write(dialog.FileName, layoutName, BuildExcelRows());
+            SetStatus($"Excelへ出力しました: {Path.GetFileName(dialog.FileName)}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Excel出力エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private IReadOnlyList<IReadOnlyList<ExcelCell>> BuildExcelRows()
+    {
+        var rows = new List<IReadOnlyList<ExcelCell>>();
+        rows.Add(grid.Columns
+            .Cast<DataGridViewColumn>()
+            .Select(column => new ExcelCell(column.HeaderText, ExcelCellKind.Header))
+            .ToList());
+
+        foreach (DataGridViewRow gridRow in grid.Rows)
+        {
+            if (gridRow.IsNewRow)
+            {
+                continue;
+            }
+
+            var row = new List<ExcelCell>();
+            for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
+            {
+                var kind = IsDefinitionCellForExcel(columnIndex) ? ExcelCellKind.Definition : ExcelCellKind.Normal;
+                row.Add(new ExcelCell(gridRow.Cells[columnIndex].Value?.ToString() ?? string.Empty, kind));
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
+    }
+
+    private bool IsDefinitionCellForExcel(int columnIndex)
+    {
+        return layout == GridLayout.FieldRows
+            ? columnIndex < 2
+            : columnIndex == 0;
     }
 
     private bool ValidateBeforeSave()
