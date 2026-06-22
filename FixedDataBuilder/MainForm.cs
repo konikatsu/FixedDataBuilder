@@ -172,6 +172,8 @@ public sealed class MainForm : Form
         toolStrip.Items.Add(CreateButton("複製", (_, _) => DuplicateRecord()));
         toolStrip.Items.Add(CreateButton("削除", (_, _) => DeleteRecord()));
         toolStrip.Items.Add(new ToolStripSeparator());
+        toolStrip.Items.Add(CreateButton("定義作成", (_, _) => CreateDefinition()));
+        toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(fieldRowsButton);
         toolStrip.Items.Add(recordRowsButton);
         toolStrip.Items.Add(new ToolStripSeparator());
@@ -564,6 +566,30 @@ public sealed class MainForm : Form
             FieldDataType.FullWidthText => new string('\u3000', field.Length),
             _ => string.Empty
         }).ToList();
+    }
+
+    private void CreateDefinition()
+    {
+        using var form = new DefinitionEditorForm(fields);
+        if (form.ShowDialog(this) != DialogResult.OK || string.IsNullOrWhiteSpace(form.SavedPath))
+        {
+            return;
+        }
+
+        try
+        {
+            LoadDefinition(form.SavedPath);
+            dataPathComboBox.Text = string.Empty;
+            saveDataPath = null;
+            records.Clear();
+            records.Add(CreateEmptyRecord());
+            RefreshGrid();
+            SetStatus("定義ファイルを作成して読み込みました。");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "定義読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private void NormalizeRecords()
