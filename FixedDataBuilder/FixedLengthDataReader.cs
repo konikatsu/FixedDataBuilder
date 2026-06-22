@@ -121,6 +121,12 @@ public static class FixedLengthDataReader
             text = text[1..];
         }
 
+        if (signed && text.Length > 0 && TryDecodeAsciiZonedSign(text[^1], out var lastDigit, out var zonedNegative))
+        {
+            text = text[..^1] + lastDigit;
+            negative = zonedNegative;
+        }
+
         if (!text.All(char.IsDigit))
         {
             throw new InvalidDataException($"{field.Name}: 数値以外の文字があります。");
@@ -133,6 +139,32 @@ public static class FixedLengthDataReader
     {
         var digits = PackedDecimal.DecodeDigits(bytes, field.Length, signed, out var negative);
         return FormatDigitsForDisplay(digits, field, signed, negative);
+    }
+
+    private static bool TryDecodeAsciiZonedSign(char value, out char digit, out bool negative)
+    {
+        const string positiveSigns = "{ABCDEFGHI";
+        const string negativeSigns = "}JKLMNOPQR";
+
+        var positiveIndex = positiveSigns.IndexOf(value);
+        if (positiveIndex >= 0)
+        {
+            digit = (char)('0' + positiveIndex);
+            negative = false;
+            return true;
+        }
+
+        var negativeIndex = negativeSigns.IndexOf(value);
+        if (negativeIndex >= 0)
+        {
+            digit = (char)('0' + negativeIndex);
+            negative = true;
+            return true;
+        }
+
+        digit = '\0';
+        negative = false;
+        return false;
     }
 
     private static string FormatDigitsForDisplay(string digits, FieldDefinition field, bool signed, bool negative)

@@ -6,7 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-cobol-sample-v0.1.12.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-cobol-sample-v0.1.13.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示し、最近使ったファイルをそれぞれ直近 20 件まで履歴から選べます。
 
@@ -58,6 +58,7 @@ UTF-8 CSV を想定しています。基本形式は `項目名,定義` の 2 �
 - 画面表示形式の Excel 出力
 - Shift_JIS 前提の固定長データ保存
 - `N(n)` の未入力値は全角スペースで保存
+- `S9(n)` / `S9(nVm)` の表示数値は末尾桁の ASCII ゾーン符号で保存
 - COMP-3 / packed decimal の暫定エンコード・デコード
 
 ## サンプル

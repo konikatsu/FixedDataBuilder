@@ -56,12 +56,28 @@ public static class FixedLengthDataWriter
             throw new InvalidDataException($"{field.Name}: {error}");
         }
 
-        if (negative)
+        if (signed)
         {
-            throw new InvalidDataException($"{field.Name}: 符号付き表示数値の負値保存ルールは未設定です。");
+            digits = ApplyAsciiZonedSign(digits, negative);
         }
 
         return encoding.GetBytes(digits);
+    }
+
+    private static string ApplyAsciiZonedSign(string digits, bool negative)
+    {
+        var lastDigit = digits[^1];
+        if (lastDigit is < '0' or > '9')
+        {
+            throw new InvalidDataException("符号付き表示数値の末尾が数字ではありません。");
+        }
+
+        const string positiveSigns = "{ABCDEFGHI";
+        const string negativeSigns = "}JKLMNOPQR";
+        var signedLastDigit = negative
+            ? negativeSigns[lastDigit - '0']
+            : positiveSigns[lastDigit - '0'];
+        return digits[..^1] + signedLastDigit;
     }
 
     private static byte[] EncodePackedNumber(string value, FieldDefinition field, bool signed)
