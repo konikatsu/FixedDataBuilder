@@ -43,7 +43,8 @@ public static class FixedLengthDataWriter
             FieldDataType.SignedNumber => EncodeDisplayNumber(value, field, signed: true, encoding),
             FieldDataType.PackedUnsigned => EncodePackedNumber(value, field, signed: false),
             FieldDataType.PackedSigned => EncodePackedNumber(value, field, signed: true),
-            FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText => EncodeText(value, field.StorageByteLength, encoding),
+            FieldDataType.Text or FieldDataType.HalfWidthText => EncodeText(value, field.StorageByteLength, encoding),
+            FieldDataType.FullWidthText => EncodeFullWidthText(value, field.Length, encoding),
             _ => throw new InvalidOperationException($"未対応の型です: {field.Type}")
         };
     }
@@ -84,5 +85,27 @@ public static class FixedLengthDataWriter
         var buffer = Enumerable.Repeat((byte)0x20, byteLength).ToArray();
         Array.Copy(bytes, buffer, bytes.Length);
         return buffer;
+    }
+
+    private static byte[] EncodeFullWidthText(string value, int length, Encoding encoding)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value;
+
+        if (normalized.Length > length)
+        {
+            throw new InvalidDataException($"{value} は保存文字数 {length} を超えています。");
+        }
+
+        normalized = normalized.PadRight(length, '\u3000');
+        var bytes = encoding.GetBytes(normalized);
+        var byteLength = length * 2;
+        if (bytes.Length != byteLength)
+        {
+            throw new InvalidDataException($"{value} は全角文字 {length} 文字の領域に保存できません。");
+        }
+
+        return bytes;
     }
 }

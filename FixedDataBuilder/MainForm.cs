@@ -203,7 +203,18 @@ public sealed class MainForm : Form
         grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         grid.EnableHeadersVisualStyles = false;
-        grid.CellEndEdit += (_, e) => UpdateRecordValue(e.RowIndex, e.ColumnIndex);
+        grid.CellEndEdit += (_, e) =>
+        {
+            try
+            {
+                UpdateRecordValue(e.RowIndex, e.ColumnIndex);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "セル編集エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                RefreshGrid();
+            }
+        };
         grid.SelectionChanged += (_, _) => UpdateHexView();
     }
 
@@ -319,6 +330,7 @@ public sealed class MainForm : Form
     {
         records.Clear();
         records.AddRange(FixedLengthDataReader.Read(path, fields, separatorMode));
+        NormalizeRecords();
         currentSeparatorMode = separatorMode;
         saveDataPath = path;
         SetPathText(dataPathComboBox, path);
@@ -549,8 +561,43 @@ public sealed class MainForm : Form
         return fields.Select(field => field.Type switch
         {
             FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned => "0",
+            FieldDataType.FullWidthText => new string('\u3000', field.Length),
             _ => string.Empty
         }).ToList();
+    }
+
+    private void NormalizeRecords()
+    {
+        if (fields.Count == 0)
+        {
+            records.Clear();
+            return;
+        }
+
+        if (records.Count == 0)
+        {
+            records.Add(CreateEmptyRecord());
+            return;
+        }
+
+        foreach (var record in records)
+        {
+            while (record.Count < fields.Count)
+            {
+                var field = fields[record.Count];
+                record.Add(field.Type switch
+                {
+                    FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned => "0",
+                    FieldDataType.FullWidthText => new string('\u3000', field.Length),
+                    _ => string.Empty
+                });
+            }
+
+            if (record.Count > fields.Count)
+            {
+                record.RemoveRange(fields.Count, record.Count - fields.Count);
+            }
+        }
     }
 
     private void AddRecord()
@@ -802,14 +849,21 @@ public sealed class MainForm : Form
             return;
         }
 
+        NormalizeRecords();
+
         if (layout == GridLayout.FieldRows)
         {
-            if (columnIndex < 2)
+            if (columnIndex < 2 || rowIndex >= fields.Count)
             {
                 return;
             }
 
             var recordIndex = columnIndex - 2;
+            if (recordIndex < 0 || recordIndex >= records.Count)
+            {
+                return;
+            }
+
             var formattedValue = FormatValueForDisplay(fields[rowIndex], grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
             records[recordIndex][rowIndex] = formattedValue;
             grid[columnIndex, rowIndex].Value = formattedValue;
@@ -818,12 +872,17 @@ public sealed class MainForm : Form
             return;
         }
 
-        if (columnIndex < 1)
+        if (columnIndex < 1 || rowIndex >= records.Count)
         {
             return;
         }
 
         var fieldIndex = columnIndex - 1;
+        if (fieldIndex < 0 || fieldIndex >= fields.Count)
+        {
+            return;
+        }
+
         var recordRowsFormattedValue = FormatValueForDisplay(fields[fieldIndex], grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
         records[rowIndex][fieldIndex] = recordRowsFormattedValue;
         grid[columnIndex, rowIndex].Value = recordRowsFormattedValue;
@@ -870,6 +929,7 @@ public sealed class MainForm : Form
 
     private void RefreshGrid()
     {
+        NormalizeRecords();
         grid.Columns.Clear();
         grid.Rows.Clear();
         UpdateLayoutButtons();
@@ -953,7 +1013,11 @@ public sealed class MainForm : Form
     {
         var recordIndex = CurrentRecordIndex();
         var fieldIndex = CurrentFieldIndex();
-        if (recordIndex < 0 || recordIndex >= records.Count || fieldIndex < 0 || fieldIndex >= fields.Count)
+        if (recordIndex < 0
+            || recordIndex >= records.Count
+            || fieldIndex < 0
+            || fieldIndex >= fields.Count
+            || fieldIndex >= records[recordIndex].Count)
         {
             hexTextBox.Clear();
             return;
