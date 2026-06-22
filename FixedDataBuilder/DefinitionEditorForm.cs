@@ -66,7 +66,20 @@ public sealed class DefinitionEditorForm : Form
         grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
         grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-        grid.CellValueChanged += (_, e) => UpdatePreviewCell(e.RowIndex);
+        grid.CellValueChanged += (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+            {
+                return;
+            }
+
+            if (grid.Columns[e.ColumnIndex].Name == "Type")
+            {
+                UpdateRowEditability(e.RowIndex);
+            }
+
+            UpdatePreviewCell(e.RowIndex);
+        };
         grid.CurrentCellDirtyStateChanged += (_, _) =>
         {
             if (grid.IsCurrentCellDirty)
@@ -158,6 +171,7 @@ public sealed class DefinitionEditorForm : Form
         row.Cells["IntegerDigits"].Value = integerDigits;
         row.Cells["DecimalDigits"].Value = decimalDigits;
         row.Cells["Comp3"].Value = comp3;
+        UpdateRowEditability(rowIndex);
         UpdatePreviewCell(rowIndex);
     }
 
@@ -282,6 +296,28 @@ public sealed class DefinitionEditorForm : Form
             grid.Rows[rowIndex].Cells["Preview"].Value = string.Empty;
             grid.Rows[rowIndex].Cells["Preview"].Style.BackColor = Color.FromArgb(255, 225, 225);
             grid.Rows[rowIndex].Cells["Preview"].ToolTipText = ex.Message;
+        }
+    }
+
+    private void UpdateRowEditability(int rowIndex)
+    {
+        if (rowIndex < 0 || rowIndex >= grid.Rows.Count || grid.Rows[rowIndex].IsNewRow)
+        {
+            return;
+        }
+
+        var row = grid.Rows[rowIndex];
+        var type = row.Cells["Type"].Value?.ToString() ?? TypeHalfWidthText;
+        var isNumber = type is TypeNumber or TypeSignedNumber;
+        var decimalCell = row.Cells["DecimalDigits"];
+
+        decimalCell.ReadOnly = !isNumber;
+        decimalCell.Style.BackColor = isNumber ? Color.Empty : SystemColors.Control;
+        decimalCell.ToolTipText = isNumber ? string.Empty : "文字型では小数桁を入力できません。";
+
+        if (!isNumber)
+        {
+            decimalCell.Value = string.Empty;
         }
     }
 
