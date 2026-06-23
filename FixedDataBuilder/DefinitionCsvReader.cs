@@ -37,6 +37,21 @@ public static partial class DefinitionCsvReader
         return fields;
     }
 
+    public static FieldDefinition ParseFieldDefinition(string name, string definition, int lineNumber = 1)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidDataException($"{lineNumber} 行目: 項目名が空です。");
+        }
+
+        if (string.IsNullOrWhiteSpace(definition))
+        {
+            throw new InvalidDataException($"{lineNumber} 行目: 定義が空です。");
+        }
+
+        return ParseCobolPicture(name.Trim(), definition.Trim(), lineNumber);
+    }
+
     private static FieldDefinition ParseField(IReadOnlyList<string> cells, int lineNumber)
     {
         if (cells.Count < 2)
@@ -61,7 +76,7 @@ public static partial class DefinitionCsvReader
             return new FieldDefinition(name, ParseLegacyType(legacyType), legacyLength, $"{legacyType} {legacyLength}");
         }
 
-        return ParseCobolPicture(name, cells[1].Trim(), lineNumber);
+        return ParseFieldDefinition(name, cells[1], lineNumber);
     }
 
     private static FieldDefinition ParseCobolPicture(string name, string picture, int lineNumber)

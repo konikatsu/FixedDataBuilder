@@ -184,6 +184,7 @@ public sealed class MainForm : Form
         toolStrip.Items.Add(CreateButton("名前を付けて保存", (_, _) => SaveDataAs()));
         toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(CreateButton("Excel出力", (_, _) => ExportExcel()));
+        toolStrip.Items.Add(CreateButton("Excel取込", (_, _) => ImportExcel()));
     }
 
     private static ToolStripButton CreateButton(string text, EventHandler onClick)
@@ -762,6 +763,69 @@ public sealed class MainForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Excel出力エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ImportExcel()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "Excel ブック (*.xlsx)|*.xlsx",
+            Title = "Excelから取り込み"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            var imported = ExcelImporter.Read(dialog.FileName);
+            ValidateImportedDefinition(imported.Fields);
+
+            fields.Clear();
+            fields.AddRange(imported.Fields);
+            records.Clear();
+            records.AddRange(imported.Records.Select(record => record.ToList()));
+            saveDataPath = null;
+            SetPathText(definitionPathComboBox, $"(Excel) {dialog.FileName}");
+            SetPathText(dataPathComboBox, dialog.FileName);
+            layout = imported.LayoutName == "レコード縦" ? GridLayout.RecordRows : GridLayout.FieldRows;
+            NormalizeRecords();
+            RefreshGrid();
+            ValidateRecords(showSuccess: false);
+            SetStatus($"Excelから取り込みました: {Path.GetFileName(dialog.FileName)}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Excel取込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ValidateImportedDefinition(IReadOnlyList<FieldDefinition> importedFields)
+    {
+        if (fields.Count == 0)
+        {
+            return;
+        }
+
+        if (fields.Count != importedFields.Count)
+        {
+            throw new InvalidDataException($"現在の定義項目数 {fields.Count} と Excel の定義項目数 {importedFields.Count} が一致しません。");
+        }
+
+        for (var index = 0; index < fields.Count; index++)
+        {
+            var current = fields[index];
+            var imported = importedFields[index];
+            if (!string.Equals(current.Name, imported.Name, StringComparison.Ordinal)
+                || !string.Equals(current.DisplayDefinition, imported.DisplayDefinition, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"Excel の定義が現在の定義と一致しません。{Environment.NewLine}"
+                    + $"{index + 1} 番目: 現在={current.Name},{current.DisplayDefinition} / Excel={imported.Name},{imported.DisplayDefinition}");
+            }
         }
     }
 
