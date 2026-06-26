@@ -18,20 +18,20 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.19`
+- 現在の最新 Release: `v0.1.20`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.19` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.19 の Release ビルド済み
-- `FixedDataBuilder-v0.1.19.zip` を作成済み
+- `v0.1.20` を GitHub Release 予定
+- `release/FixedDataBuilder.exe` は v0.1.20 の Release ビルド済み
+- `FixedDataBuilder-v0.1.20.zip` を作成予定
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-cobol-sample-v0.1.19.png` を参照
+- README は `docs/screen-image-cobol-sample-v0.1.20.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
-- v0.1.19 で、履歴選択/Enter読み込み改善、半角スペース表示、横表示ルーラ、フォント設定を実装済み
+- v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
 
 最後に push 済みの重要コミット:
 

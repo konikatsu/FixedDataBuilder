@@ -38,6 +38,7 @@ public sealed class MainForm : Form
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
     private GridLayout layout = GridLayout.FieldRows;
     private bool isUpdatingPathComboBoxes;
+    private bool isRefreshingGrid;
     private Font? displayFont;
 
     public MainForm(string[]? args = null)
@@ -94,8 +95,8 @@ public sealed class MainForm : Form
         ConfigureReadOnlyTextBox(separatorModeTextBox);
         RefreshRecentFileItems();
 
-        definitionPathComboBox.SelectedIndexChanged += (_, _) => LoadDefinitionFromHistory();
-        dataPathComboBox.SelectedIndexChanged += (_, _) => LoadDataFromHistory();
+        definitionPathComboBox.SelectionChangeCommitted += (_, _) => LoadDefinitionFromHistory();
+        dataPathComboBox.SelectionChangeCommitted += (_, _) => LoadDataFromHistory();
         definitionPathComboBox.KeyDown += (_, e) => LoadDefinitionFromEnteredPath(e);
         dataPathComboBox.KeyDown += (_, e) => LoadDataFromEnteredPath(e);
 
@@ -223,6 +224,11 @@ public sealed class MainForm : Form
         grid.EnableHeadersVisualStyles = false;
         grid.CellEndEdit += (_, e) =>
         {
+            if (isRefreshingGrid)
+            {
+                return;
+            }
+
             try
             {
                 UpdateRecordValue(e.RowIndex, e.ColumnIndex);
@@ -233,7 +239,13 @@ public sealed class MainForm : Form
                 RefreshGrid();
             }
         };
-        grid.SelectionChanged += (_, _) => UpdateHexView();
+        grid.SelectionChanged += (_, _) =>
+        {
+            if (!isRefreshingGrid)
+            {
+                UpdateHexView();
+            }
+        };
         grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
     }
 
@@ -451,7 +463,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        var path = SelectedPath(definitionPathComboBox);
+        var path = definitionPathComboBox.SelectedItem?.ToString();
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
@@ -502,7 +514,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        var path = SelectedPath(dataPathComboBox);
+        var path = dataPathComboBox.SelectedItem?.ToString();
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
@@ -583,11 +595,6 @@ public sealed class MainForm : Form
                 recentDataFiles.Add(path);
             }
         }
-    }
-
-    private static string SelectedPath(ComboBox comboBox)
-    {
-        return comboBox.SelectedItem?.ToString() ?? comboBox.Text;
     }
 
     private void AddRecentFile(List<string> target, string path)
@@ -1227,22 +1234,30 @@ public sealed class MainForm : Form
 
     private void RefreshGrid()
     {
-        NormalizeRecords();
-        grid.Columns.Clear();
-        grid.Rows.Clear();
-        UpdateLayoutButtons();
-
-        if (layout == GridLayout.FieldRows)
+        isRefreshingGrid = true;
+        try
         {
-            RefreshFieldRowsGrid();
-        }
-        else
-        {
-            RefreshRecordRowsGrid();
-        }
+            NormalizeRecords();
+            grid.Columns.Clear();
+            grid.Rows.Clear();
+            UpdateLayoutButtons();
 
-        SetStatus($"{fields.Count} 項目 / {records.Count} レコード");
-        RefreshGridSizing();
+            if (layout == GridLayout.FieldRows)
+            {
+                RefreshFieldRowsGrid();
+            }
+            else
+            {
+                RefreshRecordRowsGrid();
+            }
+
+            SetStatus($"{fields.Count} 項目 / {records.Count} レコード");
+            RefreshGridSizing();
+        }
+        finally
+        {
+            isRefreshingGrid = false;
+        }
         UpdateHexView();
     }
 
@@ -1346,21 +1361,18 @@ public sealed class MainForm : Form
         var error = GetValidationError(field, value);
         cell.Style.BackColor = error is not null
             ? ErrorBackColor
-            : value.Contains(' ')
-                ? HalfWidthSpaceBackColor
-                : Color.Empty;
+            : Color.Empty;
         cell.ToolTipText = error ?? string.Empty;
     }
 
     private void PaintTextPaddingArea(DataGridViewCellPaintingEventArgs e)
     {
-        if ((e.State & DataGridViewElementStates.Selected) != 0
-            || e.RowIndex < 0
+        if (e.RowIndex < 0
             || e.ColumnIndex < 0
             || e.Graphics is null
             || e.CellStyle is null
             || !TryGetCellField(e.RowIndex, e.ColumnIndex, out var field)
-            || field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText))
+            || field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText))
         {
             return;
         }
@@ -1371,11 +1383,14 @@ public sealed class MainForm : Form
             return;
         }
 
-        var usedLength = field.Type == FieldDataType.HalfWidthText
-            ? value.Length
-            : ShiftJisEncoding.GetByteCount(value);
+        var usedLength = field.Type switch
+        {
+            FieldDataType.FullWidthText => value.Length,
+            FieldDataType.HalfWidthText => value.Length,
+            _ => ShiftJisEncoding.GetByteCount(value)
+        };
         var remainingLength = field.Length - usedLength;
-        if (remainingLength <= 0)
+        if (remainingLength <= 0 && !ContainsVisibleSpace(value))
         {
             return;
         }
@@ -1389,45 +1404,87 @@ public sealed class MainForm : Form
             e.CellBounds.Width - padding.Left - padding.Right - 6,
             e.CellBounds.Height - padding.Top - padding.Bottom - 2);
         var font = e.CellStyle.Font ?? grid.Font;
-        var textWidth = string.IsNullOrEmpty(value)
-            ? 0
-            : TextRenderer.MeasureText(
-                e.Graphics,
-                value,
-                font,
-                Size.Empty,
-                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
-        var remainingWidth = TextRenderer.MeasureText(
-            e.Graphics,
-            new string('0', remainingLength),
-            font,
-            Size.Empty,
-            TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
-
-        var highlightX = Math.Min(textBounds.Left + textWidth, textBounds.Right);
-        var highlightWidth = Math.Min(remainingWidth, textBounds.Right - highlightX);
-        if (highlightWidth > 0)
-        {
-            using var brush = new SolidBrush(HalfWidthSpaceBackColor);
-            e.Graphics.FillRectangle(brush, highlightX, textBounds.Top, highlightWidth, textBounds.Height);
-
-            TextRenderer.DrawText(
-                e.Graphics,
-                new string('･', remainingLength),
-                font,
-                new Rectangle(highlightX, textBounds.Top, textBounds.Right - highlightX, textBounds.Height),
-                Color.FromArgb(150, 130, 40),
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-        }
-
+        var visibleValue = BuildVisibleTextValue(field, value, remainingLength);
+        PaintVisibleSpaceHighlights(e.Graphics, font, textBounds, visibleValue);
         TextRenderer.DrawText(
             e.Graphics,
-            value,
+            visibleValue,
             font,
             textBounds,
             e.CellStyle.ForeColor,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         e.Handled = true;
+    }
+
+    private static void PaintVisibleSpaceHighlights(Graphics graphics, Font font, Rectangle textBounds, string visibleValue)
+    {
+        var runStart = -1;
+        for (var index = 0; index <= visibleValue.Length; index++)
+        {
+            var isSpaceMarker = index < visibleValue.Length && IsVisibleSpaceMarker(visibleValue[index]);
+            if (isSpaceMarker && runStart < 0)
+            {
+                runStart = index;
+            }
+
+            if (runStart < 0)
+            {
+                continue;
+            }
+
+            if (isSpaceMarker)
+            {
+                continue;
+            }
+
+            var beforeText = visibleValue[..runStart];
+            var runText = visibleValue[runStart..index];
+            var runX = textBounds.Left + MeasureTextWidth(graphics, beforeText, font);
+            var runWidth = MeasureTextWidth(graphics, runText, font);
+            var clippedWidth = Math.Min(runWidth, textBounds.Right - runX);
+            if (clippedWidth > 0)
+            {
+                using var brush = new SolidBrush(HalfWidthSpaceBackColor);
+                graphics.FillRectangle(brush, runX, textBounds.Top, clippedWidth, textBounds.Height);
+            }
+
+            runStart = -1;
+        }
+    }
+
+    private static int MeasureTextWidth(Graphics graphics, string text, Font font)
+    {
+        return string.IsNullOrEmpty(text)
+            ? 0
+            : TextRenderer.MeasureText(
+                graphics,
+                text,
+                font,
+                Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
+    }
+
+    private static bool IsVisibleSpaceMarker(char value)
+    {
+        return value is '\uFF65' or '\u25A1';
+    }
+
+    private static bool ContainsVisibleSpace(string value)
+    {
+        return value.Contains(' ') || value.Contains('\u3000');
+    }
+
+    private static string BuildVisibleTextValue(FieldDefinition field, string value, int remainingLength)
+    {
+        var displayValue = value.Replace(' ', '\uFF65').Replace('\u3000', '\u25A1');
+        return remainingLength > 0
+            ? displayValue + new string(VisibleSpaceMarker(field), remainingLength)
+            : displayValue;
+    }
+
+    private static char VisibleSpaceMarker(FieldDefinition field)
+    {
+        return field.Type == FieldDataType.FullWidthText ? '\u25A1' : '\uFF65';
     }
 
     private bool TryGetCellField(int rowIndex, int columnIndex, out FieldDefinition field)
