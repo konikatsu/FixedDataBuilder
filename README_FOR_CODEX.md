@@ -18,19 +18,20 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.18`
+- 現在の最新 Release: `v0.1.19`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.18` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.18 の Release ビルド済み
-- `FixedDataBuilder-v0.1.18.zip` を作成済み
+- `v0.1.19` を GitHub Release 済み
+- `release/FixedDataBuilder.exe` は v0.1.19 の Release ビルド済み
+- `FixedDataBuilder-v0.1.19.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-cobol-sample-v0.1.18.png` を参照
+- README は `docs/screen-image-cobol-sample-v0.1.19.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
+- v0.1.19 で、履歴選択/Enter読み込み改善、半角スペース表示、横表示ルーラ、フォント設定を実装済み
 
 最後に push 済みの重要コミット:
 
@@ -57,8 +58,12 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
+- レコード縦表示時の項目ヘッダーにバイト位置ルーラを表示
 - レコード追加・複製・削除
+- 表とHEX表示のフォント名・サイズ設定と記憶
+- 初期フォントは `MS ゴシック 12pt`
 - 検証エラーセルの薄赤表示
+- 文字項目で半角スペース埋めになる残り領域を薄黄色と `･` で表示
 - 選択項目 HEX 表示
 - N型の未入力・不足分を全角スペースで保存
 - S9の ASCII ゾーン符号保存
@@ -66,6 +71,8 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - Excel出力
 - Excel出力後にブックを開く
 - FixedDataBuilder が出力した Excel の取り込み
+- ファイル履歴リストから選択した定義ファイル・データファイルの読み込み
+- ファイルパス欄で Enter を押したときの定義ファイル・データファイル読み込み
 
 ## 重要な仕様メモ
 
@@ -154,6 +161,9 @@ S9(3) COMP-3  -123 -> 12 3D
 - `FixedDataBuilder-v*.zip`
   - Release アセット用のローカル zip
   - Git 管理対象ではない
+- `%LOCALAPPDATA%\FixedDataBuilder\settings.txt`
+  - フォント名・フォントサイズ設定を保存するユーザー別設定ファイル
+  - 設定がない場合は `MS ゴシック 12pt` を既定値にする
 
 ### 既知の未追跡ファイル
 

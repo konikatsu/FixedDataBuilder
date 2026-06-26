@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Diagnostics;
 
@@ -8,11 +9,16 @@ public sealed class MainForm : Form
     private static readonly Color DefinitionBackColor = Color.FromArgb(226, 242, 226);
     private static readonly Color DefinitionHeaderBackColor = Color.FromArgb(204, 232, 204);
     private static readonly Color ErrorBackColor = Color.FromArgb(255, 225, 225);
+    private static readonly Color HalfWidthSpaceBackColor = Color.FromArgb(255, 250, 205);
     private static readonly Encoding ShiftJisEncoding = Encoding.GetEncoding("shift_jis");
     private static readonly string RecentFilesPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "FixedDataBuilder",
         "recent-files.txt");
+    private static readonly string SettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "FixedDataBuilder",
+        "settings.txt");
 
     private readonly ComboBox definitionPathComboBox = new();
     private readonly ComboBox dataPathComboBox = new();
@@ -32,6 +38,7 @@ public sealed class MainForm : Form
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
     private GridLayout layout = GridLayout.FieldRows;
     private bool isUpdatingPathComboBoxes;
+    private Font? displayFont;
 
     public MainForm(string[]? args = null)
     {
@@ -44,6 +51,8 @@ public sealed class MainForm : Form
         recordRowsButton = CreateButton("表示: レコード縦", (_, _) => ChangeLayout(GridLayout.RecordRows));
 
         LoadRecentFiles();
+        LoadSettings();
+        displayFont ??= CreateDefaultDisplayFont();
 
         Controls.Add(grid);
         Controls.Add(BuildHexPanel());
@@ -53,6 +62,7 @@ public sealed class MainForm : Form
 
         BuildToolStrip();
         BuildGrid();
+        ApplyDisplayFont();
 
         statusLabel.Spring = true;
         statusLabel.TextAlign = ContentAlignment.MiddleLeft;
@@ -84,8 +94,10 @@ public sealed class MainForm : Form
         ConfigureReadOnlyTextBox(separatorModeTextBox);
         RefreshRecentFileItems();
 
-        definitionPathComboBox.SelectionChangeCommitted += (_, _) => LoadDefinitionFromHistory();
-        dataPathComboBox.SelectionChangeCommitted += (_, _) => LoadDataFromHistory();
+        definitionPathComboBox.SelectedIndexChanged += (_, _) => LoadDefinitionFromHistory();
+        dataPathComboBox.SelectedIndexChanged += (_, _) => LoadDataFromHistory();
+        definitionPathComboBox.KeyDown += (_, e) => LoadDefinitionFromEnteredPath(e);
+        dataPathComboBox.KeyDown += (_, e) => LoadDataFromEnteredPath(e);
 
         panel.Controls.Add(CreatePathLabel("定義ファイル"), 0, 0);
         panel.Controls.Add(definitionPathComboBox, 1, 0);
@@ -178,6 +190,7 @@ public sealed class MainForm : Form
         toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(fieldRowsButton);
         toolStrip.Items.Add(recordRowsButton);
+        toolStrip.Items.Add(CreateButton("フォント設定", (_, _) => ChooseDisplayFont()));
         toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(CreateButton("検証", (_, _) => ValidateRecords(showSuccess: true)));
         toolStrip.Items.Add(CreateButton("上書き保存", (_, _) => SaveDataOverwrite()));
@@ -221,6 +234,79 @@ public sealed class MainForm : Form
             }
         };
         grid.SelectionChanged += (_, _) => UpdateHexView();
+        grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
+    }
+
+    private void ChooseDisplayFont()
+    {
+        using var dialog = new FontDialog
+        {
+            Font = displayFont ?? grid.Font,
+            ShowEffects = false
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        displayFont?.Dispose();
+        displayFont = new Font(dialog.Font.FontFamily, dialog.Font.Size, FontStyle.Regular);
+        ApplyDisplayFont();
+        SaveSettings();
+        SetStatus($"フォントを設定しました: {displayFont.Name} {displayFont.SizeInPoints:0.#}pt");
+    }
+
+    private void ApplyDisplayFont()
+    {
+        if (displayFont is null)
+        {
+            return;
+        }
+
+        grid.Font = displayFont;
+        grid.ColumnHeadersDefaultCellStyle.Font = displayFont;
+        grid.DefaultCellStyle.Font = displayFont;
+        hexTextBox.Font = displayFont;
+        RefreshGridSizing();
+    }
+
+    private static Font CreateDefaultDisplayFont()
+    {
+        foreach (var fontName in new[] { "MS Gothic", "ＭＳ ゴシック" })
+        {
+            try
+            {
+                using var fontFamily = new FontFamily(fontName);
+                if (fontFamily.IsStyleAvailable(FontStyle.Regular))
+                {
+                    return new Font(fontFamily, 12f, FontStyle.Regular);
+                }
+            }
+            catch
+            {
+                // Try the next common family name, then fall back to generic monospace.
+            }
+        }
+
+        return new Font(FontFamily.GenericMonospace, 12f, FontStyle.Regular);
+    }
+
+    private void RefreshGridSizing()
+    {
+        if (grid.Columns.Count == 0)
+        {
+            return;
+        }
+
+        grid.ColumnHeadersHeight = layout == GridLayout.RecordRows
+            ? Math.Max(64, (grid.Font.Height * 3) + 16)
+            : Math.Max(28, grid.Font.Height + 12);
+        grid.RowTemplate.Height = Math.Max(22, grid.Font.Height + 8);
+        foreach (DataGridViewRow row in grid.Rows)
+        {
+            row.Height = grid.RowTemplate.Height;
+        }
     }
 
     private void OpenDefinition()
@@ -360,20 +446,48 @@ public sealed class MainForm : Form
 
     private void LoadDefinitionFromHistory()
     {
-        if (isUpdatingPathComboBoxes || string.IsNullOrWhiteSpace(definitionPathComboBox.Text))
+        if (isUpdatingPathComboBoxes)
         {
             return;
         }
 
+        var path = SelectedPath(definitionPathComboBox);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        LoadDefinitionFromPath(path, "履歴から定義ファイルを読み込みました。");
+    }
+
+    private void LoadDefinitionFromEnteredPath(KeyEventArgs e)
+    {
+        if (e.KeyCode != Keys.Enter || isUpdatingPathComboBoxes)
+        {
+            return;
+        }
+
+        e.SuppressKeyPress = true;
+        var path = definitionPathComboBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        LoadDefinitionFromPath(path, "入力された定義ファイルを読み込みました。");
+    }
+
+    private void LoadDefinitionFromPath(string path, string statusMessage)
+    {
         try
         {
-            LoadDefinition(definitionPathComboBox.Text);
+            LoadDefinition(path);
             dataPathComboBox.Text = string.Empty;
             saveDataPath = null;
             records.Clear();
             records.Add(CreateEmptyRecord());
             RefreshGrid();
-            SetStatus("履歴から定義ファイルを読み込みました。");
+            SetStatus(statusMessage);
         }
         catch (Exception ex)
         {
@@ -383,11 +497,39 @@ public sealed class MainForm : Form
 
     private void LoadDataFromHistory()
     {
-        if (isUpdatingPathComboBoxes || string.IsNullOrWhiteSpace(dataPathComboBox.Text))
+        if (isUpdatingPathComboBoxes)
         {
             return;
         }
 
+        var path = SelectedPath(dataPathComboBox);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        LoadDataFromPath(path, "履歴からデータファイルを読み込みました。");
+    }
+
+    private void LoadDataFromEnteredPath(KeyEventArgs e)
+    {
+        if (e.KeyCode != Keys.Enter || isUpdatingPathComboBoxes)
+        {
+            return;
+        }
+
+        e.SuppressKeyPress = true;
+        var path = dataPathComboBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        LoadDataFromPath(path, "入力されたデータファイルを読み込みました。");
+    }
+
+    private void LoadDataFromPath(string path, string statusMessage)
+    {
         if (fields.Count == 0)
         {
             MessageBox.Show(this, "先に定義ファイルを読み込んでください。", "データ読込", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -402,9 +544,9 @@ public sealed class MainForm : Form
                 return;
             }
 
-            LoadData(dataPathComboBox.Text, separatorMode.Value);
+            LoadData(path, separatorMode.Value);
             RefreshGrid();
-            SetStatus("履歴からデータファイルを読み込みました。");
+            SetStatus(statusMessage);
         }
         catch (Exception ex)
         {
@@ -443,6 +585,11 @@ public sealed class MainForm : Form
         }
     }
 
+    private static string SelectedPath(ComboBox comboBox)
+    {
+        return comboBox.SelectedItem?.ToString() ?? comboBox.Text;
+    }
+
     private void AddRecentFile(List<string> target, string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -473,6 +620,49 @@ public sealed class MainForm : Form
             .Select(path => $"D\t{path}")
             .Concat(recentDataFiles.Select(path => $"F\t{path}"));
         File.WriteAllLines(RecentFilesPath, lines, Encoding.UTF8);
+    }
+
+    private void LoadSettings()
+    {
+        if (!File.Exists(SettingsPath))
+        {
+            return;
+        }
+
+        var settings = File.ReadAllLines(SettingsPath, Encoding.UTF8)
+            .Select(line => line.Split('\t', 2))
+            .Where(parts => parts.Length == 2)
+            .ToDictionary(parts => parts[0], parts => parts[1]);
+
+        if (!settings.TryGetValue("FontName", out var fontName)
+            || !settings.TryGetValue("FontSize", out var fontSizeText)
+            || !float.TryParse(fontSizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out var fontSize)
+            || fontSize <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            displayFont = new Font(fontName, fontSize, FontStyle.Regular);
+        }
+        catch
+        {
+            displayFont = null;
+        }
+    }
+
+    private void SaveSettings()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        var lines = displayFont is null
+            ? []
+            : new[]
+            {
+                $"FontName\t{displayFont.Name}",
+                $"FontSize\t{displayFont.SizeInPoints.ToString(CultureInfo.InvariantCulture)}"
+            };
+        File.WriteAllLines(SettingsPath, lines, Encoding.UTF8);
     }
 
     private void RefreshRecentFileItems()
@@ -1052,6 +1242,7 @@ public sealed class MainForm : Form
         }
 
         SetStatus($"{fields.Count} 項目 / {records.Count} レコード");
+        RefreshGridSizing();
         UpdateHexView();
     }
 
@@ -1089,16 +1280,23 @@ public sealed class MainForm : Form
     private void RefreshRecordRowsGrid()
     {
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
-        grid.ColumnHeadersHeight = 46;
+        grid.ColumnHeadersHeight = 64;
         grid.Columns.Add(CreateReadOnlyColumn("Record", "レコード", 90, frozen: true));
         ApplyDefinitionColumnStyle(grid.Columns[0]);
 
+        var byteStart = 1;
         for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
         {
             var field = fields[fieldIndex];
-            var column = CreateEditableColumn($"Field{fieldIndex + 1}", $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}", 170);
+            var byteEnd = byteStart + field.StorageByteLength - 1;
+            var ruler = $"byte {byteStart}-{byteEnd}";
+            var column = CreateEditableColumn(
+                $"Field{fieldIndex + 1}",
+                $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}",
+                170);
             column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
             grid.Columns.Add(column);
+            byteStart = byteEnd + 1;
         }
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
@@ -1146,8 +1344,114 @@ public sealed class MainForm : Form
     private static void ApplyCellValidationStyle(DataGridViewCell cell, FieldDefinition field, string value)
     {
         var error = GetValidationError(field, value);
-        cell.Style.BackColor = error is null ? Color.Empty : ErrorBackColor;
+        cell.Style.BackColor = error is not null
+            ? ErrorBackColor
+            : value.Contains(' ')
+                ? HalfWidthSpaceBackColor
+                : Color.Empty;
         cell.ToolTipText = error ?? string.Empty;
+    }
+
+    private void PaintTextPaddingArea(DataGridViewCellPaintingEventArgs e)
+    {
+        if ((e.State & DataGridViewElementStates.Selected) != 0
+            || e.RowIndex < 0
+            || e.ColumnIndex < 0
+            || e.Graphics is null
+            || e.CellStyle is null
+            || !TryGetCellField(e.RowIndex, e.ColumnIndex, out var field)
+            || field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText))
+        {
+            return;
+        }
+
+        var value = e.FormattedValue?.ToString() ?? string.Empty;
+        if (GetValidationError(field, value) is not null)
+        {
+            return;
+        }
+
+        var usedLength = field.Type == FieldDataType.HalfWidthText
+            ? value.Length
+            : ShiftJisEncoding.GetByteCount(value);
+        var remainingLength = field.Length - usedLength;
+        if (remainingLength <= 0)
+        {
+            return;
+        }
+
+        e.Paint(e.CellBounds, e.PaintParts & ~DataGridViewPaintParts.ContentForeground);
+
+        var padding = e.CellStyle.Padding;
+        var textBounds = new Rectangle(
+            e.CellBounds.Left + padding.Left + 3,
+            e.CellBounds.Top + padding.Top + 1,
+            e.CellBounds.Width - padding.Left - padding.Right - 6,
+            e.CellBounds.Height - padding.Top - padding.Bottom - 2);
+        var font = e.CellStyle.Font ?? grid.Font;
+        var textWidth = string.IsNullOrEmpty(value)
+            ? 0
+            : TextRenderer.MeasureText(
+                e.Graphics,
+                value,
+                font,
+                Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
+        var remainingWidth = TextRenderer.MeasureText(
+            e.Graphics,
+            new string('0', remainingLength),
+            font,
+            Size.Empty,
+            TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
+
+        var highlightX = Math.Min(textBounds.Left + textWidth, textBounds.Right);
+        var highlightWidth = Math.Min(remainingWidth, textBounds.Right - highlightX);
+        if (highlightWidth > 0)
+        {
+            using var brush = new SolidBrush(HalfWidthSpaceBackColor);
+            e.Graphics.FillRectangle(brush, highlightX, textBounds.Top, highlightWidth, textBounds.Height);
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                new string('･', remainingLength),
+                font,
+                new Rectangle(highlightX, textBounds.Top, textBounds.Right - highlightX, textBounds.Height),
+                Color.FromArgb(150, 130, 40),
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        }
+
+        TextRenderer.DrawText(
+            e.Graphics,
+            value,
+            font,
+            textBounds,
+            e.CellStyle.ForeColor,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        e.Handled = true;
+    }
+
+    private bool TryGetCellField(int rowIndex, int columnIndex, out FieldDefinition field)
+    {
+        if (layout == GridLayout.FieldRows)
+        {
+            if (columnIndex >= 2 && rowIndex >= 0 && rowIndex < fields.Count)
+            {
+                field = fields[rowIndex];
+                return true;
+            }
+        }
+        else if (columnIndex >= 1)
+        {
+            var fieldIndex = columnIndex - 1;
+            if (fieldIndex >= 0 && fieldIndex < fields.Count)
+            {
+                field = fields[fieldIndex];
+                return true;
+            }
+        }
+
+        field = null!;
+        return false;
     }
 
     private static string? GetValidationError(FieldDefinition field, string value)
