@@ -6,15 +6,15 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-menu-v0.1.28.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-occurs-v0.1.29.png)
 
-項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示し、最近使ったファイルをそれぞれ直近 20 件まで履歴から選べます。
+項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
 ## ダウンロード
 
 最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
 
-zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv`、`samples/definition.cbl`、`samples/definition-english.cbl`、`samples/sample-records.csv`、`samples/sample.dat`、`samples/sample-shiftjis.dat`、`samples/sample-copybook-*.dat` も同梱しています。
+zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 
 ## 定義書 CSV / COBOL コピー句
 
@@ -49,7 +49,8 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - `PIC 9(n)` / `PIC S9(n)`
 - `PIC 9(n)V9(m)` / `PIC S9(n)V9(m)`
 - `COMP-3` / `PACKED-DECIMAL`
-- 同一 PIC 行の `OCCURS n TIMES`
+- 同一 PIC 行の基本項目 `OCCURS n TIMES`
+- 集団項目に指定された `OCCURS` は未対応です
 - `REDEFINES` は物理レコード長には加算せず、保存時は重複領域として書き出しません。画面の表示対象からは除外します
 - 66 レベル、88 レベルは固定長データ項目ではないため読み飛ばします
 - 英字の COBOL 項目名は内蔵辞書で可能な範囲だけ日本語表示名に変換します
@@ -119,11 +120,11 @@ S9(3) COMP-3  -123 -> 12 3D
 
 ## サンプル
 
-サンプルデータは 2 種類あります。
+サンプルは、定義ファイルとデータファイルの先頭名をなるべくそろえています。
 
 ### CSV 定義サンプル
 
-`samples/definition.csv` と `samples/sample.dat`、または同じ内容の `samples/sample-shiftjis.dat` を読み込むと、以下の 3 レコードを固定長データとして確認できます。従来のサンプルと同じ Shift_JIS 前提のデータです。
+まずは `samples/basic-definition.csv` と `samples/basic-data-sjis-crlf.dat` を読み込んでください。Shift_JIS 前提、改行ありの固定長データです。
 
 ```csv
 ジナン,JINAN,7,6.7,100
@@ -131,28 +132,45 @@ S9(3) COMP-3  -123 -> 12 3D
 オジュン,OJUN,18,45.1,-9999
 ```
 
-攻撃力は `S9(9) COMP-3` の packed decimal として `sample.dat` に格納しています。
+攻撃力は `S9(9) COMP-3` の packed decimal としてデータファイルに格納しています。旧名の `definition.csv`、`sample.dat`、`sample-shiftjis.dat` も互換用に残しています。
 
 ### COBOL コピー句サンプル
 
-`samples/definition-english.cbl` と `samples/sample-copybook-*.dat` は、コピー句読み込み確認用のサンプルです。
+コピー句サンプルは、定義ファイル名とデータファイル名の先頭をそろえています。データファイル名の末尾は読み込み条件を表します。
 
 - コピー句ファイルは UTF-8 です
 - データファイル名の `crlf` は `改行あり (CRLF/LF)`、`none` は `改行なし` を表します
-- データファイル名の `nutf8` / `nutf16` / `nutf32` / `nsjis` は、型N文字コードの選択値を表します
+- データファイル名の `n-utf8` / `n-utf16le` / `n-utf32le` / `n-sjis` は、型N文字コードの選択値を表します
 - 以下の表にない組み合わせは、エラーまたは文字化けになります
 
-| データファイル | 定義ファイル | 改行区切り | 型N文字コード |
-| --- | --- | --- | --- |
-| `sample-copybook-utf16.dat` | `definition-english.cbl` | 改行あり (CRLF/LF) | UTF-16LE |
-| `sample-copybook-crlf-utf8-nutf16.dat` | `definition-english.cbl` | 改行あり (CRLF/LF) | UTF-16LE |
-| `sample-copybook-crlf-utf8-nutf8.dat` | `definition-english.cbl` | 改行あり (CRLF/LF) | UTF-8 |
-| `sample-copybook-none-sjis-nsjis.dat` | `definition-english.cbl` | 改行なし | Shift_JIS |
-| `sample-copybook-none-utf8-nutf8.dat` | `definition-english.cbl` | 改行なし | UTF-8 |
-| `sample-copybook-none-utf8-nutf16.dat` | `definition-english.cbl` | 改行なし | UTF-16LE |
-| `sample-copybook-none-utf8-nutf32.dat` | `definition-english.cbl` | 改行なし | UTF-32LE |
+| 用途 | 定義ファイル | データファイル | 改行区切り | 型N文字コード |
+| --- | --- | --- | --- | --- |
+| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
+| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
+| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-sjis-n-sjis.dat` | 改行なし | Shift_JIS |
+| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf8.dat` | 改行なし | UTF-8 |
+| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf16le.dat` | 改行なし | UTF-16LE |
+| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf32le.dat` | 改行なし | UTF-32LE |
+| 基本項目OCCURS | `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
 
-このサンプルでは、顧客名、英名、年齢、金額の 3 レコードを確認できます。金額は `S9(9) COMP-3` の packed decimal で、3 レコード目は `-9999` です。
+基本コピー句サンプルでは、顧客名、英名、年齢、金額の 3 レコードを確認できます。金額は `S9(9) COMP-3` の packed decimal で、3 レコード目は `-9999` です。
+
+基本項目OCCURSサンプルでは、以下のように PIC 付き項目に直接指定された `OCCURS` を展開します。
+
+```cobol
+05 ITEM-CODE  PIC X(4) OCCURS 3 TIMES.
+05 ITEM-COUNT PIC 9(3) OCCURS 3 TIMES.
+```
+
+集団項目に指定された `OCCURS` は現時点では未対応です。
+
+```cobol
+05 ITEM-GROUP OCCURS 3 TIMES.
+   10 ITEM-CODE  PIC X(4).
+   10 ITEM-COUNT PIC 9(3).
+```
+
+旧名の `definition-english.cbl`、`sample-copybook-*.dat` も互換用に残しています。
 
 ## ビルド済み exe
 

@@ -18,17 +18,17 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.28`
+- 現在の最新 Release: `v0.1.29`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.28` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.28 の Release ビルド済み
-- `FixedDataBuilder-v0.1.28.zip` を作成済み
+- `v0.1.29` を GitHub Release 済み
+- `release/FixedDataBuilder.exe` は v0.1.29 の Release ビルド済み
+- `FixedDataBuilder-v0.1.29.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-menu-v0.1.28.png` と `docs/screen-image-data-load-options-v0.1.28.png` を参照
+- README は `docs/screen-image-occurs-v0.1.29.png` と `docs/screen-image-data-load-options-v0.1.28.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
@@ -40,7 +40,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.26 で、REDEFINES 項目を画面表示・項目表示選択の対象から除外する。
 - v0.1.27 で、データ読み込み時の「改行区切り」と「型N文字コード」を1つの `データ読込条件` ダイアログに統合し、選択条件で先頭レコードを試し読みするプレビュー欄を追加する。既知のコピー句サンプルは対応条件を初期選択する。
 - v0.1.28 で、上部の操作ボタン群を一般的なWindowsアプリ寄りの `ファイル` / `編集` / `定義` / `表示` / `ツール` メニューへ整理する。`データ読込条件` ダイアログはリサイズ可能にし、プレビューを表形式にする。README スクリーンショットも v0.1.28 に更新する。
-- 次回対応メモ: `サンプル条件` 欄は利用者に分かりにくいため削除する。現時点では実装変更しない。削除時は、画面上部の `サンプル条件` 行、関連する `sampleHintTextBox` / `UpdateSampleHintText` / `EnsureKnownSampleSelection` 周辺の扱い、README の説明・スクリーンショットもあわせて見直す。
+- v0.1.29 で、画面上部の `サンプル条件` 行を削除し、定義/データのファイル欄を読み取り専用表示にする。最近使ったファイルは `ファイル` メニュー配下の `最近使った定義ファイル` / `最近使ったデータファイル` へ移動する。サンプル名は `basic-*` / `copybook-basic-*` / `copybook-occurs-*` の分かりやすい別名を追加し、基本項目OCCURSサンプルを追加する。集団項目OCCURSは未対応としてREADMEに明記する。
 
 最後に push 済みの重要コミット:
 
@@ -68,7 +68,8 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
   - `PIC 9(n)` / `PIC S9(n)`
   - `PIC 9(n)V9(m)` / `PIC S9(n)V9(m)`
   - `COMP-3` / `PACKED-DECIMAL`
-  - 同一 PIC 行の `OCCURS n TIMES`
+  - 同一 PIC 行の基本項目 `OCCURS n TIMES`
+  - 集団項目 `OCCURS` は未対応
   - `REDEFINES` は物理長に加算せず保存時は書き出さない。画面表示・項目表示選択の対象からは除外する
   - 66 レベル、88 レベルは読み飛ばし
   - コピー句ファイルは UTF-8、固定形式の 7 桁目ルールあり
@@ -76,7 +77,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - 固定長データ読み込み
 - 読み込み時の改行あり / 改行なしと型N文字コード選択。`データ読込条件` ダイアログに統合済み
 - `データ読込条件` ダイアログで、選択中の条件による先頭レコードのプレビューを表示
-- コピー句サンプルの対応条件表示。表にない組み合わせはエラーまたは文字化けすることを画面上部とREADMEに明示
+- コピー句サンプルの対応条件表示。表にない組み合わせはエラーまたは文字化けすることをREADMEに明示
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
@@ -94,8 +95,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - Excel出力
 - Excel出力後にブックを開く
 - FixedDataBuilder が出力した Excel の取り込み
-- ファイル履歴リストから選択した定義ファイル・データファイルの読み込み
-- ファイルパス欄で Enter を押したときの定義ファイル・データファイル読み込み
+- `ファイル` メニューの最近使った定義ファイル・データファイルから読み込み
 
 ## 重要な仕様メモ
 
@@ -129,17 +129,19 @@ S9(3) COMP-3  -123 -> 12 3D
 
 ### コピー句サンプル
 
-すべて `samples/definition-english.cbl` 用です。以下の組み合わせ以外はエラーまたは文字化けします。
+READMEでは新しい分かりやすい名前を主に説明します。旧名の `definition-english.cbl` / `sample-copybook-*.dat` は互換用に残します。以下の組み合わせ以外はエラーまたは文字化けします。
 
-| データファイル | 改行区切り | 型N文字コード |
-| --- | --- | --- |
-| `sample-copybook-utf16.dat` | 改行あり (CRLF/LF) | UTF-16LE |
-| `sample-copybook-crlf-utf8-nutf16.dat` | 改行あり (CRLF/LF) | UTF-16LE |
-| `sample-copybook-crlf-utf8-nutf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
-| `sample-copybook-none-sjis-nsjis.dat` | 改行なし | Shift_JIS |
-| `sample-copybook-none-utf8-nutf8.dat` | 改行なし | UTF-8 |
-| `sample-copybook-none-utf8-nutf16.dat` | 改行なし | UTF-16LE |
-| `sample-copybook-none-utf8-nutf32.dat` | 改行なし | UTF-32LE |
+| 定義ファイル | データファイル | 改行区切り | 型N文字コード |
+| --- | --- | --- | --- |
+| `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
+| `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
+| `copybook-basic-definition.cbl` | `copybook-basic-data-none-sjis-n-sjis.dat` | 改行なし | Shift_JIS |
+| `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf8.dat` | 改行なし | UTF-8 |
+| `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf16le.dat` | 改行なし | UTF-16LE |
+| `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf32le.dat` | 改行なし | UTF-32LE |
+| `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
+
+OCCURSはPIC付き基本項目の同一行指定だけ対応します。集団項目OCCURSは未対応です。
 
 ### Excel取込
 
@@ -179,28 +181,22 @@ S9(3) COMP-3  -123 -> 12 3D
   - 外部ライブラリなしの `.xlsx` 出力
 - `FixedDataBuilder/ExcelImporter.cs`
   - FixedDataBuilder 出力 `.xlsx` の取り込み
-- `samples/definition.csv`
-  - サンプル定義
-- `samples/definition.cbl`
-  - サンプル COBOL コピー句
-- `samples/sample.dat`
-  - サンプル固定長データ
-- `samples/sample-shiftjis.dat`
-  - コピー句追加対応前と同じ内容の Shift_JIS サンプル固定長データ
-- `samples/sample-copybook-utf16.dat`
-  - `definition-english.cbl` 用のコピー句サンプル固定長データ。N項目は UTF-16LE、その他は UTF-8
-- `samples/sample-copybook-crlf-utf8-nutf16.dat`
-  - `sample-copybook-utf16.dat` と同内容の分かりやすい名前のコピー
-- `samples/sample-copybook-crlf-utf8-nutf8.dat`
-  - 改行あり、型N UTF-8
-- `samples/sample-copybook-none-sjis-nsjis.dat`
-  - 改行なし、型N Shift_JIS
-- `samples/sample-copybook-none-utf8-nutf8.dat`
-  - 改行なし、型N UTF-8
-- `samples/sample-copybook-none-utf8-nutf16.dat`
-  - 改行なし、型N UTF-16LE
-- `samples/sample-copybook-none-utf8-nutf32.dat`
-  - 改行なし、型N UTF-32LE
+- `samples/basic-definition.csv`
+  - CSV定義の基本サンプル
+- `samples/basic-data-sjis-crlf.dat`
+  - CSV定義用のShift_JIS・改行あり固定長データ
+- `samples/basic-records.csv`
+  - 固定長データ作成元の見やすいCSV
+- `samples/copybook-basic-definition.cbl`
+  - コピー句基本サンプル
+- `samples/copybook-basic-data-*.dat`
+  - コピー句基本サンプル用の固定長データ。ファイル名で改行有無と型N文字コードを表す
+- `samples/copybook-occurs-definition.cbl`
+  - PIC付き基本項目OCCURSのサンプル
+- `samples/copybook-occurs-data-crlf-utf8-n-utf8.dat`
+  - OCCURSサンプル用のUTF-8・改行あり固定長データ
+- `samples/definition.csv` / `samples/sample.dat` / `samples/sample-copybook-*.dat`
+  - 旧名互換用。READMEでは新しい名前を主に案内する
 - `docs/release-checklist.md`
   - README画像やRelease漏れ防止のチェックリスト
 - `docs/development-history.md`

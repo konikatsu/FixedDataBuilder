@@ -21,6 +21,13 @@ public sealed class MainForm : Form
         "settings.txt");
     private static readonly SamplePattern[] CopybookSamplePatterns =
     [
+        new("copybook-basic-data-crlf-utf8-n-utf16le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
+        new("copybook-basic-data-crlf-utf8-n-utf8.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
+        new("copybook-basic-data-none-sjis-n-sjis.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.ShiftJis),
+        new("copybook-basic-data-none-utf8-n-utf8.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf8),
+        new("copybook-basic-data-none-utf8-n-utf16le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf16),
+        new("copybook-basic-data-none-utf8-n-utf32le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf32),
+        new("copybook-occurs-data-crlf-utf8-n-utf8.dat", "copybook-occurs-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
         new("sample-copybook-utf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
         new("sample-copybook-crlf-utf8-nutf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
         new("sample-copybook-crlf-utf8-nutf8.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
@@ -30,13 +37,14 @@ public sealed class MainForm : Form
         new("sample-copybook-none-utf8-nutf32.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf32)
     ];
 
-    private readonly ComboBox definitionPathComboBox = new();
-    private readonly ComboBox dataPathComboBox = new();
+    private readonly TextBox definitionPathTextBox = new();
+    private readonly TextBox dataPathTextBox = new();
     private readonly TextBox separatorModeTextBox = new();
-    private readonly TextBox sampleHintTextBox = new();
     private readonly TextBox hexTextBox = new();
     private readonly DataGridView grid = new();
     private readonly MenuStrip menuStrip = new();
+    private readonly ToolStripMenuItem recentDefinitionFilesMenu = new("最近使った定義ファイル");
+    private readonly ToolStripMenuItem recentDataFilesMenu = new("最近使ったデータファイル");
     private readonly StatusStrip statusStrip = new();
     private readonly ToolStripStatusLabel statusLabel = new();
     private readonly ToolStripMenuItem fieldRowsButton;
@@ -52,7 +60,6 @@ public sealed class MainForm : Form
     private NationalTextEncoding currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
     private bool definitionLoadedFromCopybook;
     private GridLayout layout = GridLayout.FieldRows;
-    private bool isUpdatingPathComboBoxes;
     private bool isRefreshingGrid;
     private Font? displayFont;
 
@@ -95,41 +102,26 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            ColumnCount = 3,
-            RowCount = 4,
+            ColumnCount = 2,
+            RowCount = 3,
             Padding = new Padding(8, 6, 8, 4)
         };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72));
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
 
-        ConfigurePathComboBox(definitionPathComboBox);
-        ConfigurePathComboBox(dataPathComboBox);
+        ConfigureReadOnlyTextBox(definitionPathTextBox);
+        ConfigureReadOnlyTextBox(dataPathTextBox);
         ConfigureReadOnlyTextBox(separatorModeTextBox);
-        ConfigureReadOnlyTextBox(sampleHintTextBox);
-        RefreshRecentFileItems();
-
-        definitionPathComboBox.SelectionChangeCommitted += (_, _) => LoadDefinitionFromHistory();
-        dataPathComboBox.SelectionChangeCommitted += (_, _) => LoadDataFromHistory();
-        definitionPathComboBox.KeyDown += (_, e) => LoadDefinitionFromEnteredPath(e);
-        dataPathComboBox.KeyDown += (_, e) => LoadDataFromEnteredPath(e);
 
         panel.Controls.Add(CreatePathLabel("定義ファイル"), 0, 0);
-        panel.Controls.Add(definitionPathComboBox, 1, 0);
-        panel.Controls.Add(CreatePathButton("選択", (_, _) => OpenDefinition()), 2, 0);
+        panel.Controls.Add(definitionPathTextBox, 1, 0);
         panel.Controls.Add(CreatePathLabel("データファイル"), 0, 1);
-        panel.Controls.Add(dataPathComboBox, 1, 1);
-        panel.Controls.Add(CreatePathButton("選択", (_, _) => OpenData()), 2, 1);
+        panel.Controls.Add(dataPathTextBox, 1, 1);
         panel.Controls.Add(CreatePathLabel("レコード区切り"), 0, 2);
         panel.Controls.Add(separatorModeTextBox, 1, 2);
-        panel.SetColumnSpan(separatorModeTextBox, 2);
-        panel.Controls.Add(CreatePathLabel("サンプル条件"), 0, 3);
-        panel.Controls.Add(sampleHintTextBox, 1, 3);
-        panel.SetColumnSpan(sampleHintTextBox, 2);
         return panel;
     }
 
@@ -172,32 +164,11 @@ public sealed class MainForm : Form
         };
     }
 
-    private static Button CreatePathButton(string text, EventHandler onClick)
-    {
-        var button = new Button
-        {
-            Text = text,
-            Dock = DockStyle.Fill,
-            Margin = new Padding(6, 1, 0, 3)
-        };
-        button.Click += onClick;
-        return button;
-    }
-
     private static void ConfigureReadOnlyTextBox(TextBox textBox)
     {
         textBox.Dock = DockStyle.Fill;
         textBox.ReadOnly = true;
         textBox.Margin = new Padding(0, 1, 0, 3);
-    }
-
-    private static void ConfigurePathComboBox(ComboBox comboBox)
-    {
-        comboBox.Dock = DockStyle.Fill;
-        comboBox.DropDownStyle = ComboBoxStyle.DropDown;
-        comboBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-        comboBox.AutoCompleteSource = AutoCompleteSource.ListItems;
-        comboBox.Margin = new Padding(0, 1, 0, 3);
     }
 
     private void BuildMenuStrip()
@@ -206,6 +177,9 @@ public sealed class MainForm : Form
         menuStrip.Items.Add(CreateMenu("ファイル",
             CreateMenuItem("定義を開く...", (_, _) => OpenDefinition()),
             CreateMenuItem("データを開く...", (_, _) => OpenData()),
+            new ToolStripSeparator(),
+            recentDefinitionFilesMenu,
+            recentDataFilesMenu,
             new ToolStripSeparator(),
             CreateMenuItem("上書き保存", (_, _) => SaveDataOverwrite()),
             CreateMenuItem("名前を付けて保存...", (_, _) => SaveDataAs()),
@@ -229,6 +203,7 @@ public sealed class MainForm : Form
             CreateMenuItem("フォント設定...", (_, _) => ChooseDisplayFont())));
         menuStrip.Items.Add(CreateMenu("ツール",
             CreateMenuItem("検証", (_, _) => ValidateRecords(showSuccess: true))));
+        RefreshRecentFileItems();
     }
 
     private static ToolStripMenuItem CreateMenu(string text, params ToolStripItem[] items)
@@ -463,7 +438,7 @@ public sealed class MainForm : Form
         try
         {
             LoadDefinition(dialog.FileName);
-            dataPathComboBox.Text = string.Empty;
+            ClearPathText(dataPathTextBox);
             saveDataPath = null;
             records.Clear();
             records.Add(CreateEmptyRecord());
@@ -561,10 +536,9 @@ public sealed class MainForm : Form
             ? CopybookDefinitionReader.Read(path)
             : DefinitionCsvReader.Read(path));
         hiddenFieldIndexes.Clear();
-        SetPathText(definitionPathComboBox, path);
+        SetPathText(definitionPathTextBox, path);
         AddRecentFile(recentDefinitionFiles, path);
         UpdateSeparatorModeText();
-        UpdateSampleHintText();
     }
 
     private static bool IsCopybookPath(string path)
@@ -585,10 +559,9 @@ public sealed class MainForm : Form
         NormalizeRecords();
         currentSeparatorMode = separatorMode;
         saveDataPath = path;
-        SetPathText(dataPathComboBox, path);
+        SetPathText(dataPathTextBox, path);
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
-        UpdateSampleHintText();
     }
 
     private void ApplyNationalTextEncoding(NationalTextEncoding nationalTextEncoding)
@@ -602,7 +575,6 @@ public sealed class MainForm : Form
                 fields[index] = fields[index] with { NationalByteWidth = byteWidth };
             }
         }
-        UpdateSampleHintText();
     }
 
     private void EnsureKnownSampleSelection(string dataPath, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
@@ -641,52 +613,11 @@ public sealed class MainForm : Form
             $"必要な選択: {string.Join(" / ", required)}");
     }
 
-    private void SetPathText(ComboBox comboBox, string path)
+    private static void SetPathText(TextBox textBox, string path)
     {
-        isUpdatingPathComboBoxes = true;
-        try
-        {
-            comboBox.Text = path;
-            comboBox.SelectionStart = comboBox.Text.Length;
-            comboBox.SelectionLength = 0;
-        }
-        finally
-        {
-            isUpdatingPathComboBoxes = false;
-        }
-    }
-
-    private void LoadDefinitionFromHistory()
-    {
-        if (isUpdatingPathComboBoxes)
-        {
-            return;
-        }
-
-        var path = definitionPathComboBox.SelectedItem?.ToString();
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return;
-        }
-
-        LoadDefinitionFromPath(path, "履歴から定義ファイルを読み込みました。");
-    }
-
-    private void LoadDefinitionFromEnteredPath(KeyEventArgs e)
-    {
-        if (e.KeyCode != Keys.Enter || isUpdatingPathComboBoxes)
-        {
-            return;
-        }
-
-        e.SuppressKeyPress = true;
-        var path = definitionPathComboBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return;
-        }
-
-        LoadDefinitionFromPath(path, "入力された定義ファイルを読み込みました。");
+        textBox.Text = path;
+        textBox.SelectionStart = textBox.TextLength;
+        textBox.SelectionLength = 0;
     }
 
     private void LoadDefinitionFromPath(string path, string statusMessage)
@@ -694,7 +625,7 @@ public sealed class MainForm : Form
         try
         {
             LoadDefinition(path);
-            dataPathComboBox.Text = string.Empty;
+            ClearPathText(dataPathTextBox);
             saveDataPath = null;
             records.Clear();
             records.Add(CreateEmptyRecord());
@@ -705,39 +636,6 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(this, ex.Message, "定義読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-    }
-
-    private void LoadDataFromHistory()
-    {
-        if (isUpdatingPathComboBoxes)
-        {
-            return;
-        }
-
-        var path = dataPathComboBox.SelectedItem?.ToString();
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return;
-        }
-
-        LoadDataFromPath(path, "履歴からデータファイルを読み込みました。");
-    }
-
-    private void LoadDataFromEnteredPath(KeyEventArgs e)
-    {
-        if (e.KeyCode != Keys.Enter || isUpdatingPathComboBoxes)
-        {
-            return;
-        }
-
-        e.SuppressKeyPress = true;
-        var path = dataPathComboBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return;
-        }
-
-        LoadDataFromPath(path, "入力されたデータファイルを読み込みました。");
     }
 
     private void LoadDataFromPath(string path, string statusMessage)
@@ -874,22 +772,42 @@ public sealed class MainForm : Form
 
     private void RefreshRecentFileItems()
     {
-        isUpdatingPathComboBoxes = true;
-        try
+        PopulateRecentMenu(
+            recentDefinitionFilesMenu,
+            recentDefinitionFiles,
+            path => LoadDefinitionFromPath(path, "履歴から定義ファイルを読み込みました。"));
+        PopulateRecentMenu(
+            recentDataFilesMenu,
+            recentDataFiles,
+            path => LoadDataFromPath(path, "履歴からデータファイルを読み込みました。"));
+    }
+
+    private static void PopulateRecentMenu(ToolStripMenuItem menu, IReadOnlyList<string> files, Action<string> onClick)
+    {
+        menu.DropDownItems.Clear();
+        if (files.Count == 0)
         {
-            var definitionText = definitionPathComboBox.Text;
-            var dataText = dataPathComboBox.Text;
-            definitionPathComboBox.Items.Clear();
-            dataPathComboBox.Items.Clear();
-            definitionPathComboBox.Items.AddRange(recentDefinitionFiles.Cast<object>().ToArray());
-            dataPathComboBox.Items.AddRange(recentDataFiles.Cast<object>().ToArray());
-            definitionPathComboBox.Text = definitionText;
-            dataPathComboBox.Text = dataText;
+            menu.DropDownItems.Add(new ToolStripMenuItem("履歴なし") { Enabled = false });
+            return;
         }
-        finally
+
+        for (var i = 0; i < files.Count; i++)
         {
-            isUpdatingPathComboBoxes = false;
+            var path = files[i];
+            var item = new ToolStripMenuItem($"{i + 1}. {path}") { ToolTipText = path };
+            item.Click += (_, _) => onClick(path);
+            menu.DropDownItems.Add(item);
+
+            if (i == 8)
+            {
+                menu.DropDownItems.Add(new ToolStripSeparator());
+            }
         }
+    }
+
+    private static void ClearPathText(TextBox textBox)
+    {
+        textBox.Clear();
     }
 
     private static string? GetOptionValue(string[] args, string optionName)
@@ -1211,7 +1129,7 @@ public sealed class MainForm : Form
         try
         {
             LoadDefinition(form.SavedPath);
-            dataPathComboBox.Text = string.Empty;
+            ClearPathText(dataPathTextBox);
             saveDataPath = null;
             records.Clear();
             records.Add(CreateEmptyRecord());
@@ -1345,7 +1263,7 @@ public sealed class MainForm : Form
         {
             FixedLengthDataWriter.Write(dialog.FileName, fields, records, currentSeparatorMode, currentDataEncodingProfile, currentNationalTextEncoding);
             saveDataPath = dialog.FileName;
-            SetPathText(dataPathComboBox, dialog.FileName);
+            SetPathText(dataPathTextBox, dialog.FileName);
             AddRecentFile(recentDataFiles, dialog.FileName);
             SetStatus($"保存しました: {Path.GetFileName(dialog.FileName)}");
         }
@@ -1416,8 +1334,8 @@ public sealed class MainForm : Form
             records.Clear();
             records.AddRange(imported.Records.Select(record => record.ToList()));
             saveDataPath = null;
-            SetPathText(definitionPathComboBox, $"(Excel) {dialog.FileName}");
-            SetPathText(dataPathComboBox, dialog.FileName);
+            SetPathText(definitionPathTextBox, $"(Excel) {dialog.FileName}");
+            SetPathText(dataPathTextBox, dialog.FileName);
             layout = imported.LayoutName == "レコード縦" ? GridLayout.RecordRows : GridLayout.FieldRows;
             NormalizeRecords();
             RefreshGrid();
@@ -2075,26 +1993,16 @@ public sealed class MainForm : Form
             ? "改行なし"
             : "改行あり (CRLF/LF)";
         separatorModeTextBox.Text = $"{separatorText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
-        UpdateSampleHintText();
-    }
-
-    private void UpdateSampleHintText()
-    {
-        var samplePattern = FindCopybookSamplePattern(GetCurrentDataPath());
-        sampleHintTextBox.Text = samplePattern is null
-            ? "コピー句サンプルは、ファイル名に合う定義・改行・型N文字コードで読み込んでください。対象外はエラーまたは文字化けします。"
-            : $"{samplePattern.FileName}: {samplePattern.DefinitionFileName} + {FormatSeparatorMode(samplePattern.SeparatorMode)} + 型N={NationalTextEncodingHelper.DisplayName(samplePattern.NationalTextEncoding)} 用 / 対象外はエラーまたは文字化けします。";
-        sampleHintTextBox.SelectionStart = sampleHintTextBox.TextLength;
     }
 
     private string? GetCurrentDefinitionPath()
     {
-        return definitionPathComboBox.Text;
+        return definitionPathTextBox.Text;
     }
 
     private string? GetCurrentDataPath()
     {
-        return dataPathComboBox.Text;
+        return dataPathTextBox.Text;
     }
 
     private static SamplePattern? FindCopybookSamplePattern(string? path)
