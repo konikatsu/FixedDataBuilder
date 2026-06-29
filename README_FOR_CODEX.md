@@ -18,16 +18,15 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.27` 予定（データ読込条件ダイアログ統合のRelease作成中）
+- 現在の最新 Release: `v0.1.27`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.26` を GitHub Release 済み
-- 次の作業対象は `v0.1.27`: データ読み込み時の改行区切りと型N文字コード選択を1つの `データ読込条件` ダイアログに統合し、プレビュー欄を追加する
+- `v0.1.27` を GitHub Release 済み
 - `release/FixedDataBuilder.exe` は v0.1.27 の Release ビルド済み
-- `FixedDataBuilder-v0.1.27.zip` を作成する
+- `FixedDataBuilder-v0.1.27.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
 - README は `docs/screen-image-redefines-hidden-v0.1.26.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
