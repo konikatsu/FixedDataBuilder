@@ -19,3 +19,26 @@ v0.1.10 で `Excel出力` ボタンを追加したとき、Excel 出力結果の
 4. `git diff --cached --stat` で、README 参照先画像が staged に含まれていることを確認する。
 5. push 後に `git status --short --branch` で `main...origin/main` が同期済みであることを確認する。
 6. GitHub の README は画像キャッシュが残ることがあるため、必要なら画像 URL に直接アクセスして最新 commit の画像を確認する。
+
+## GitHub Releases の整理
+
+GitHub Releases は、原則として最新 3 バージョンだけを残します。
+
+目的:
+
+- 利用者が古い配布物で迷わないようにする。
+- Release アセットの不要な蓄積を避ける。
+
+運用:
+
+1. 新しい Release を作成したあと、`gh release list --repo konikatsu/FixedDataBuilder --limit 20` で一覧を確認する。
+2. 最新 3 バージョンを残す。
+3. 4つ前より古い GitHub Release は削除する。
+4. 削除対象は GitHub Release 本体。Git タグは原則として削除しない。
+5. 削除後、再度 `gh release list --repo konikatsu/FixedDataBuilder --limit 20` で残っている Release を確認する。
+
+例:
+
+```powershell
+gh release delete v0.1.xx --repo konikatsu/FixedDataBuilder --yes
+```

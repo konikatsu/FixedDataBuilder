@@ -320,6 +320,7 @@ UI変更がある場合:
 7. commit / push
 8. `gh release create vX.Y.Z FixedDataBuilder-vX.Y.Z.zip ...`
 9. `gh release view vX.Y.Z --repo konikatsu/FixedDataBuilder --json tagName,url,assets`
+10. `gh release list --repo konikatsu/FixedDataBuilder --limit 20` でRelease一覧を確認し、最新3バージョンだけ残す。4つ前より古いGitHub Releaseは削除する。Gitタグは原則削除しない
 
 ## 既知の失敗・注意点
 
