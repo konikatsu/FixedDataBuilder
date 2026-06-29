@@ -18,20 +18,23 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.20`
+- 現在の最新 Release: `v0.1.23`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.20` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.20 の Release ビルド済み
-- `FixedDataBuilder-v0.1.20.zip` を作成済み
+- `v0.1.23` を GitHub Release 予定
+- `release/FixedDataBuilder.exe` は v0.1.23 の Release ビルド済み
+- `FixedDataBuilder-v0.1.23.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
 - README は `docs/screen-image-cobol-sample-v0.1.20.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
+- v0.1.21 で、COBOL コピー句（`.cbl` / `.cpy`）読み込みの初期対応を追加済み。PIC 句から既存の `FieldDefinition` に変換する。
+- v0.1.22 で、コピー句 UTF-8/固定形式前提、英字項目名の日本語変換、REDEFINES 表示、`PIC XXXXXX` / `PIC 999V99`、コピー句由来データの UTF-8 + N 項目 UTF-16LE/UTF-32LE 混在読み込み推定を追加。
+- v0.1.23 で、`項目表示` ボタンからグリッドに表示する項目を選択できるようにした。非表示項目も内部レコードには保持し、保存時のレコード構造から除外しない。
 
 最後に push 済みの重要コミット:
 
@@ -53,11 +56,23 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
   - `S9(nVm)`
   - `9(n) COMP-3`
   - `S9(n) COMP-3`
+- COBOL コピー句（`.cbl` / `.cpy`）読み込み
+  - `PIC X(n)` / `PIC N(n)`
+  - `PIC XXXXXX` / `PIC 999V99`
+  - `PIC 9(n)` / `PIC S9(n)`
+  - `PIC 9(n)V9(m)` / `PIC S9(n)V9(m)`
+  - `COMP-3` / `PACKED-DECIMAL`
+  - 同一 PIC 行の `OCCURS n TIMES`
+  - `REDEFINES` は表示。ただし物理長に加算せず保存時は書き出さない
+  - 66 レベル、88 レベルは読み飛ばし
+  - コピー句ファイルは UTF-8、固定形式の 7 桁目ルールあり
+  - コピー句由来のデータは X/9/S9/COMP-3 を UTF-8、N 項目を UTF-16LE/UTF-32LE として項目単位で推定
 - 固定長データ読み込み
 - 読み込み時の改行あり / 改行なし選択
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
+- 表示項目の選択
 - レコード縦表示時の項目ヘッダーにバイト位置ルーラを表示
 - レコード追加・複製・削除
 - 表とHEX表示のフォント名・サイズ設定と記憶
@@ -121,6 +136,10 @@ S9(3) COMP-3  -123 -> 12 3D
   - 型選択、小数桁制御、定義プレビュー
 - `FixedDataBuilder/DefinitionCsvReader.cs`
   - 定義 CSV と COBOL 風定義の読み込み
+- `FixedDataBuilder/CopybookDefinitionReader.cs`
+  - COBOL コピー句 `.cbl` / `.cpy` の PIC 句読み込み
+- `FixedDataBuilder/NationalTextByteWidthDetector.cs`
+  - コピー句由来データ読み込み時に N 項目の UTF-16LE/UTF-32LE 幅をレコード長から推定
 - `FixedDataBuilder/DefinitionCsvWriter.cs`
   - 定義 CSV 書き出し
 - `FixedDataBuilder/FixedLengthDataReader.cs`
@@ -139,6 +158,8 @@ S9(3) COMP-3  -123 -> 12 3D
   - FixedDataBuilder 出力 `.xlsx` の取り込み
 - `samples/definition.csv`
   - サンプル定義
+- `samples/definition.cbl`
+  - サンプル COBOL コピー句
 - `samples/sample.dat`
   - サンプル固定長データ
 - `docs/release-checklist.md`

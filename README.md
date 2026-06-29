@@ -14,9 +14,9 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
 
-zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv`、`samples/sample-records.csv`、`samples/sample.dat` も同梱しています。
+zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv`、`samples/definition.cbl`、`samples/definition-english.cbl`、`samples/sample-records.csv`、`samples/sample.dat` も同梱しています。
 
-## 定義書 CSV
+## 定義書 CSV / COBOL コピー句
 
 UTF-8 CSV を想定しています。基本形式は `項目名,定義` の 2 列です。
 
@@ -28,6 +28,32 @@ UTF-8 CSV を想定しています。基本形式は `項目名,定義` の 2 �
 体重,S9(3V2)
 攻撃力,S9(9) COMP-3
 ```
+
+COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込めます。コピー句ファイルは UTF-8、固定形式の 7 桁目ルールありとして扱います。選択ボタンからコピー句を選ぶと、PIC 句付きの項目を表へ表示します。
+
+![COBOL コピー句読み込みのスクリーンショット](docs/screen-image-field-visibility-v0.1.23.png)
+
+```cobol
+       01 SAMPLE-RECORD.
+          05 名前       PIC N(10).
+          05 英名       PIC X(10).
+          05 年齢       PIC 9(2)V9(1).
+          05 体重       PIC S9(3)V9(2).
+          05 攻撃力     PIC S9(9) COMP-3.
+```
+
+コピー句読み込みの初期対応範囲:
+
+- `PIC X(n)` / `PIC N(n)`
+- `PIC XXXXXX` / `PIC 999V99` のような括弧なし表記
+- `PIC 9(n)` / `PIC S9(n)`
+- `PIC 9(n)V9(m)` / `PIC S9(n)V9(m)`
+- `COMP-3` / `PACKED-DECIMAL`
+- 同一 PIC 行の `OCCURS n TIMES`
+- `REDEFINES` は表示します。ただし物理レコード長には加算せず、保存時は重複領域として書き出しません
+- 66 レベル、88 レベルは固定長データ項目ではないため読み飛ばします
+- 英字の COBOL 項目名は内蔵辞書で可能な範囲だけ日本語表示名に変換します
+- コピー句由来のデータ読み込みでは、X/9/S9/COMP-3 は UTF-8、N 項目は実データ長から UTF-16LE / UTF-32LE を項目単位で推定します
 
 対応している COBOL 表記:
 
@@ -52,6 +78,7 @@ UTF-8 CSV を想定しています。基本形式は `項目名,定義` の 2 �
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
+- `項目表示` から、画面に表示する項目を選択できます。非表示にした項目も内部データとしては保持され、保存時のレコード構造からは除外されません
 - レコード縦表示時の項目ヘッダーにバイト位置ルーラを表示
 - レコード追加、複製、削除
 - セル編集

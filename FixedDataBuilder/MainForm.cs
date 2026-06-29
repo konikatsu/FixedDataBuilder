@@ -34,8 +34,11 @@ public sealed class MainForm : Form
     private readonly List<string> recentDataFiles = [];
     private readonly List<FieldDefinition> fields = [];
     private readonly List<List<string>> records = [];
+    private readonly HashSet<int> hiddenFieldIndexes = [];
     private string? saveDataPath;
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
+    private DataEncodingProfile currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
+    private bool definitionLoadedFromCopybook;
     private GridLayout layout = GridLayout.FieldRows;
     private bool isUpdatingPathComboBoxes;
     private bool isRefreshingGrid;
@@ -191,6 +194,7 @@ public sealed class MainForm : Form
         toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(fieldRowsButton);
         toolStrip.Items.Add(recordRowsButton);
+        toolStrip.Items.Add(CreateButton("項目表示", (_, _) => ChooseVisibleFields()));
         toolStrip.Items.Add(CreateButton("フォント設定", (_, _) => ChooseDisplayFont()));
         toolStrip.Items.Add(new ToolStripSeparator());
         toolStrip.Items.Add(CreateButton("検証", (_, _) => ValidateRecords(showSuccess: true)));
@@ -247,6 +251,90 @@ public sealed class MainForm : Form
             }
         };
         grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
+    }
+
+    private void ChooseVisibleFields()
+    {
+        if (fields.Count == 0)
+        {
+            MessageBox.Show(this, "先に定義ファイルを読み込んでください。", "項目表示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var form = new Form
+        {
+            Text = "表示する項目",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ClientSize = new Size(460, 520)
+        };
+
+        var list = new CheckedListBox
+        {
+            Dock = DockStyle.Fill,
+            CheckOnClick = true,
+            IntegralHeight = false
+        };
+        for (var index = 0; index < fields.Count; index++)
+        {
+            list.Items.Add(FieldVisibilityLabel(fields[index]), !hiddenFieldIndexes.Contains(index));
+        }
+
+        var buttonPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            FlowDirection = FlowDirection.RightToLeft,
+            Height = 44,
+            Padding = new Padding(8)
+        };
+        var okButton = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 90 };
+        var cancelButton = new Button { Text = "キャンセル", DialogResult = DialogResult.Cancel, Width = 90 };
+        var showAllButton = new Button { Text = "すべて表示", Width = 100 };
+        showAllButton.Click += (_, _) =>
+        {
+            for (var index = 0; index < list.Items.Count; index++)
+            {
+                list.SetItemChecked(index, true);
+            }
+        };
+
+        buttonPanel.Controls.Add(okButton);
+        buttonPanel.Controls.Add(cancelButton);
+        buttonPanel.Controls.Add(showAllButton);
+        form.Controls.Add(list);
+        form.Controls.Add(buttonPanel);
+        form.AcceptButton = okButton;
+        form.CancelButton = cancelButton;
+
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        if (list.CheckedItems.Count == 0)
+        {
+            MessageBox.Show(this, "少なくとも 1 項目は表示してください。", "項目表示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        hiddenFieldIndexes.Clear();
+        for (var index = 0; index < list.Items.Count; index++)
+        {
+            if (!list.GetItemChecked(index))
+            {
+                hiddenFieldIndexes.Add(index);
+            }
+        }
+
+        RefreshGrid();
+        SetStatus($"表示項目: {VisibleFieldIndexes().Count} / {fields.Count}");
+    }
+
+    private static string FieldVisibilityLabel(FieldDefinition field)
+    {
+        return $"{field.Name}  ({field.DisplayDefinition})";
     }
 
     private void ChooseDisplayFont()
@@ -325,7 +413,7 @@ public sealed class MainForm : Form
     {
         using var dialog = new OpenFileDialog
         {
-            Filter = "CSV ファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*",
+            Filter = "定義ファイル (*.csv;*.cbl;*.cpy)|*.csv;*.cbl;*.cpy|CSV ファイル (*.csv)|*.csv|COBOL コピー句 (*.cbl;*.cpy)|*.cbl;*.cpy|すべてのファイル (*.*)|*.*",
             Title = "定義ファイルを選択"
         };
 
@@ -423,16 +511,38 @@ public sealed class MainForm : Form
 
     private void LoadDefinition(string path)
     {
+        definitionLoadedFromCopybook = IsCopybookPath(path);
+        currentDataEncodingProfile = definitionLoadedFromCopybook
+            ? DataEncodingProfile.Utf8WithNationalText
+            : DataEncodingProfile.ShiftJis;
         fields.Clear();
-        fields.AddRange(DefinitionCsvReader.Read(path));
+        fields.AddRange(definitionLoadedFromCopybook
+            ? CopybookDefinitionReader.Read(path)
+            : DefinitionCsvReader.Read(path));
+        hiddenFieldIndexes.Clear();
         SetPathText(definitionPathComboBox, path);
         AddRecentFile(recentDefinitionFiles, path);
     }
 
+    private static bool IsCopybookPath(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return extension.Equals(".cbl", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".cpy", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".cob", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void LoadData(string path, RecordSeparatorMode separatorMode)
     {
+        if (definitionLoadedFromCopybook)
+        {
+            var detectedFields = NationalTextByteWidthDetector.Detect(path, fields, separatorMode);
+            fields.Clear();
+            fields.AddRange(detectedFields);
+        }
+
         records.Clear();
-        records.AddRange(FixedLengthDataReader.Read(path, fields, separatorMode));
+        records.AddRange(FixedLengthDataReader.Read(path, fields, separatorMode, currentDataEncodingProfile));
         NormalizeRecords();
         currentSeparatorMode = separatorMode;
         saveDataPath = path;
@@ -886,7 +996,7 @@ public sealed class MainForm : Form
 
         try
         {
-            FixedLengthDataWriter.Write(saveDataPath, fields, records, currentSeparatorMode);
+            FixedLengthDataWriter.Write(saveDataPath, fields, records, currentSeparatorMode, currentDataEncodingProfile);
             SetStatus($"上書き保存しました: {Path.GetFileName(saveDataPath)}");
         }
         catch (Exception ex)
@@ -917,7 +1027,7 @@ public sealed class MainForm : Form
 
         try
         {
-            FixedLengthDataWriter.Write(dialog.FileName, fields, records, currentSeparatorMode);
+            FixedLengthDataWriter.Write(dialog.FileName, fields, records, currentSeparatorMode, currentDataEncodingProfile);
             saveDataPath = dialog.FileName;
             SetPathText(dataPathComboBox, dialog.FileName);
             AddRecentFile(recentDataFiles, dialog.FileName);
@@ -981,8 +1091,11 @@ public sealed class MainForm : Form
             var imported = ExcelImporter.Read(dialog.FileName);
             ValidateImportedDefinition(imported.Fields);
 
+            definitionLoadedFromCopybook = false;
+            currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
             fields.Clear();
             fields.AddRange(imported.Fields);
+            hiddenFieldIndexes.Clear();
             records.Clear();
             records.AddRange(imported.Records.Select(record => record.ToList()));
             saveDataPath = null;
@@ -1105,7 +1218,7 @@ public sealed class MainForm : Form
 
             try
             {
-                FixedLengthDataWriter.EncodeRecord(fields, records[recordIndex]);
+                FixedLengthDataWriter.EncodeRecord(fields, records[recordIndex], currentDataEncodingProfile);
             }
             catch (Exception ex)
             {
@@ -1135,6 +1248,46 @@ public sealed class MainForm : Form
         return false;
     }
 
+    private List<int> VisibleFieldIndexes()
+    {
+        var indexes = new List<int>();
+        for (var index = 0; index < fields.Count; index++)
+        {
+            if (!hiddenFieldIndexes.Contains(index))
+            {
+                indexes.Add(index);
+            }
+        }
+
+        return indexes;
+    }
+
+    private int FieldIndexFromVisibleIndex(int visibleIndex)
+    {
+        if (visibleIndex < 0)
+        {
+            return -1;
+        }
+
+        var currentVisibleIndex = 0;
+        for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+        {
+            if (hiddenFieldIndexes.Contains(fieldIndex))
+            {
+                continue;
+            }
+
+            if (currentVisibleIndex == visibleIndex)
+            {
+                return fieldIndex;
+            }
+
+            currentVisibleIndex++;
+        }
+
+        return -1;
+    }
+
     private void ChangeLayout(GridLayout nextLayout)
     {
         if (layout == nextLayout)
@@ -1158,7 +1311,8 @@ public sealed class MainForm : Form
 
         if (layout == GridLayout.FieldRows)
         {
-            if (columnIndex < 2 || rowIndex >= fields.Count)
+            var fieldRowsFieldIndex = FieldIndexFromVisibleIndex(rowIndex);
+            if (columnIndex < 2 || fieldRowsFieldIndex < 0)
             {
                 return;
             }
@@ -1169,10 +1323,16 @@ public sealed class MainForm : Form
                 return;
             }
 
-            var formattedValue = FormatValueForDisplay(fields[rowIndex], grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
-            records[recordIndex][rowIndex] = formattedValue;
+            var field = fields[fieldRowsFieldIndex];
+            if (field.IsRedefines)
+            {
+                return;
+            }
+
+            var formattedValue = FormatValueForDisplay(field, grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
+            records[recordIndex][fieldRowsFieldIndex] = formattedValue;
             grid[columnIndex, rowIndex].Value = formattedValue;
-            ApplyCellValidationStyle(grid[columnIndex, rowIndex], fields[rowIndex], formattedValue);
+            ApplyCellValidationStyle(grid[columnIndex, rowIndex], field, formattedValue);
             UpdateHexView();
             return;
         }
@@ -1182,16 +1342,22 @@ public sealed class MainForm : Form
             return;
         }
 
-        var fieldIndex = columnIndex - 1;
+        var fieldIndex = FieldIndexFromVisibleIndex(columnIndex - 1);
         if (fieldIndex < 0 || fieldIndex >= fields.Count)
         {
             return;
         }
 
-        var recordRowsFormattedValue = FormatValueForDisplay(fields[fieldIndex], grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
+        var recordRowsField = fields[fieldIndex];
+        if (recordRowsField.IsRedefines)
+        {
+            return;
+        }
+
+        var recordRowsFormattedValue = FormatValueForDisplay(recordRowsField, grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
         records[rowIndex][fieldIndex] = recordRowsFormattedValue;
         grid[columnIndex, rowIndex].Value = recordRowsFormattedValue;
-        ApplyCellValidationStyle(grid[columnIndex, rowIndex], fields[fieldIndex], recordRowsFormattedValue);
+        ApplyCellValidationStyle(grid[columnIndex, rowIndex], recordRowsField, recordRowsFormattedValue);
         UpdateHexView();
     }
 
@@ -1215,13 +1381,13 @@ public sealed class MainForm : Form
         }
 
         return layout == GridLayout.FieldRows
-            ? grid.CurrentCell.RowIndex
-            : grid.CurrentCell.ColumnIndex >= 1 ? grid.CurrentCell.ColumnIndex - 1 : -1;
+            ? FieldIndexFromVisibleIndex(grid.CurrentCell.RowIndex)
+            : grid.CurrentCell.ColumnIndex >= 1 ? FieldIndexFromVisibleIndex(grid.CurrentCell.ColumnIndex - 1) : -1;
     }
 
     private void SelectRecord(int recordIndex)
     {
-        if (recordIndex < 0 || fields.Count == 0 || records.Count == 0)
+        if (recordIndex < 0 || fields.Count == 0 || records.Count == 0 || VisibleFieldIndexes().Count == 0)
         {
             return;
         }
@@ -1251,7 +1417,7 @@ public sealed class MainForm : Form
                 RefreshRecordRowsGrid();
             }
 
-            SetStatus($"{fields.Count} 項目 / {records.Count} レコード");
+            SetStatus($"{VisibleFieldIndexes().Count} / {fields.Count} 項目表示 / {records.Count} レコード");
             RefreshGridSizing();
         }
         finally
@@ -1275,7 +1441,7 @@ public sealed class MainForm : Form
             grid.Columns.Add(CreateEditableColumn($"Record{recordIndex + 1}", $"Rec {recordIndex + 1}", 140));
         }
 
-        for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+        foreach (var fieldIndex in VisibleFieldIndexes())
         {
             var field = fields[fieldIndex];
             var rowIndex = grid.Rows.Add();
@@ -1287,6 +1453,7 @@ public sealed class MainForm : Form
             {
                 var value = FormatValueForDisplay(field, records[recordIndex][fieldIndex]);
                 row.Cells[recordIndex + 2].Value = value;
+                row.Cells[recordIndex + 2].ReadOnly = field.IsRedefines;
                 ApplyCellValidationStyle(row.Cells[recordIndex + 2], field, value);
             }
         }
@@ -1304,28 +1471,40 @@ public sealed class MainForm : Form
         {
             var field = fields[fieldIndex];
             var byteEnd = byteStart + field.StorageByteLength - 1;
-            var ruler = $"byte {byteStart}-{byteEnd}";
-            var column = CreateEditableColumn(
-                $"Field{fieldIndex + 1}",
-                $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}",
-                170);
-            column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
-            grid.Columns.Add(column);
-            byteStart = byteEnd + 1;
+            if (!hiddenFieldIndexes.Contains(fieldIndex))
+            {
+                var ruler = field.IsRedefines
+                    ? $"REDEFINES {field.RedefinesName}"
+                    : $"byte {byteStart}-{byteEnd}";
+                var column = CreateEditableColumn(
+                    $"Field{fieldIndex + 1}",
+                    $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}",
+                    170);
+                column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
+                grid.Columns.Add(column);
+            }
+
+            if (!field.IsRedefines)
+            {
+                byteStart = byteEnd + 1;
+            }
         }
 
+        var visibleFieldIndexes = VisibleFieldIndexes();
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
         {
             var rowIndex = grid.Rows.Add();
             var row = grid.Rows[rowIndex];
             row.Cells[0].Value = $"Rec {recordIndex + 1}";
 
-            for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+            for (var visibleIndex = 0; visibleIndex < visibleFieldIndexes.Count; visibleIndex++)
             {
+                var fieldIndex = visibleFieldIndexes[visibleIndex];
                 var field = fields[fieldIndex];
                 var value = FormatValueForDisplay(field, records[recordIndex][fieldIndex]);
-                row.Cells[fieldIndex + 1].Value = value;
-                ApplyCellValidationStyle(row.Cells[fieldIndex + 1], field, value);
+                row.Cells[visibleIndex + 1].Value = value;
+                row.Cells[visibleIndex + 1].ReadOnly = field.IsRedefines;
+                ApplyCellValidationStyle(row.Cells[visibleIndex + 1], field, value);
             }
         }
     }
@@ -1347,7 +1526,7 @@ public sealed class MainForm : Form
         try
         {
             var field = fields[fieldIndex];
-            var bytes = FixedLengthDataWriter.EncodeField(field, records[recordIndex][fieldIndex]);
+            var bytes = FixedLengthDataWriter.EncodeField(field, records[recordIndex][fieldIndex], currentDataEncodingProfile);
             hexTextBox.Text = string.Join(" ", bytes.Select(value => value.ToString("X2")));
         }
         catch (Exception ex)
@@ -1491,15 +1670,16 @@ public sealed class MainForm : Form
     {
         if (layout == GridLayout.FieldRows)
         {
-            if (columnIndex >= 2 && rowIndex >= 0 && rowIndex < fields.Count)
+            var fieldIndex = FieldIndexFromVisibleIndex(rowIndex);
+            if (columnIndex >= 2 && fieldIndex >= 0)
             {
-                field = fields[rowIndex];
+                field = fields[fieldIndex];
                 return true;
             }
         }
         else if (columnIndex >= 1)
         {
-            var fieldIndex = columnIndex - 1;
+            var fieldIndex = FieldIndexFromVisibleIndex(columnIndex - 1);
             if (fieldIndex >= 0 && fieldIndex < fields.Count)
             {
                 field = fields[fieldIndex];

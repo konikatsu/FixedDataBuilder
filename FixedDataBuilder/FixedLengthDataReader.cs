@@ -6,8 +6,19 @@ public static class FixedLengthDataReader
 {
     public static IReadOnlyList<List<string>> Read(string path, IReadOnlyList<FieldDefinition> fields, RecordSeparatorMode separatorMode)
     {
+        return Read(path, fields, separatorMode, DataEncodingProfile.ShiftJis);
+    }
+
+    public static IReadOnlyList<List<string>> Read(
+        string path,
+        IReadOnlyList<FieldDefinition> fields,
+        RecordSeparatorMode separatorMode,
+        DataEncodingProfile encodingProfile)
+    {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = Encoding.GetEncoding(932);
+        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
+            ? Encoding.UTF8
+            : Encoding.GetEncoding(932);
         var bytes = File.ReadAllBytes(path);
         var recordLength = fields.Sum(field => field.StorageByteLength);
         if (recordLength <= 0)
@@ -16,7 +27,7 @@ public static class FixedLengthDataReader
         }
 
         var records = SplitRecords(bytes, recordLength, separatorMode);
-        return records.Select(record => DecodeRecord(record, fields, encoding)).ToList();
+        return records.Select(record => DecodeRecord(record, fields, encoding, encodingProfile)).ToList();
     }
 
     private static List<byte[]> SplitRecords(byte[] bytes, int recordLength, RecordSeparatorMode separatorMode)
@@ -89,27 +100,46 @@ public static class FixedLengthDataReader
         return records;
     }
 
-    private static List<string> DecodeRecord(byte[] recordBytes, IReadOnlyList<FieldDefinition> fields, Encoding encoding)
+    private static List<string> DecodeRecord(byte[] recordBytes, IReadOnlyList<FieldDefinition> fields, Encoding encoding, DataEncodingProfile encodingProfile)
     {
         var values = new List<string>(fields.Count);
         var offset = 0;
+        var offsetsByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var field in fields)
         {
-            var fieldBytes = recordBytes.AsSpan(offset, field.StorageByteLength);
+            var fieldOffset = field.IsRedefines
+                && field.RedefinesName is not null
+                && offsetsByName.TryGetValue(field.RedefinesName, out var redefinedOffset)
+                    ? redefinedOffset
+                    : offset;
+            var fieldBytes = recordBytes.AsSpan(fieldOffset, field.PhysicalByteLength);
             values.Add(field.Type switch
             {
                 FieldDataType.PlainNumber => DecodeDisplayNumber(fieldBytes, field, signed: false, encoding),
                 FieldDataType.SignedNumber => DecodeDisplayNumber(fieldBytes, field, signed: true, encoding),
                 FieldDataType.PackedUnsigned => DecodePackedNumber(fieldBytes, field, signed: false),
                 FieldDataType.PackedSigned => DecodePackedNumber(fieldBytes, field, signed: true),
-                FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText => encoding.GetString(fieldBytes).TrimEnd(),
+                FieldDataType.Text or FieldDataType.HalfWidthText => encoding.GetString(fieldBytes).TrimEnd(),
+                FieldDataType.FullWidthText => DecodeNationalText(fieldBytes, field, encodingProfile),
                 _ => throw new InvalidOperationException($"未対応の型です: {field.Type}")
             });
-            offset += field.StorageByteLength;
+            if (!field.IsRedefines)
+            {
+                offsetsByName[field.Name] = offset;
+                offset += field.StorageByteLength;
+            }
         }
 
         return values;
+    }
+
+    private static string DecodeNationalText(ReadOnlySpan<byte> bytes, FieldDefinition field, DataEncodingProfile encodingProfile)
+    {
+        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
+            ? field.NationalByteWidth == 4 ? Encoding.UTF32 : Encoding.Unicode
+            : Encoding.GetEncoding(932);
+        return encoding.GetString(bytes).TrimEnd('\0', ' ', '\u3000');
     }
 
     private static string DecodeDisplayNumber(ReadOnlySpan<byte> bytes, FieldDefinition field, bool signed, Encoding encoding)

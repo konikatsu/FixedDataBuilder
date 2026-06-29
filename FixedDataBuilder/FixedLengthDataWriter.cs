@@ -6,10 +6,20 @@ public static class FixedLengthDataWriter
 {
     public static void Write(string path, IReadOnlyList<FieldDefinition> fields, IReadOnlyList<List<string>> records, RecordSeparatorMode separatorMode)
     {
+        Write(path, fields, records, separatorMode, DataEncodingProfile.ShiftJis);
+    }
+
+    public static void Write(
+        string path,
+        IReadOnlyList<FieldDefinition> fields,
+        IReadOnlyList<List<string>> records,
+        RecordSeparatorMode separatorMode,
+        DataEncodingProfile encodingProfile)
+    {
         using var stream = File.Create(path);
         foreach (var record in records)
         {
-            stream.Write(EncodeRecord(fields, record));
+            stream.Write(EncodeRecord(fields, record, encodingProfile));
 
             if (separatorMode == RecordSeparatorMode.CrLfOrLf)
             {
@@ -21,11 +31,21 @@ public static class FixedLengthDataWriter
 
     public static byte[] EncodeRecord(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<string> record)
     {
+        return EncodeRecord(fields, record, DataEncodingProfile.ShiftJis);
+    }
+
+    public static byte[] EncodeRecord(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<string> record, DataEncodingProfile encodingProfile)
+    {
         using var stream = new MemoryStream();
 
         foreach (var (field, index) in fields.Select((field, index) => (field, index)))
         {
-            stream.Write(EncodeField(field, record[index]));
+            if (field.IsRedefines)
+            {
+                continue;
+            }
+
+            stream.Write(EncodeField(field, record[index], encodingProfile));
         }
 
         return stream.ToArray();
@@ -33,8 +53,15 @@ public static class FixedLengthDataWriter
 
     public static byte[] EncodeField(FieldDefinition field, string value)
     {
+        return EncodeField(field, value, DataEncodingProfile.ShiftJis);
+    }
+
+    public static byte[] EncodeField(FieldDefinition field, string value, DataEncodingProfile encodingProfile)
+    {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = Encoding.GetEncoding(932);
+        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
+            ? Encoding.UTF8
+            : Encoding.GetEncoding(932);
         value = value.Trim();
 
         return field.Type switch
@@ -43,8 +70,8 @@ public static class FixedLengthDataWriter
             FieldDataType.SignedNumber => EncodeDisplayNumber(value, field, signed: true, encoding),
             FieldDataType.PackedUnsigned => EncodePackedNumber(value, field, signed: false),
             FieldDataType.PackedSigned => EncodePackedNumber(value, field, signed: true),
-            FieldDataType.Text or FieldDataType.HalfWidthText => EncodeText(value, field.StorageByteLength, encoding),
-            FieldDataType.FullWidthText => EncodeFullWidthText(value, field.Length, encoding),
+            FieldDataType.Text or FieldDataType.HalfWidthText => EncodeText(value, field.PhysicalByteLength, encoding),
+            FieldDataType.FullWidthText => EncodeFullWidthText(value, field, encodingProfile),
             _ => throw new InvalidOperationException($"未対応の型です: {field.Type}")
         };
     }
@@ -103,8 +130,12 @@ public static class FixedLengthDataWriter
         return buffer;
     }
 
-    private static byte[] EncodeFullWidthText(string value, int length, Encoding encoding)
+    private static byte[] EncodeFullWidthText(string value, FieldDefinition field, DataEncodingProfile encodingProfile)
     {
+        var length = field.Length;
+        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
+            ? field.NationalByteWidth == 4 ? Encoding.UTF32 : Encoding.Unicode
+            : Encoding.GetEncoding(932);
         var normalized = string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : value;
@@ -116,7 +147,7 @@ public static class FixedLengthDataWriter
 
         normalized = normalized.PadRight(length, '\u3000');
         var bytes = encoding.GetBytes(normalized);
-        var byteLength = length * 2;
+        var byteLength = field.PhysicalByteLength;
         if (bytes.Length != byteLength)
         {
             throw new InvalidDataException($"{value} は全角文字 {length} 文字の領域に保存できません。");
@@ -124,4 +155,10 @@ public static class FixedLengthDataWriter
 
         return bytes;
     }
+}
+
+public enum DataEncodingProfile
+{
+    ShiftJis,
+    Utf8WithNationalText
 }
