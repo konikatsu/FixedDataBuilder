@@ -18,18 +18,17 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.26` 予定（REDEFINES 非表示対応のRelease作成中）
+- 現在の最新 Release: `v0.1.26`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.25` を GitHub Release 済み
-- 次の作業対象は `v0.1.26`: REDEFINES 項目を画面表示・項目表示選択の対象から除外する
+- `v0.1.26` を GitHub Release 済み
 - `release/FixedDataBuilder.exe` は v0.1.26 の Release ビルド済み
 - `FixedDataBuilder-v0.1.26.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-redefines-hidden-v0.1.26.png` を参照する予定
+- README は `docs/screen-image-redefines-hidden-v0.1.26.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
