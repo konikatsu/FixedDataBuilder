@@ -24,7 +24,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 最新の成功状態:
 
-- `v0.1.23` を GitHub Release 予定
+- `v0.1.23` を GitHub Release 済み
 - `release/FixedDataBuilder.exe` は v0.1.23 の Release ビルド済み
 - `FixedDataBuilder-v0.1.23.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
