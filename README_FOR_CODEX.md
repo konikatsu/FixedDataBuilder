@@ -18,17 +18,18 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.25`
+- 現在の最新 Release: `v0.1.26` 予定（REDEFINES 非表示対応のRelease作成中）
 
 ## 現在の成功状態
 
 最新の成功状態:
 
 - `v0.1.25` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.25 の Release ビルド済み
-- `FixedDataBuilder-v0.1.25.zip` を作成済み
+- 次の作業対象は `v0.1.26`: REDEFINES 項目を画面表示・項目表示選択の対象から除外する
+- `release/FixedDataBuilder.exe` は v0.1.26 の Release ビルド済み
+- `FixedDataBuilder-v0.1.26.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-sample-rules-v0.1.25.png` を参照
+- README は `docs/screen-image-redefines-hidden-v0.1.26.png` を参照する予定
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
@@ -37,7 +38,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.23 で、`項目表示` ボタンからグリッドに表示する項目を選択できるようにした。非表示項目も内部レコードには保持し、保存時のレコード構造から除外しない。
 - v0.1.24 で、データ読み込み時に改行コード選択の後で型Nの文字コードを `Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` から選べるようにする。コピー句サンプルとして、N項目UTF-16LE・その他UTF-8の `sample-copybook-utf16.dat` を追加する。
 - v0.1.25 で、画面上部に `サンプル条件` 欄を追加する。既知のコピー句サンプルを誤った定義・改行・型N文字コードで開こうとした場合は、読み込み前に専用エラーを出す。コピー句サンプルを改行有無・型N文字コード別に追加する。
-- v0.1.26 作業中: REDEFINES 項目を画面表示・項目表示選択の対象から除外する。
+- v0.1.26 で、REDEFINES 項目を画面表示・項目表示選択の対象から除外する。
 
 最後に push 済みの重要コミット:
 
