@@ -9,16 +9,12 @@ public static partial class CopybookDefinitionReader
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var statements = ReadStatements(path);
+        var nodes = BuildFieldTree(statements);
         var fields = new List<FieldDefinition>();
 
-        foreach (var (statement, lineNumber) in statements)
+        foreach (var node in nodes)
         {
-            if (!TryParseField(statement, lineNumber, out var parsedFields))
-            {
-                continue;
-            }
-
-            fields.AddRange(parsedFields);
+            fields.AddRange(ExpandNode(node, [], hasOccursAncestor: false, isInsideRedefines: false));
         }
 
         if (fields.Count == 0)
@@ -27,6 +23,38 @@ public static partial class CopybookDefinitionReader
         }
 
         return fields;
+    }
+
+    private static IReadOnlyList<CopybookNode> BuildFieldTree(IReadOnlyList<(string Statement, int LineNumber)> statements)
+    {
+        var roots = new List<CopybookNode>();
+        var stack = new List<CopybookNode>();
+
+        foreach (var (statement, lineNumber) in statements)
+        {
+            if (!TryParseNode(statement, lineNumber, out var node))
+            {
+                continue;
+            }
+
+            while (stack.Count > 0 && stack[^1].Level >= node.Level)
+            {
+                stack.RemoveAt(stack.Count - 1);
+            }
+
+            if (stack.Count == 0)
+            {
+                roots.Add(node);
+            }
+            else
+            {
+                stack[^1].Children.Add(node);
+            }
+
+            stack.Add(node);
+        }
+
+        return roots;
     }
 
     private static IReadOnlyList<(string Statement, int LineNumber)> ReadStatements(string path)
@@ -120,9 +148,9 @@ public static partial class CopybookDefinitionReader
             : trimmed;
     }
 
-    private static bool TryParseField(string statement, int lineNumber, out IReadOnlyList<FieldDefinition> fields)
+    private static bool TryParseNode(string statement, int lineNumber, out CopybookNode node)
     {
-        fields = [];
+        node = null!;
 
         var match = FieldStatementRegex().Match(statement);
         if (!match.Success)
@@ -136,26 +164,90 @@ public static partial class CopybookDefinitionReader
             return false;
         }
 
-        var name = match.Groups["name"].Value;
-        var rest = match.Groups["rest"].Value;
-        var redefinesName = ParseRedefinesName(rest);
-
-        var pictureMatch = PictureRegex().Match(rest);
-        if (!pictureMatch.Success)
+        if (!int.TryParse(level, out var levelNumber))
         {
             return false;
         }
 
-        var definition = NormalizePicture(pictureMatch.Groups["picture"].Value, rest);
+        var name = match.Groups["name"].Value;
+        var rest = match.Groups["rest"].Value;
+        var redefinesName = ParseRedefinesName(rest);
+        var pictureMatch = PictureRegex().Match(rest);
+        var picture = pictureMatch.Success ? pictureMatch.Groups["picture"].Value : null;
         var occursCount = ParseOccursCount(rest, lineNumber);
-        var parsedFields = new List<FieldDefinition>(occursCount);
-        for (var index = 0; index < occursCount; index++)
+
+        node = new CopybookNode(levelNumber, name, rest, lineNumber, picture, occursCount, redefinesName);
+        return true;
+    }
+
+    private static IReadOnlyList<FieldDefinition> ExpandNode(
+        CopybookNode node,
+        IReadOnlyList<string> groupPrefixes,
+        bool hasOccursAncestor,
+        bool isInsideRedefines)
+    {
+        var nodeIsRedefines = !string.IsNullOrWhiteSpace(node.RedefinesName);
+        if ((isInsideRedefines || nodeIsRedefines) && node.OccursCount > 1)
         {
-            var fieldName = occursCount == 1 ? ConvertCobolNameToJapanese(name) : $"{ConvertCobolNameToJapanese(name)}-{index + 1}";
-            var field = DefinitionCsvReader.ParseFieldDefinition(fieldName, definition, lineNumber);
-            if (!string.IsNullOrWhiteSpace(redefinesName))
+            throw new InvalidDataException($"{node.LineNumber} 行目: REDEFINES 配下または REDEFINES 項目の OCCURS は未対応です。");
+        }
+
+        if (hasOccursAncestor && node.OccursCount > 1)
+        {
+            throw new InvalidDataException($"{node.LineNumber} 行目: 多重 OCCURS は未対応です。");
+        }
+
+        if (!string.IsNullOrWhiteSpace(node.Picture))
+        {
+            return ExpandPictureNode(node, groupPrefixes);
+        }
+
+        if (node.OccursCount > 1)
+        {
+            var fields = new List<FieldDefinition>();
+            var groupName = ConvertCobolNameToJapanese(node.Name);
+            for (var index = 0; index < node.OccursCount; index++)
             {
-                var convertedRedefinesName = ConvertCobolNameToJapanese(redefinesName);
+                var groupPrefix = $"{groupName}-{index + 1}";
+                fields.AddRange(ExpandChildren(node.Children, [.. groupPrefixes, groupPrefix], hasOccursAncestor: true, isInsideRedefines));
+            }
+
+            return fields;
+        }
+
+        return ExpandChildren(node.Children, groupPrefixes, hasOccursAncestor, isInsideRedefines || nodeIsRedefines);
+    }
+
+    private static IReadOnlyList<FieldDefinition> ExpandChildren(
+        IReadOnlyList<CopybookNode> children,
+        IReadOnlyList<string> groupPrefixes,
+        bool hasOccursAncestor,
+        bool isInsideRedefines)
+    {
+        var fields = new List<FieldDefinition>();
+        foreach (var child in children)
+        {
+            fields.AddRange(ExpandNode(child, groupPrefixes, hasOccursAncestor, isInsideRedefines));
+        }
+
+        return fields;
+    }
+
+    private static IReadOnlyList<FieldDefinition> ExpandPictureNode(CopybookNode node, IReadOnlyList<string> groupPrefixes)
+    {
+        var definition = NormalizePicture(node.Picture!, node.Rest);
+        var parsedFields = new List<FieldDefinition>(node.OccursCount);
+        var convertedName = ConvertCobolNameToJapanese(node.Name);
+        for (var index = 0; index < node.OccursCount; index++)
+        {
+            var fieldNamePart = node.OccursCount == 1 ? convertedName : $"{convertedName}-{index + 1}";
+            var fieldName = groupPrefixes.Count == 0
+                ? fieldNamePart
+                : $"{string.Join('.', groupPrefixes)}.{fieldNamePart}";
+            var field = DefinitionCsvReader.ParseFieldDefinition(fieldName, definition, node.LineNumber);
+            if (!string.IsNullOrWhiteSpace(node.RedefinesName))
+            {
+                var convertedRedefinesName = ConvertCobolNameToJapanese(node.RedefinesName);
                 field = field with
                 {
                     DefinitionText = $"{definition} REDEFINES {convertedRedefinesName}",
@@ -166,8 +258,7 @@ public static partial class CopybookDefinitionReader
             parsedFields.Add(field);
         }
 
-        fields = parsedFields;
-        return true;
+        return parsedFields;
     }
 
     private static string NormalizePicture(string picture, string rest)
@@ -306,10 +397,12 @@ public static partial class CopybookDefinitionReader
         ["CUSTOMER"] = "顧客",
         ["DATA"] = "データ",
         ["DATE"] = "日付",
+        ["DETAIL"] = "明細",
         ["DT"] = "日付",
         ["EN"] = "英",
         ["FLG"] = "フラグ",
         ["FLAG"] = "フラグ",
+        ["GROUP"] = "グループ",
         ["ID"] = "ID",
         ["ITEM"] = "項目",
         ["KANJI"] = "漢字",
@@ -320,14 +413,37 @@ public static partial class CopybookDefinitionReader
         ["NM"] = "名",
         ["NO"] = "番号",
         ["NUMBER"] = "番号",
+        ["PRODUCT"] = "商品",
+        ["QTY"] = "数量",
+        ["QUANTITY"] = "数量",
         ["RAW"] = "生データ",
         ["REC"] = "レコード",
         ["RECORD"] = "レコード",
         ["STATUS"] = "状態",
+        ["TOTAL"] = "合計",
         ["TYPE"] = "種別",
         ["WEIGHT"] = "体重",
         ["YEAR"] = "年"
     };
+
+    private sealed class CopybookNode(
+        int level,
+        string name,
+        string rest,
+        int lineNumber,
+        string? picture,
+        int occursCount,
+        string? redefinesName)
+    {
+        public int Level { get; } = level;
+        public string Name { get; } = name;
+        public string Rest { get; } = rest;
+        public int LineNumber { get; } = lineNumber;
+        public string? Picture { get; } = picture;
+        public int OccursCount { get; } = occursCount;
+        public string? RedefinesName { get; } = redefinesName;
+        public List<CopybookNode> Children { get; } = [];
+    }
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex SpaceRegex();

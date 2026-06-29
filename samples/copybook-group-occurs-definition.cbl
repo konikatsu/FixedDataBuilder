@@ -1,0 +1,6 @@
+       01 GROUP-OCCURS-RECORD.
+          05 CUSTOMER-NAME PIC N(10).
+          05 DETAIL OCCURS 3 TIMES.
+             10 PRODUCT-CODE PIC X(4).
+             10 QUANTITY     PIC 9(3).
+          05 TOTAL-AMOUNT    PIC S9(7) COMP-3.

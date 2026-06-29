@@ -18,17 +18,17 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.29`
+- 現在の最新 Release: `v0.1.30`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.29` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.29 の Release ビルド済み
-- `FixedDataBuilder-v0.1.29.zip` を作成済み
+- `v0.1.30` を GitHub Release 済み
+- `release/FixedDataBuilder.exe` は v0.1.30 の Release ビルド済み
+- `FixedDataBuilder-v0.1.30.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-occurs-v0.1.29.png` と `docs/screen-image-data-load-options-v0.1.28.png` を参照
+- README は `docs/screen-image-group-occurs-v0.1.30.png` と `docs/screen-image-data-load-options-v0.1.28.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
@@ -41,6 +41,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.27 で、データ読み込み時の「改行区切り」と「型N文字コード」を1つの `データ読込条件` ダイアログに統合し、選択条件で先頭レコードを試し読みするプレビュー欄を追加する。既知のコピー句サンプルは対応条件を初期選択する。
 - v0.1.28 で、上部の操作ボタン群を一般的なWindowsアプリ寄りの `ファイル` / `編集` / `定義` / `表示` / `ツール` メニューへ整理する。`データ読込条件` ダイアログはリサイズ可能にし、プレビューを表形式にする。README スクリーンショットも v0.1.28 に更新する。
 - v0.1.29 で、画面上部の `サンプル条件` 行を削除し、定義/データのファイル欄を読み取り専用表示にする。最近使ったファイルは `ファイル` メニュー配下の `最近使った定義ファイル` / `最近使ったデータファイル` へ移動する。サンプル名は `basic-*` / `copybook-basic-*` / `copybook-occurs-*` の分かりやすい別名を追加し、基本項目OCCURSサンプルを追加する。集団項目OCCURSは未対応としてREADMEに明記する。
+- v0.1.30 で、集団項目OCCURSの限定対応を追加する。対応範囲は、非REDEFINES配下の単一集団項目 `OCCURS n TIMES` と、その配下の通常PIC項目の展開。REDEFINES配下OCCURS、多重OCCURS、OCCURS DEPENDING ON は未対応。`copybook-group-occurs-definition.cbl` と `copybook-group-occurs-data-crlf-utf8-n-utf8.dat` を追加する。
 
 最後に push 済みの重要コミット:
 
@@ -69,7 +70,8 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
   - `PIC 9(n)V9(m)` / `PIC S9(n)V9(m)`
   - `COMP-3` / `PACKED-DECIMAL`
   - 同一 PIC 行の基本項目 `OCCURS n TIMES`
-  - 集団項目 `OCCURS` は未対応
+  - 集団項目 `OCCURS n TIMES` の限定対応
+  - `REDEFINES` 配下の `OCCURS`、多重 `OCCURS`、`OCCURS DEPENDING ON` は未対応
   - `REDEFINES` は物理長に加算せず保存時は書き出さない。画面表示・項目表示選択の対象からは除外する
   - 66 レベル、88 レベルは読み飛ばし
   - コピー句ファイルは UTF-8、固定形式の 7 桁目ルールあり
@@ -140,8 +142,9 @@ READMEでは新しい分かりやすい名前を主に説明します。旧名�
 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf16le.dat` | 改行なし | UTF-16LE |
 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf32le.dat` | 改行なし | UTF-32LE |
 | `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
+| `copybook-group-occurs-definition.cbl` | `copybook-group-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
 
-OCCURSはPIC付き基本項目の同一行指定だけ対応します。集団項目OCCURSは未対応です。
+OCCURSはPIC付き基本項目の同一行指定と、限定的な集団項目OCCURSに対応します。REDEFINES配下OCCURS、多重OCCURS、OCCURS DEPENDING ON は未対応です。
 
 ### Excel取込
 
@@ -195,6 +198,10 @@ OCCURSはPIC付き基本項目の同一行指定だけ対応します。集団�
   - PIC付き基本項目OCCURSのサンプル
 - `samples/copybook-occurs-data-crlf-utf8-n-utf8.dat`
   - OCCURSサンプル用のUTF-8・改行あり固定長データ
+- `samples/copybook-group-occurs-definition.cbl`
+  - 集団項目OCCURSの限定対応サンプル
+- `samples/copybook-group-occurs-data-crlf-utf8-n-utf8.dat`
+  - 集団項目OCCURSサンプル用のUTF-8・改行あり固定長データ
 - `samples/definition.csv` / `samples/sample.dat` / `samples/sample-copybook-*.dat`
   - 旧名互換用。READMEでは新しい名前を主に案内する
 - `docs/release-checklist.md`

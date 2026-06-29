@@ -6,7 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-occurs-v0.1.29.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-group-occurs-v0.1.30.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
@@ -50,7 +50,8 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - `PIC 9(n)V9(m)` / `PIC S9(n)V9(m)`
 - `COMP-3` / `PACKED-DECIMAL`
 - 同一 PIC 行の基本項目 `OCCURS n TIMES`
-- 集団項目に指定された `OCCURS` は未対応です
+- 集団項目 `OCCURS n TIMES` の限定対応
+- `REDEFINES` 配下の `OCCURS`、多重 `OCCURS`、`OCCURS DEPENDING ON` は未対応です
 - `REDEFINES` は物理レコード長には加算せず、保存時は重複領域として書き出しません。画面の表示対象からは除外します
 - 66 レベル、88 レベルは固定長データ項目ではないため読み飛ばします
 - 英字の COBOL 項目名は内蔵辞書で可能な範囲だけ日本語表示名に変換します
@@ -152,6 +153,7 @@ S9(3) COMP-3  -123 -> 12 3D
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf16le.dat` | 改行なし | UTF-16LE |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf32le.dat` | 改行なし | UTF-32LE |
 | 基本項目OCCURS | `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
+| 集団項目OCCURS | `copybook-group-occurs-definition.cbl` | `copybook-group-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
 
 基本コピー句サンプルでは、顧客名、英名、年齢、金額の 3 レコードを確認できます。金額は `S9(9) COMP-3` の packed decimal で、3 レコード目は `-9999` です。
 
@@ -162,13 +164,26 @@ S9(3) COMP-3  -123 -> 12 3D
 05 ITEM-COUNT PIC 9(3) OCCURS 3 TIMES.
 ```
 
-集団項目に指定された `OCCURS` は現時点では未対応です。
+集団項目OCCURSサンプルでは、以下のように集団項目の配下にあるPIC付き項目を回数分展開します。
 
 ```cobol
-05 ITEM-GROUP OCCURS 3 TIMES.
-   10 ITEM-CODE  PIC X(4).
-   10 ITEM-COUNT PIC 9(3).
+05 DETAIL OCCURS 3 TIMES.
+   10 PRODUCT-CODE PIC X(4).
+   10 QUANTITY     PIC 9(3).
 ```
+
+画面上では、たとえば以下のような項目名になります。
+
+```text
+明細-1.商品コード
+明細-1.数量
+明細-2.商品コード
+明細-2.数量
+明細-3.商品コード
+明細-3.数量
+```
+
+`REDEFINES` 配下の `OCCURS`、多重 `OCCURS`、`OCCURS DEPENDING ON` は現時点では未対応です。
 
 旧名の `definition-english.cbl`、`sample-copybook-*.dat` も互換用に残しています。
 

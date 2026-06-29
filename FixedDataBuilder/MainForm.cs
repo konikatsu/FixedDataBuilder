@@ -28,6 +28,7 @@ public sealed class MainForm : Form
         new("copybook-basic-data-none-utf8-n-utf16le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf16),
         new("copybook-basic-data-none-utf8-n-utf32le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf32),
         new("copybook-occurs-data-crlf-utf8-n-utf8.dat", "copybook-occurs-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
+        new("copybook-group-occurs-data-crlf-utf8-n-utf8.dat", "copybook-group-occurs-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
         new("sample-copybook-utf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
         new("sample-copybook-crlf-utf8-nutf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
         new("sample-copybook-crlf-utf8-nutf8.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
