@@ -295,9 +295,17 @@ public sealed class MainForm : Form
             CheckOnClick = true,
             IntegralHeight = false
         };
-        for (var index = 0; index < fields.Count; index++)
+        var displayFieldIndexes = DisplayableFieldIndexes();
+        if (displayFieldIndexes.Count == 0)
         {
-            list.Items.Add(FieldVisibilityLabel(fields[index]), !hiddenFieldIndexes.Contains(index));
+            MessageBox.Show(this, "表示できる項目がありません。", "項目表示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        for (var listIndex = 0; listIndex < displayFieldIndexes.Count; listIndex++)
+        {
+            var fieldIndex = displayFieldIndexes[listIndex];
+            list.Items.Add(FieldVisibilityLabel(fields[fieldIndex]), !hiddenFieldIndexes.Contains(fieldIndex));
         }
 
         var buttonPanel = new FlowLayoutPanel
@@ -338,16 +346,17 @@ public sealed class MainForm : Form
         }
 
         hiddenFieldIndexes.Clear();
-        for (var index = 0; index < list.Items.Count; index++)
+        for (var listIndex = 0; listIndex < list.Items.Count; listIndex++)
         {
-            if (!list.GetItemChecked(index))
+            var fieldIndex = displayFieldIndexes[listIndex];
+            if (!list.GetItemChecked(listIndex))
             {
-                hiddenFieldIndexes.Add(index);
+                hiddenFieldIndexes.Add(fieldIndex);
             }
         }
 
         RefreshGrid();
-        SetStatus($"表示項目: {VisibleFieldIndexes().Count} / {fields.Count}");
+        SetStatus($"表示項目: {VisibleFieldIndexes().Count} / {DisplayableFieldIndexes().Count}");
     }
 
     private static string FieldVisibilityLabel(FieldDefinition field)
@@ -1422,13 +1431,32 @@ public sealed class MainForm : Form
         var indexes = new List<int>();
         for (var index = 0; index < fields.Count; index++)
         {
-            if (!hiddenFieldIndexes.Contains(index))
+            if (IsDisplayableField(fields[index]) && !hiddenFieldIndexes.Contains(index))
             {
                 indexes.Add(index);
             }
         }
 
         return indexes;
+    }
+
+    private List<int> DisplayableFieldIndexes()
+    {
+        var indexes = new List<int>();
+        for (var index = 0; index < fields.Count; index++)
+        {
+            if (IsDisplayableField(fields[index]))
+            {
+                indexes.Add(index);
+            }
+        }
+
+        return indexes;
+    }
+
+    private static bool IsDisplayableField(FieldDefinition field)
+    {
+        return !field.IsRedefines;
     }
 
     private int FieldIndexFromVisibleIndex(int visibleIndex)
@@ -1441,7 +1469,7 @@ public sealed class MainForm : Form
         var currentVisibleIndex = 0;
         for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
         {
-            if (hiddenFieldIndexes.Contains(fieldIndex))
+            if (!IsDisplayableField(fields[fieldIndex]) || hiddenFieldIndexes.Contains(fieldIndex))
             {
                 continue;
             }
@@ -1586,7 +1614,7 @@ public sealed class MainForm : Form
                 RefreshRecordRowsGrid();
             }
 
-            SetStatus($"{VisibleFieldIndexes().Count} / {fields.Count} 項目表示 / {records.Count} レコード");
+            SetStatus($"{VisibleFieldIndexes().Count} / {DisplayableFieldIndexes().Count} 項目表示 / {records.Count} レコード");
             RefreshGridSizing();
         }
         finally
@@ -1640,11 +1668,9 @@ public sealed class MainForm : Form
         {
             var field = fields[fieldIndex];
             var byteEnd = byteStart + field.StorageByteLength - 1;
-            if (!hiddenFieldIndexes.Contains(fieldIndex))
+            if (IsDisplayableField(field) && !hiddenFieldIndexes.Contains(fieldIndex))
             {
-                var ruler = field.IsRedefines
-                    ? $"REDEFINES {field.RedefinesName}"
-                    : $"byte {byteStart}-{byteEnd}";
+                var ruler = $"byte {byteStart}-{byteEnd}";
                 var column = CreateEditableColumn(
                     $"Field{fieldIndex + 1}",
                     $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}",
