@@ -6,7 +6,7 @@ public static class FixedLengthDataWriter
 {
     public static void Write(string path, IReadOnlyList<FieldDefinition> fields, IReadOnlyList<List<string>> records, RecordSeparatorMode separatorMode)
     {
-        Write(path, fields, records, separatorMode, DataEncodingProfile.ShiftJis);
+        Write(path, fields, records, separatorMode, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
     }
 
     public static void Write(
@@ -14,12 +14,13 @@ public static class FixedLengthDataWriter
         IReadOnlyList<FieldDefinition> fields,
         IReadOnlyList<List<string>> records,
         RecordSeparatorMode separatorMode,
-        DataEncodingProfile encodingProfile)
+        DataEncodingProfile encodingProfile,
+        NationalTextEncoding nationalTextEncoding)
     {
         using var stream = File.Create(path);
         foreach (var record in records)
         {
-            stream.Write(EncodeRecord(fields, record, encodingProfile));
+            stream.Write(EncodeRecord(fields, record, encodingProfile, nationalTextEncoding));
 
             if (separatorMode == RecordSeparatorMode.CrLfOrLf)
             {
@@ -31,10 +32,14 @@ public static class FixedLengthDataWriter
 
     public static byte[] EncodeRecord(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<string> record)
     {
-        return EncodeRecord(fields, record, DataEncodingProfile.ShiftJis);
+        return EncodeRecord(fields, record, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
     }
 
-    public static byte[] EncodeRecord(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<string> record, DataEncodingProfile encodingProfile)
+    public static byte[] EncodeRecord(
+        IReadOnlyList<FieldDefinition> fields,
+        IReadOnlyList<string> record,
+        DataEncodingProfile encodingProfile,
+        NationalTextEncoding nationalTextEncoding)
     {
         using var stream = new MemoryStream();
 
@@ -45,7 +50,7 @@ public static class FixedLengthDataWriter
                 continue;
             }
 
-            stream.Write(EncodeField(field, record[index], encodingProfile));
+            stream.Write(EncodeField(field, record[index], encodingProfile, nationalTextEncoding));
         }
 
         return stream.ToArray();
@@ -53,10 +58,14 @@ public static class FixedLengthDataWriter
 
     public static byte[] EncodeField(FieldDefinition field, string value)
     {
-        return EncodeField(field, value, DataEncodingProfile.ShiftJis);
+        return EncodeField(field, value, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
     }
 
-    public static byte[] EncodeField(FieldDefinition field, string value, DataEncodingProfile encodingProfile)
+    public static byte[] EncodeField(
+        FieldDefinition field,
+        string value,
+        DataEncodingProfile encodingProfile,
+        NationalTextEncoding nationalTextEncoding)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
@@ -71,7 +80,7 @@ public static class FixedLengthDataWriter
             FieldDataType.PackedUnsigned => EncodePackedNumber(value, field, signed: false),
             FieldDataType.PackedSigned => EncodePackedNumber(value, field, signed: true),
             FieldDataType.Text or FieldDataType.HalfWidthText => EncodeText(value, field.PhysicalByteLength, encoding),
-            FieldDataType.FullWidthText => EncodeFullWidthText(value, field, encodingProfile),
+            FieldDataType.FullWidthText => EncodeFullWidthText(value, field, nationalTextEncoding),
             _ => throw new InvalidOperationException($"未対応の型です: {field.Type}")
         };
     }
@@ -130,12 +139,10 @@ public static class FixedLengthDataWriter
         return buffer;
     }
 
-    private static byte[] EncodeFullWidthText(string value, FieldDefinition field, DataEncodingProfile encodingProfile)
+    private static byte[] EncodeFullWidthText(string value, FieldDefinition field, NationalTextEncoding nationalTextEncoding)
     {
         var length = field.Length;
-        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
-            ? field.NationalByteWidth == 4 ? Encoding.UTF32 : Encoding.Unicode
-            : Encoding.GetEncoding(932);
+        var encoding = NationalTextEncodingHelper.GetEncoding(nationalTextEncoding);
         var normalized = string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : value;
@@ -161,4 +168,52 @@ public enum DataEncodingProfile
 {
     ShiftJis,
     Utf8WithNationalText
+}
+
+public enum NationalTextEncoding
+{
+    ShiftJis,
+    Utf8,
+    Utf16,
+    Utf32
+}
+
+public static class NationalTextEncodingHelper
+{
+    public static Encoding GetEncoding(NationalTextEncoding encoding)
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return encoding switch
+        {
+            NationalTextEncoding.ShiftJis => Encoding.GetEncoding(932),
+            NationalTextEncoding.Utf8 => Encoding.UTF8,
+            NationalTextEncoding.Utf16 => Encoding.Unicode,
+            NationalTextEncoding.Utf32 => Encoding.UTF32,
+            _ => throw new InvalidOperationException($"未対応の型N文字コードです: {encoding}")
+        };
+    }
+
+    public static int FixedByteWidth(NationalTextEncoding encoding)
+    {
+        return encoding switch
+        {
+            NationalTextEncoding.ShiftJis => 2,
+            NationalTextEncoding.Utf8 => 3,
+            NationalTextEncoding.Utf16 => 2,
+            NationalTextEncoding.Utf32 => 4,
+            _ => throw new InvalidOperationException($"未対応の型N文字コードです: {encoding}")
+        };
+    }
+
+    public static string DisplayName(NationalTextEncoding encoding)
+    {
+        return encoding switch
+        {
+            NationalTextEncoding.ShiftJis => "Shift_JIS",
+            NationalTextEncoding.Utf8 => "UTF-8",
+            NationalTextEncoding.Utf16 => "UTF-16LE",
+            NationalTextEncoding.Utf32 => "UTF-32LE",
+            _ => encoding.ToString()
+        };
+    }
 }

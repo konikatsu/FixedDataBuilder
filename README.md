@@ -6,7 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-cobol-sample-v0.1.20.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-national-encoding-v0.1.24.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示し、最近使ったファイルをそれぞれ直近 20 件まで履歴から選べます。
 
@@ -14,7 +14,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
 
-zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv`、`samples/definition.cbl`、`samples/definition-english.cbl`、`samples/sample-records.csv`、`samples/sample.dat` も同梱しています。
+zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv`、`samples/definition.cbl`、`samples/definition-english.cbl`、`samples/sample-records.csv`、`samples/sample.dat`、`samples/sample-shiftjis.dat`、`samples/sample-copybook-utf16.dat` も同梱しています。
 
 ## 定義書 CSV / COBOL コピー句
 
@@ -53,7 +53,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - `REDEFINES` は表示します。ただし物理レコード長には加算せず、保存時は重複領域として書き出しません
 - 66 レベル、88 レベルは固定長データ項目ではないため読み飛ばします
 - 英字の COBOL 項目名は内蔵辞書で可能な範囲だけ日本語表示名に変換します
-- コピー句由来のデータ読み込みでは、X/9/S9/COMP-3 は UTF-8、N 項目は実データ長から UTF-16LE / UTF-32LE を項目単位で推定します
+- コピー句由来のデータ読み込みでは、X/9/S9/COMP-3 は UTF-8、N 項目はデータ読み込み時に選択した文字コードで読み込みます
 
 対応している COBOL 表記:
 
@@ -75,6 +75,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - `定義作成` は空の新規作成、`定義修正` は読み込み済み定義の編集
 - 固定長データ読み込み
 - 読み込み時の改行あり / 改行なし選択
+- 読み込み時の型N文字コード選択。改行コード選択の後に、`Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` から選べます。既定値は `Shift_JIS` です
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
@@ -116,7 +117,11 @@ S9(3) COMP-3  -123 -> 12 3D
 
 ## サンプル
 
-`samples/definition.csv` と `samples/sample.dat` を読み込むと、以下の 3 レコードを固定長データとして確認できます。
+サンプルデータは 2 種類あります。
+
+### CSV 定義サンプル
+
+`samples/definition.csv` と `samples/sample.dat`、または同じ内容の `samples/sample-shiftjis.dat` を読み込むと、以下の 3 レコードを固定長データとして確認できます。従来のサンプルと同じ Shift_JIS 前提のデータです。
 
 ```csv
 ジナン,JINAN,7,6.7,100
@@ -125,6 +130,17 @@ S9(3) COMP-3  -123 -> 12 3D
 ```
 
 攻撃力は `S9(9) COMP-3` の packed decimal として `sample.dat` に格納しています。
+
+### COBOL コピー句サンプル
+
+`samples/definition-english.cbl` と `samples/sample-copybook-utf16.dat` は、コピー句読み込み確認用のサンプルです。
+
+- コピー句ファイルは UTF-8 です
+- データファイルの X/9/S9/COMP-3 項目は UTF-8 です
+- N 項目は UTF-16LE です。データ読み込み時は、改行コード選択の後に表示される `型N 文字コード` 画面で `UTF-16LE` を選択してください
+- レコード区切りは `改行あり (CRLF/LF)` です
+
+このサンプルでは、顧客名、英名、年齢、金額の 3 レコードを確認できます。金額は `S9(9) COMP-3` の packed decimal で、3 レコード目は `-9999` です。
 
 ## ビルド済み exe
 

@@ -18,23 +18,25 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.23`
+- 現在の最新 Release: `v0.1.24` 予定（この作業で作成・push する）
 
 ## 現在の成功状態
 
 最新の成功状態:
 
 - `v0.1.23` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.23 の Release ビルド済み
-- `FixedDataBuilder-v0.1.23.zip` を作成済み
+- 次の作業対象は `v0.1.24`: データ読み込み時の型N文字コード選択、UTF-16LEコピー句サンプル追加
+- `release/FixedDataBuilder.exe` は作業完了時に v0.1.24 の Release ビルドへ更新する
+- `FixedDataBuilder-v0.1.24.zip` を作成する
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-cobol-sample-v0.1.20.png` を参照
+- README は `docs/screen-image-national-encoding-v0.1.24.png` を参照する予定
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
 - v0.1.21 で、COBOL コピー句（`.cbl` / `.cpy`）読み込みの初期対応を追加済み。PIC 句から既存の `FieldDefinition` に変換する。
 - v0.1.22 で、コピー句 UTF-8/固定形式前提、英字項目名の日本語変換、REDEFINES 表示、`PIC XXXXXX` / `PIC 999V99`、コピー句由来データの UTF-8 + N 項目 UTF-16LE/UTF-32LE 混在読み込み推定を追加。
 - v0.1.23 で、`項目表示` ボタンからグリッドに表示する項目を選択できるようにした。非表示項目も内部レコードには保持し、保存時のレコード構造から除外しない。
+- v0.1.24 で、データ読み込み時に改行コード選択の後で型Nの文字コードを `Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` から選べるようにする。コピー句サンプルとして、N項目UTF-16LE・その他UTF-8の `sample-copybook-utf16.dat` を追加する。
 
 最後に push 済みの重要コミット:
 
@@ -66,9 +68,10 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
   - `REDEFINES` は表示。ただし物理長に加算せず保存時は書き出さない
   - 66 レベル、88 レベルは読み飛ばし
   - コピー句ファイルは UTF-8、固定形式の 7 桁目ルールあり
-  - コピー句由来のデータは X/9/S9/COMP-3 を UTF-8、N 項目を UTF-16LE/UTF-32LE として項目単位で推定
+  - コピー句由来のデータは X/9/S9/COMP-3 を UTF-8、N 項目をデータ読み込み時に選択した文字コードで読み込む
 - 固定長データ読み込み
 - 読み込み時の改行あり / 改行なし選択
+- 読み込み時の型N文字コード選択。改行コード選択後に `Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` から選ぶ。既定値は `Shift_JIS`
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
@@ -113,7 +116,9 @@ S9(3) COMP-3  -123 -> 12 3D
 
 ### 文字コード
 
-- 固定長データは Shift_JIS 前提
+- CSV定義由来の固定長データは Shift_JIS 前提
+- コピー句由来の固定長データは X/9/S9/COMP-3 を UTF-8、N項目を選択した文字コードで扱う
+- 型Nの選択肢は `Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE`
 - `N(n)` は全角 n 文字領域として扱い、保存時の不足分は全角スペース
 - `X(n)` は定義上は半角文字として扱う想定
 
@@ -138,8 +143,6 @@ S9(3) COMP-3  -123 -> 12 3D
   - 定義 CSV と COBOL 風定義の読み込み
 - `FixedDataBuilder/CopybookDefinitionReader.cs`
   - COBOL コピー句 `.cbl` / `.cpy` の PIC 句読み込み
-- `FixedDataBuilder/NationalTextByteWidthDetector.cs`
-  - コピー句由来データ読み込み時に N 項目の UTF-16LE/UTF-32LE 幅をレコード長から推定
 - `FixedDataBuilder/DefinitionCsvWriter.cs`
   - 定義 CSV 書き出し
 - `FixedDataBuilder/FixedLengthDataReader.cs`
@@ -162,6 +165,10 @@ S9(3) COMP-3  -123 -> 12 3D
   - サンプル COBOL コピー句
 - `samples/sample.dat`
   - サンプル固定長データ
+- `samples/sample-shiftjis.dat`
+  - コピー句追加対応前と同じ内容の Shift_JIS サンプル固定長データ
+- `samples/sample-copybook-utf16.dat`
+  - `definition-english.cbl` 用のコピー句サンプル固定長データ。N項目は UTF-16LE、その他は UTF-8
 - `docs/release-checklist.md`
   - README画像やRelease漏れ防止のチェックリスト
 - `docs/development-history.md`
@@ -224,6 +231,7 @@ dotnet publish FixedDataBuilder\FixedDataBuilder.csproj -c Release -o release
 
 ```powershell
 .\release\FixedDataBuilder.exe --definition .\samples\definition.csv --data .\samples\sample.dat --separator crlf
+.\release\FixedDataBuilder.exe --definition .\samples\definition-english.cbl --data .\samples\sample-copybook-utf16.dat --separator crlf --national-encoding utf16
 ```
 
 GUI 起動やスクリーンショット撮影は権限付き実行が必要になることがあります。

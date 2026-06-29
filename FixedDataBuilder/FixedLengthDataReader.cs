@@ -6,14 +6,15 @@ public static class FixedLengthDataReader
 {
     public static IReadOnlyList<List<string>> Read(string path, IReadOnlyList<FieldDefinition> fields, RecordSeparatorMode separatorMode)
     {
-        return Read(path, fields, separatorMode, DataEncodingProfile.ShiftJis);
+        return Read(path, fields, separatorMode, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
     }
 
     public static IReadOnlyList<List<string>> Read(
         string path,
         IReadOnlyList<FieldDefinition> fields,
         RecordSeparatorMode separatorMode,
-        DataEncodingProfile encodingProfile)
+        DataEncodingProfile encodingProfile,
+        NationalTextEncoding nationalTextEncoding)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
@@ -27,7 +28,7 @@ public static class FixedLengthDataReader
         }
 
         var records = SplitRecords(bytes, recordLength, separatorMode);
-        return records.Select(record => DecodeRecord(record, fields, encoding, encodingProfile)).ToList();
+        return records.Select(record => DecodeRecord(record, fields, encoding, nationalTextEncoding)).ToList();
     }
 
     private static List<byte[]> SplitRecords(byte[] bytes, int recordLength, RecordSeparatorMode separatorMode)
@@ -100,7 +101,7 @@ public static class FixedLengthDataReader
         return records;
     }
 
-    private static List<string> DecodeRecord(byte[] recordBytes, IReadOnlyList<FieldDefinition> fields, Encoding encoding, DataEncodingProfile encodingProfile)
+    private static List<string> DecodeRecord(byte[] recordBytes, IReadOnlyList<FieldDefinition> fields, Encoding encoding, NationalTextEncoding nationalTextEncoding)
     {
         var values = new List<string>(fields.Count);
         var offset = 0;
@@ -121,7 +122,7 @@ public static class FixedLengthDataReader
                 FieldDataType.PackedUnsigned => DecodePackedNumber(fieldBytes, field, signed: false),
                 FieldDataType.PackedSigned => DecodePackedNumber(fieldBytes, field, signed: true),
                 FieldDataType.Text or FieldDataType.HalfWidthText => encoding.GetString(fieldBytes).TrimEnd(),
-                FieldDataType.FullWidthText => DecodeNationalText(fieldBytes, field, encodingProfile),
+                FieldDataType.FullWidthText => DecodeNationalText(fieldBytes, nationalTextEncoding),
                 _ => throw new InvalidOperationException($"未対応の型です: {field.Type}")
             });
             if (!field.IsRedefines)
@@ -134,11 +135,9 @@ public static class FixedLengthDataReader
         return values;
     }
 
-    private static string DecodeNationalText(ReadOnlySpan<byte> bytes, FieldDefinition field, DataEncodingProfile encodingProfile)
+    private static string DecodeNationalText(ReadOnlySpan<byte> bytes, NationalTextEncoding nationalTextEncoding)
     {
-        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
-            ? field.NationalByteWidth == 4 ? Encoding.UTF32 : Encoding.Unicode
-            : Encoding.GetEncoding(932);
+        var encoding = NationalTextEncodingHelper.GetEncoding(nationalTextEncoding);
         return encoding.GetString(bytes).TrimEnd('\0', ' ', '\u3000');
     }
 

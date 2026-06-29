@@ -38,6 +38,7 @@ public sealed class MainForm : Form
     private string? saveDataPath;
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
     private DataEncodingProfile currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
+    private NationalTextEncoding currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
     private bool definitionLoadedFromCopybook;
     private GridLayout layout = GridLayout.FieldRows;
     private bool isUpdatingPathComboBoxes;
@@ -465,7 +466,13 @@ public sealed class MainForm : Form
                 return;
             }
 
-            LoadData(dialog.FileName, separatorMode.Value);
+            var nationalTextEncoding = SelectNationalTextEncoding();
+            if (nationalTextEncoding is null)
+            {
+                return;
+            }
+
+            LoadData(dialog.FileName, separatorMode.Value, nationalTextEncoding.Value);
             RefreshGrid();
             SetStatus("データファイルを読み込みました。");
         }
@@ -495,7 +502,9 @@ public sealed class MainForm : Form
                 var separatorMode = string.Equals(GetOptionValue(args, "--separator"), "none", StringComparison.OrdinalIgnoreCase)
                     ? RecordSeparatorMode.None
                     : RecordSeparatorMode.CrLfOrLf;
-                LoadData(dataPath, separatorMode);
+                var nationalTextEncoding = ParseNationalTextEncoding(GetOptionValue(args, "--national-encoding"))
+                    ?? currentNationalTextEncoding;
+                LoadData(dataPath, separatorMode, nationalTextEncoding);
             }
 
             RefreshGrid();
@@ -515,6 +524,7 @@ public sealed class MainForm : Form
         currentDataEncodingProfile = definitionLoadedFromCopybook
             ? DataEncodingProfile.Utf8WithNationalText
             : DataEncodingProfile.ShiftJis;
+        currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
         fields.Clear();
         fields.AddRange(definitionLoadedFromCopybook
             ? CopybookDefinitionReader.Read(path)
@@ -522,6 +532,7 @@ public sealed class MainForm : Form
         hiddenFieldIndexes.Clear();
         SetPathText(definitionPathComboBox, path);
         AddRecentFile(recentDefinitionFiles, path);
+        UpdateSeparatorModeText();
     }
 
     private static bool IsCopybookPath(string path)
@@ -532,23 +543,31 @@ public sealed class MainForm : Form
             || extension.Equals(".cob", StringComparison.OrdinalIgnoreCase);
     }
 
-    private void LoadData(string path, RecordSeparatorMode separatorMode)
+    private void LoadData(string path, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
     {
-        if (definitionLoadedFromCopybook)
-        {
-            var detectedFields = NationalTextByteWidthDetector.Detect(path, fields, separatorMode);
-            fields.Clear();
-            fields.AddRange(detectedFields);
-        }
+        ApplyNationalTextEncoding(nationalTextEncoding);
 
         records.Clear();
-        records.AddRange(FixedLengthDataReader.Read(path, fields, separatorMode, currentDataEncodingProfile));
+        records.AddRange(FixedLengthDataReader.Read(path, fields, separatorMode, currentDataEncodingProfile, currentNationalTextEncoding));
         NormalizeRecords();
         currentSeparatorMode = separatorMode;
         saveDataPath = path;
         SetPathText(dataPathComboBox, path);
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
+    }
+
+    private void ApplyNationalTextEncoding(NationalTextEncoding nationalTextEncoding)
+    {
+        currentNationalTextEncoding = nationalTextEncoding;
+        var byteWidth = NationalTextEncodingHelper.FixedByteWidth(nationalTextEncoding);
+        for (var index = 0; index < fields.Count; index++)
+        {
+            if (fields[index].Type == FieldDataType.FullWidthText)
+            {
+                fields[index] = fields[index] with { NationalByteWidth = byteWidth };
+            }
+        }
     }
 
     private void SetPathText(ComboBox comboBox, string path)
@@ -666,7 +685,13 @@ public sealed class MainForm : Form
                 return;
             }
 
-            LoadData(path, separatorMode.Value);
+            var nationalTextEncoding = SelectNationalTextEncoding();
+            if (nationalTextEncoding is null)
+            {
+                return;
+            }
+
+            LoadData(path, separatorMode.Value, nationalTextEncoding.Value);
             RefreshGrid();
             SetStatus(statusMessage);
         }
@@ -815,6 +840,23 @@ public sealed class MainForm : Form
         return null;
     }
 
+    private static NationalTextEncoding? ParseNationalTextEncoding(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().ToLowerInvariant().Replace("_", "").Replace("-", "") switch
+        {
+            "shiftjis" or "sjis" => NationalTextEncoding.ShiftJis,
+            "utf8" => NationalTextEncoding.Utf8,
+            "utf16" or "utf16le" => NationalTextEncoding.Utf16,
+            "utf32" or "utf32le" => NationalTextEncoding.Utf32,
+            _ => null
+        };
+    }
+
     private RecordSeparatorMode? SelectRecordSeparatorMode()
     {
         using var form = new Form
@@ -866,6 +908,75 @@ public sealed class MainForm : Form
         }
 
         return noLineBreakRadio.Checked ? RecordSeparatorMode.None : RecordSeparatorMode.CrLfOrLf;
+    }
+
+    private NationalTextEncoding? SelectNationalTextEncoding()
+    {
+        using var form = new Form
+        {
+            Text = "型N 文字コード",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ClientSize = new Size(320, 210)
+        };
+
+        var options = new[]
+        {
+            (Encoding: NationalTextEncoding.ShiftJis, Text: "Shift_JIS"),
+            (Encoding: NationalTextEncoding.Utf8, Text: "UTF-8"),
+            (Encoding: NationalTextEncoding.Utf16, Text: "UTF-16LE"),
+            (Encoding: NationalTextEncoding.Utf32, Text: "UTF-32LE")
+        };
+        var buttons = new List<RadioButton>();
+        for (var index = 0; index < options.Length; index++)
+        {
+            var option = options[index];
+            var radioButton = new RadioButton
+            {
+                Text = option.Text,
+                Tag = option.Encoding,
+                Checked = currentNationalTextEncoding == option.Encoding,
+                Location = new Point(20, 20 + (index * 28)),
+                AutoSize = true
+            };
+            buttons.Add(radioButton);
+            form.Controls.Add(radioButton);
+        }
+
+        if (!buttons.Any(button => button.Checked))
+        {
+            buttons[0].Checked = true;
+        }
+
+        var okButton = new Button
+        {
+            Text = "OK",
+            DialogResult = DialogResult.OK,
+            Location = new Point(140, 160),
+            Width = 75
+        };
+        var cancelButton = new Button
+        {
+            Text = "キャンセル",
+            DialogResult = DialogResult.Cancel,
+            Location = new Point(220, 160),
+            Width = 75
+        };
+
+        form.Controls.AddRange([okButton, cancelButton]);
+        form.AcceptButton = okButton;
+        form.CancelButton = cancelButton;
+
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return null;
+        }
+
+        return buttons.First(button => button.Checked).Tag is NationalTextEncoding encoding
+            ? encoding
+            : NationalTextEncoding.ShiftJis;
     }
 
     private List<string> CreateEmptyRecord()
@@ -996,7 +1107,7 @@ public sealed class MainForm : Form
 
         try
         {
-            FixedLengthDataWriter.Write(saveDataPath, fields, records, currentSeparatorMode, currentDataEncodingProfile);
+            FixedLengthDataWriter.Write(saveDataPath, fields, records, currentSeparatorMode, currentDataEncodingProfile, currentNationalTextEncoding);
             SetStatus($"上書き保存しました: {Path.GetFileName(saveDataPath)}");
         }
         catch (Exception ex)
@@ -1027,7 +1138,7 @@ public sealed class MainForm : Form
 
         try
         {
-            FixedLengthDataWriter.Write(dialog.FileName, fields, records, currentSeparatorMode, currentDataEncodingProfile);
+            FixedLengthDataWriter.Write(dialog.FileName, fields, records, currentSeparatorMode, currentDataEncodingProfile, currentNationalTextEncoding);
             saveDataPath = dialog.FileName;
             SetPathText(dataPathComboBox, dialog.FileName);
             AddRecentFile(recentDataFiles, dialog.FileName);
@@ -1093,6 +1204,7 @@ public sealed class MainForm : Form
 
             definitionLoadedFromCopybook = false;
             currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
+            currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
             fields.Clear();
             fields.AddRange(imported.Fields);
             hiddenFieldIndexes.Clear();
@@ -1218,7 +1330,7 @@ public sealed class MainForm : Form
 
             try
             {
-                FixedLengthDataWriter.EncodeRecord(fields, records[recordIndex], currentDataEncodingProfile);
+                FixedLengthDataWriter.EncodeRecord(fields, records[recordIndex], currentDataEncodingProfile, currentNationalTextEncoding);
             }
             catch (Exception ex)
             {
@@ -1526,7 +1638,7 @@ public sealed class MainForm : Form
         try
         {
             var field = fields[fieldIndex];
-            var bytes = FixedLengthDataWriter.EncodeField(field, records[recordIndex][fieldIndex], currentDataEncodingProfile);
+            var bytes = FixedLengthDataWriter.EncodeField(field, records[recordIndex][fieldIndex], currentDataEncodingProfile, currentNationalTextEncoding);
             hexTextBox.Text = string.Join(" ", bytes.Select(value => value.ToString("X2")));
         }
         catch (Exception ex)
@@ -1737,9 +1849,10 @@ public sealed class MainForm : Form
 
     private void UpdateSeparatorModeText()
     {
-        separatorModeTextBox.Text = currentSeparatorMode == RecordSeparatorMode.None
+        var separatorText = currentSeparatorMode == RecordSeparatorMode.None
             ? "改行なし"
             : "改行あり (CRLF/LF)";
+        separatorModeTextBox.Text = $"{separatorText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
     }
 
     private static DataGridViewTextBoxColumn CreateReadOnlyColumn(string name, string header, int width, bool frozen)
