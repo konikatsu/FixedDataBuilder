@@ -6,7 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-redefines-hidden-v0.1.26.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-menu-v0.1.28.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示し、最近使ったファイルをそれぞれ直近 20 件まで履歴から選べます。
 
@@ -77,7 +77,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - 読み込み時の改行あり / 改行なしと型N文字コード選択。`データ読込条件` 画面で、`Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` を選べます。既定値は `Shift_JIS` です
 - `データ読込条件` 画面で、選択中の条件によるデータプレビューを確認できます
 
-![データ読込条件画面](docs/screen-image-data-load-options-v0.1.27.png)
+![データ読込条件画面](docs/screen-image-data-load-options-v0.1.28.png)
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え

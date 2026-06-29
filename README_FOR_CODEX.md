@@ -18,17 +18,17 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.27`
+- 現在の最新 Release: `v0.1.28`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.27` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.27 の Release ビルド済み
-- `FixedDataBuilder-v0.1.27.zip` を作成済み
+- `v0.1.28` を GitHub Release 済み
+- `release/FixedDataBuilder.exe` は v0.1.28 の Release ビルド済み
+- `FixedDataBuilder-v0.1.28.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-redefines-hidden-v0.1.26.png` を参照
+- README は `docs/screen-image-menu-v0.1.28.png` と `docs/screen-image-data-load-options-v0.1.28.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
@@ -39,6 +39,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.25 で、画面上部に `サンプル条件` 欄を追加する。既知のコピー句サンプルを誤った定義・改行・型N文字コードで開こうとした場合は、読み込み前に専用エラーを出す。コピー句サンプルを改行有無・型N文字コード別に追加する。
 - v0.1.26 で、REDEFINES 項目を画面表示・項目表示選択の対象から除外する。
 - v0.1.27 で、データ読み込み時の「改行区切り」と「型N文字コード」を1つの `データ読込条件` ダイアログに統合し、選択条件で先頭レコードを試し読みするプレビュー欄を追加する。既知のコピー句サンプルは対応条件を初期選択する。
+- v0.1.28 で、上部の操作ボタン群を一般的なWindowsアプリ寄りの `ファイル` / `編集` / `定義` / `表示` / `ツール` メニューへ整理する。`データ読込条件` ダイアログはリサイズ可能にし、プレビューを表形式にする。README スクリーンショットも v0.1.28 に更新する。
 - 次回対応メモ: `サンプル条件` 欄は利用者に分かりにくいため削除する。現時点では実装変更しない。削除時は、画面上部の `サンプル条件` 行、関連する `sampleHintTextBox` / `UpdateSampleHintText` / `EnsureKnownSampleSelection` 周辺の扱い、README の説明・スクリーンショットもあわせて見直す。
 
 最後に push 済みの重要コミット:

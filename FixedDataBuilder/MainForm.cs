@@ -36,11 +36,11 @@ public sealed class MainForm : Form
     private readonly TextBox sampleHintTextBox = new();
     private readonly TextBox hexTextBox = new();
     private readonly DataGridView grid = new();
-    private readonly ToolStrip toolStrip = new();
+    private readonly MenuStrip menuStrip = new();
     private readonly StatusStrip statusStrip = new();
     private readonly ToolStripStatusLabel statusLabel = new();
-    private readonly ToolStripButton fieldRowsButton;
-    private readonly ToolStripButton recordRowsButton;
+    private readonly ToolStripMenuItem fieldRowsButton;
+    private readonly ToolStripMenuItem recordRowsButton;
     private readonly List<string> recentDefinitionFiles = [];
     private readonly List<string> recentDataFiles = [];
     private readonly List<FieldDefinition> fields = [];
@@ -63,8 +63,8 @@ public sealed class MainForm : Form
         Width = 1100;
         Height = 740;
 
-        fieldRowsButton = CreateButton("表示: 項目縦", (_, _) => ChangeLayout(GridLayout.FieldRows));
-        recordRowsButton = CreateButton("表示: レコード縦", (_, _) => ChangeLayout(GridLayout.RecordRows));
+        fieldRowsButton = CreateMenuItem("項目縦", (_, _) => ChangeLayout(GridLayout.FieldRows));
+        recordRowsButton = CreateMenuItem("レコード縦", (_, _) => ChangeLayout(GridLayout.RecordRows));
 
         LoadRecentFiles();
         LoadSettings();
@@ -73,10 +73,11 @@ public sealed class MainForm : Form
         Controls.Add(grid);
         Controls.Add(BuildHexPanel());
         Controls.Add(statusStrip);
-        Controls.Add(toolStrip);
         Controls.Add(BuildFilePanel());
+        Controls.Add(menuStrip);
 
-        BuildToolStrip();
+        BuildMenuStrip();
+        MainMenuStrip = menuStrip;
         BuildGrid();
         ApplyDisplayFont();
 
@@ -199,39 +200,49 @@ public sealed class MainForm : Form
         comboBox.Margin = new Padding(0, 1, 0, 3);
     }
 
-    private void BuildToolStrip()
+    private void BuildMenuStrip()
     {
-        toolStrip.Dock = DockStyle.Top;
-        toolStrip.GripStyle = ToolStripGripStyle.Hidden;
-        toolStrip.Items.Add(CreateButton("追加", (_, _) => AddRecord()));
-        toolStrip.Items.Add(CreateButton("複製", (_, _) => DuplicateRecord()));
-        toolStrip.Items.Add(CreateButton("削除", (_, _) => DeleteRecord()));
-        toolStrip.Items.Add(new ToolStripSeparator());
-        toolStrip.Items.Add(CreateButton("定義作成", (_, _) => CreateDefinition(editCurrent: false)));
-        toolStrip.Items.Add(CreateButton("定義修正", (_, _) => CreateDefinition(editCurrent: true)));
-        toolStrip.Items.Add(new ToolStripSeparator());
-        toolStrip.Items.Add(fieldRowsButton);
-        toolStrip.Items.Add(recordRowsButton);
-        toolStrip.Items.Add(CreateButton("項目表示", (_, _) => ChooseVisibleFields()));
-        toolStrip.Items.Add(CreateButton("フォント設定", (_, _) => ChooseDisplayFont()));
-        toolStrip.Items.Add(new ToolStripSeparator());
-        toolStrip.Items.Add(CreateButton("検証", (_, _) => ValidateRecords(showSuccess: true)));
-        toolStrip.Items.Add(CreateButton("上書き保存", (_, _) => SaveDataOverwrite()));
-        toolStrip.Items.Add(CreateButton("名前を付けて保存", (_, _) => SaveDataAs()));
-        toolStrip.Items.Add(new ToolStripSeparator());
-        toolStrip.Items.Add(CreateButton("Excel出力", (_, _) => ExportExcel()));
-        toolStrip.Items.Add(CreateButton("Excel取込", (_, _) => ImportExcel()));
+        menuStrip.Dock = DockStyle.Top;
+        menuStrip.Items.Add(CreateMenu("ファイル",
+            CreateMenuItem("定義を開く...", (_, _) => OpenDefinition()),
+            CreateMenuItem("データを開く...", (_, _) => OpenData()),
+            new ToolStripSeparator(),
+            CreateMenuItem("上書き保存", (_, _) => SaveDataOverwrite()),
+            CreateMenuItem("名前を付けて保存...", (_, _) => SaveDataAs()),
+            new ToolStripSeparator(),
+            CreateMenuItem("Excel出力...", (_, _) => ExportExcel()),
+            CreateMenuItem("Excel取込...", (_, _) => ImportExcel()),
+            new ToolStripSeparator(),
+            CreateMenuItem("終了", (_, _) => Close())));
+        menuStrip.Items.Add(CreateMenu("編集",
+            CreateMenuItem("レコード追加", (_, _) => AddRecord()),
+            CreateMenuItem("レコード複製", (_, _) => DuplicateRecord()),
+            CreateMenuItem("レコード削除", (_, _) => DeleteRecord())));
+        menuStrip.Items.Add(CreateMenu("定義",
+            CreateMenuItem("定義作成...", (_, _) => CreateDefinition(editCurrent: false)),
+            CreateMenuItem("定義修正...", (_, _) => CreateDefinition(editCurrent: true))));
+        menuStrip.Items.Add(CreateMenu("表示",
+            fieldRowsButton,
+            recordRowsButton,
+            new ToolStripSeparator(),
+            CreateMenuItem("表示項目...", (_, _) => ChooseVisibleFields()),
+            CreateMenuItem("フォント設定...", (_, _) => ChooseDisplayFont())));
+        menuStrip.Items.Add(CreateMenu("ツール",
+            CreateMenuItem("検証", (_, _) => ValidateRecords(showSuccess: true))));
     }
 
-    private static ToolStripButton CreateButton(string text, EventHandler onClick)
+    private static ToolStripMenuItem CreateMenu(string text, params ToolStripItem[] items)
     {
-        var button = new ToolStripButton(text)
-        {
-            DisplayStyle = ToolStripItemDisplayStyle.Text,
-            AutoToolTip = false
-        };
-        button.Click += onClick;
-        return button;
+        var menu = new ToolStripMenuItem(text);
+        menu.DropDownItems.AddRange(items);
+        return menu;
+    }
+
+    private static ToolStripMenuItem CreateMenuItem(string text, EventHandler onClick)
+    {
+        var item = new ToolStripMenuItem(text);
+        item.Click += onClick;
+        return item;
     }
 
     private void BuildGrid()
@@ -926,17 +937,19 @@ public sealed class MainForm : Form
         {
             Text = "データ読込条件",
             StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
+            FormBorderStyle = FormBorderStyle.Sizable,
             MinimizeBox = false,
-            MaximizeBox = false,
-            ClientSize = new Size(620, 470)
+            MaximizeBox = true,
+            ClientSize = new Size(760, 540),
+            MinimumSize = new Size(680, 500)
         };
 
         var separatorGroup = new GroupBox
         {
-            Text = "レコード区切り",
+            Text = "1. レコード区切り",
             Location = new Point(16, 14),
-            Size = new Size(280, 86)
+            Size = new Size(340, 86),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left
         };
 
         var lineBreakRadio = new RadioButton
@@ -957,9 +970,10 @@ public sealed class MainForm : Form
 
         var nationalEncodingGroup = new GroupBox
         {
-            Text = "型N 文字コード",
-            Location = new Point(316, 14),
-            Size = new Size(280, 126)
+            Text = "2. 型N 文字コード",
+            Location = new Point(380, 14),
+            Size = new Size(340, 126),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
 
         var options = new[]
@@ -994,37 +1008,54 @@ public sealed class MainForm : Form
         {
             Text = "OK",
             DialogResult = DialogResult.OK,
-            Location = new Point(440, 424),
-            Width = 75
+            Location = new Point(580, 494),
+            Width = 75,
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom
         };
         var cancelButton = new Button
         {
             Text = "キャンセル",
             DialogResult = DialogResult.Cancel,
-            Location = new Point(522, 424),
-            Width = 75
+            Location = new Point(664, 494),
+            Width = 75,
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom
         };
         var previewButton = new Button
         {
             Text = "プレビュー更新",
-            Location = new Point(16, 424),
-            Width = 120
+            Location = new Point(16, 494),
+            Width = 120,
+            Anchor = AnchorStyles.Left | AnchorStyles.Bottom
         };
         var previewLabel = new Label
         {
-            Text = "プレビュー",
+            Text = "プレビュー（先頭5レコード）",
             Location = new Point(16, 152),
             AutoSize = true
         };
-        var previewTextBox = new TextBox
+        var previewStatusLabel = new Label
+        {
+            Location = new Point(190, 152),
+            Size = new Size(550, 20),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var previewGrid = new DataGridView
         {
             Location = new Point(16, 174),
-            Size = new Size(580, 236),
-            Multiline = true,
             ReadOnly = true,
-            ScrollBars = ScrollBars.Both,
-            WordWrap = false,
-            Font = displayFont ?? CreateDefaultDisplayFont()
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            AllowUserToResizeRows = false,
+            RowHeadersVisible = false,
+            SelectionMode = DataGridViewSelectionMode.CellSelect,
+            MultiSelect = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
+            Size = new Size(724, 304),
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+            Font = displayFont ?? CreateDefaultDisplayFont(),
+            BackgroundColor = SystemColors.AppWorkspace
         };
 
         DataLoadOptions CurrentOptions()
@@ -1051,11 +1082,11 @@ public sealed class MainForm : Form
                     options.SeparatorMode,
                     currentDataEncodingProfile,
                     options.NationalTextEncoding);
-                previewTextBox.Text = BuildDataPreviewText(previewFields, previewRecords);
+                ShowDataPreview(previewGrid, previewStatusLabel, previewFields, previewRecords);
             }
             catch (Exception ex)
             {
-                previewTextBox.Text = $"プレビューエラー: {ex.Message}";
+                ShowDataPreviewError(previewGrid, previewStatusLabel, ex.Message);
             }
         }
 
@@ -1071,7 +1102,7 @@ public sealed class MainForm : Form
             };
         }
 
-        form.Controls.AddRange([separatorGroup, nationalEncodingGroup, previewLabel, previewTextBox, previewButton, okButton, cancelButton]);
+        form.Controls.AddRange([separatorGroup, nationalEncodingGroup, previewLabel, previewStatusLabel, previewGrid, previewButton, okButton, cancelButton]);
         form.AcceptButton = okButton;
         form.CancelButton = cancelButton;
         UpdatePreview();
@@ -1094,11 +1125,20 @@ public sealed class MainForm : Form
             .ToList();
     }
 
-    private static string BuildDataPreviewText(IReadOnlyList<FieldDefinition> previewFields, IReadOnlyList<List<string>> previewRecords)
+    private static void ShowDataPreview(
+        DataGridView previewGrid,
+        Label previewStatusLabel,
+        IReadOnlyList<FieldDefinition> previewFields,
+        IReadOnlyList<List<string>> previewRecords)
     {
+        previewGrid.Columns.Clear();
+        previewGrid.Rows.Clear();
+        previewStatusLabel.ForeColor = SystemColors.ControlText;
+
         if (previewRecords.Count == 0)
         {
-            return "レコードがありません。";
+            previewStatusLabel.Text = "レコードがありません。";
+            return;
         }
 
         var displayFieldIndexes = previewFields
@@ -1107,21 +1147,41 @@ public sealed class MainForm : Form
             .Take(8)
             .Select(item => item.index)
             .ToList();
-        var lines = new List<string>
+
+        previewGrid.Columns.Add(CreateReadOnlyColumn("Record", "レコード", 80, frozen: false));
+        foreach (var fieldIndex in displayFieldIndexes)
         {
-            string.Join(" | ", displayFieldIndexes.Select(index => previewFields[index].Name))
-        };
-        foreach (var record in previewRecords.Take(5))
-        {
-            lines.Add(string.Join(" | ", displayFieldIndexes.Select(index => FormatValueForDisplay(previewFields[index], record[index]))));
+            previewGrid.Columns.Add(CreateReadOnlyColumn($"Field{fieldIndex}", previewFields[fieldIndex].Name, 120, frozen: false));
         }
 
-        if (previewRecords.Count > 5)
+        for (var recordIndex = 0; recordIndex < previewRecords.Take(5).Count(); recordIndex++)
         {
-            lines.Add($"... 他 {previewRecords.Count - 5} レコード");
+            var record = previewRecords[recordIndex];
+            var rowIndex = previewGrid.Rows.Add();
+            var row = previewGrid.Rows[rowIndex];
+            row.Cells[0].Value = $"Rec {recordIndex + 1}";
+            for (var visibleIndex = 0; visibleIndex < displayFieldIndexes.Count; visibleIndex++)
+            {
+                var fieldIndex = displayFieldIndexes[visibleIndex];
+                row.Cells[visibleIndex + 1].Value = FormatValueForDisplay(previewFields[fieldIndex], record[fieldIndex]);
+            }
         }
 
-        return string.Join(Environment.NewLine, lines);
+        var omittedRecordText = previewRecords.Count > 5
+            ? $" / 他 {previewRecords.Count - 5} レコードあり"
+            : string.Empty;
+        var omittedFieldText = previewFields.Count(field => !field.IsRedefines) > displayFieldIndexes.Count
+            ? " / 表示は先頭8項目まで"
+            : string.Empty;
+        previewStatusLabel.Text = $"読込可能: {previewRecords.Count} レコード{omittedRecordText}{omittedFieldText}";
+    }
+
+    private static void ShowDataPreviewError(DataGridView previewGrid, Label previewStatusLabel, string message)
+    {
+        previewGrid.Columns.Clear();
+        previewGrid.Rows.Clear();
+        previewStatusLabel.ForeColor = Color.Firebrick;
+        previewStatusLabel.Text = $"プレビューエラー: {message}";
     }
 
     private List<string> CreateEmptyRecord()
