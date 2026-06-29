@@ -18,15 +18,16 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.26`
+- 現在の最新 Release: `v0.1.27` 予定（データ読込条件ダイアログ統合のRelease作成中）
 
 ## 現在の成功状態
 
 最新の成功状態:
 
 - `v0.1.26` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.26 の Release ビルド済み
-- `FixedDataBuilder-v0.1.26.zip` を作成済み
+- 次の作業対象は `v0.1.27`: データ読み込み時の改行区切りと型N文字コード選択を1つの `データ読込条件` ダイアログに統合し、プレビュー欄を追加する
+- `release/FixedDataBuilder.exe` は v0.1.27 の Release ビルド済み
+- `FixedDataBuilder-v0.1.27.zip` を作成する
 - zip の中身は exe 等と `samples/` が直下に入る形
 - README は `docs/screen-image-redefines-hidden-v0.1.26.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
@@ -38,6 +39,8 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.24 で、データ読み込み時に改行コード選択の後で型Nの文字コードを `Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` から選べるようにする。コピー句サンプルとして、N項目UTF-16LE・その他UTF-8の `sample-copybook-utf16.dat` を追加する。
 - v0.1.25 で、画面上部に `サンプル条件` 欄を追加する。既知のコピー句サンプルを誤った定義・改行・型N文字コードで開こうとした場合は、読み込み前に専用エラーを出す。コピー句サンプルを改行有無・型N文字コード別に追加する。
 - v0.1.26 で、REDEFINES 項目を画面表示・項目表示選択の対象から除外する。
+- v0.1.27 で、データ読み込み時の「改行区切り」と「型N文字コード」を1つの `データ読込条件` ダイアログに統合し、選択条件で先頭レコードを試し読みするプレビュー欄を追加する。既知のコピー句サンプルは対応条件を初期選択する。
+- 次回対応メモ: `サンプル条件` 欄は利用者に分かりにくいため削除する。現時点では実装変更しない。削除時は、画面上部の `サンプル条件` 行、関連する `sampleHintTextBox` / `UpdateSampleHintText` / `EnsureKnownSampleSelection` 周辺の扱い、README の説明・スクリーンショットもあわせて見直す。
 
 最後に push 済みの重要コミット:
 
@@ -71,8 +74,8 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
   - コピー句ファイルは UTF-8、固定形式の 7 桁目ルールあり
   - コピー句由来のデータは X/9/S9/COMP-3 を UTF-8、N 項目をデータ読み込み時に選択した文字コードで読み込む
 - 固定長データ読み込み
-- 読み込み時の改行あり / 改行なし選択
-- 読み込み時の型N文字コード選択。改行コード選択後に `Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` から選ぶ。既定値は `Shift_JIS`
+- 読み込み時の改行あり / 改行なしと型N文字コード選択。`データ読込条件` ダイアログに統合済み
+- `データ読込条件` ダイアログで、選択中の条件による先頭レコードのプレビューを表示
 - コピー句サンプルの対応条件表示。表にない組み合わせはエラーまたは文字化けすることを画面上部とREADMEに明示
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存

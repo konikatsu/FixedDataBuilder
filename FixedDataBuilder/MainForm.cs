@@ -486,19 +486,13 @@ public sealed class MainForm : Form
 
         try
         {
-            var separatorMode = SelectRecordSeparatorMode();
-            if (separatorMode is null)
+            var loadOptions = SelectDataLoadOptions(dialog.FileName);
+            if (loadOptions is null)
             {
                 return;
             }
 
-            var nationalTextEncoding = SelectNationalTextEncoding();
-            if (nationalTextEncoding is null)
-            {
-                return;
-            }
-
-            LoadData(dialog.FileName, separatorMode.Value, nationalTextEncoding.Value);
+            LoadData(dialog.FileName, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding);
             RefreshGrid();
             SetStatus("データファイルを読み込みました。");
         }
@@ -745,19 +739,13 @@ public sealed class MainForm : Form
 
         try
         {
-            var separatorMode = SelectRecordSeparatorMode();
-            if (separatorMode is null)
+            var loadOptions = SelectDataLoadOptions(path);
+            if (loadOptions is null)
             {
                 return;
             }
 
-            var nationalTextEncoding = SelectNationalTextEncoding();
-            if (nationalTextEncoding is null)
-            {
-                return;
-            }
-
-            LoadData(path, separatorMode.Value, nationalTextEncoding.Value);
+            LoadData(path, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding);
             RefreshGrid();
             SetStatus(statusMessage);
         }
@@ -923,69 +911,55 @@ public sealed class MainForm : Form
         };
     }
 
-    private RecordSeparatorMode? SelectRecordSeparatorMode()
+    private DataLoadOptions? SelectDataLoadOptions(string dataPath)
     {
+        var samplePattern = FindCopybookSamplePattern(dataPath);
+        var canUseSampleDefaults = samplePattern?.MatchesDefinition(Path.GetFileName(GetCurrentDefinitionPath())) == true;
+        var defaultSeparatorMode = canUseSampleDefaults
+            ? samplePattern!.SeparatorMode
+            : currentSeparatorMode;
+        var defaultNationalTextEncoding = canUseSampleDefaults
+            ? samplePattern!.NationalTextEncoding
+            : currentNationalTextEncoding;
+
         using var form = new Form
         {
-            Text = "レコード区切り",
+            Text = "データ読込条件",
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MinimizeBox = false,
             MaximizeBox = false,
-            ClientSize = new Size(300, 150)
+            ClientSize = new Size(620, 470)
+        };
+
+        var separatorGroup = new GroupBox
+        {
+            Text = "レコード区切り",
+            Location = new Point(16, 14),
+            Size = new Size(280, 86)
         };
 
         var lineBreakRadio = new RadioButton
         {
             Text = "改行あり (CRLF/LF)",
-            Checked = currentSeparatorMode == RecordSeparatorMode.CrLfOrLf,
-            Location = new Point(20, 20),
+            Checked = defaultSeparatorMode == RecordSeparatorMode.CrLfOrLf,
+            Location = new Point(14, 24),
             AutoSize = true
         };
         var noLineBreakRadio = new RadioButton
         {
             Text = "改行なし",
-            Checked = currentSeparatorMode == RecordSeparatorMode.None,
-            Location = new Point(20, 50),
+            Checked = defaultSeparatorMode == RecordSeparatorMode.None,
+            Location = new Point(14, 52),
             AutoSize = true
         };
-        var okButton = new Button
-        {
-            Text = "OK",
-            DialogResult = DialogResult.OK,
-            Location = new Point(120, 100),
-            Width = 75
-        };
-        var cancelButton = new Button
-        {
-            Text = "キャンセル",
-            DialogResult = DialogResult.Cancel,
-            Location = new Point(200, 100),
-            Width = 75
-        };
+        separatorGroup.Controls.AddRange([lineBreakRadio, noLineBreakRadio]);
 
-        form.Controls.AddRange([lineBreakRadio, noLineBreakRadio, okButton, cancelButton]);
-        form.AcceptButton = okButton;
-        form.CancelButton = cancelButton;
-
-        if (form.ShowDialog(this) != DialogResult.OK)
-        {
-            return null;
-        }
-
-        return noLineBreakRadio.Checked ? RecordSeparatorMode.None : RecordSeparatorMode.CrLfOrLf;
-    }
-
-    private NationalTextEncoding? SelectNationalTextEncoding()
-    {
-        using var form = new Form
+        var nationalEncodingGroup = new GroupBox
         {
             Text = "型N 文字コード",
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MinimizeBox = false,
-            MaximizeBox = false,
-            ClientSize = new Size(320, 210)
+            Location = new Point(316, 14),
+            Size = new Size(280, 126)
         };
 
         var options = new[]
@@ -1003,12 +977,12 @@ public sealed class MainForm : Form
             {
                 Text = option.Text,
                 Tag = option.Encoding,
-                Checked = currentNationalTextEncoding == option.Encoding,
-                Location = new Point(20, 20 + (index * 28)),
+                Checked = defaultNationalTextEncoding == option.Encoding,
+                Location = new Point(14, 24 + (index * 24)),
                 AutoSize = true
             };
             buttons.Add(radioButton);
-            form.Controls.Add(radioButton);
+            nationalEncodingGroup.Controls.Add(radioButton);
         }
 
         if (!buttons.Any(button => button.Checked))
@@ -1020,29 +994,134 @@ public sealed class MainForm : Form
         {
             Text = "OK",
             DialogResult = DialogResult.OK,
-            Location = new Point(140, 160),
+            Location = new Point(440, 424),
             Width = 75
         };
         var cancelButton = new Button
         {
             Text = "キャンセル",
             DialogResult = DialogResult.Cancel,
-            Location = new Point(220, 160),
+            Location = new Point(522, 424),
             Width = 75
         };
+        var previewButton = new Button
+        {
+            Text = "プレビュー更新",
+            Location = new Point(16, 424),
+            Width = 120
+        };
+        var previewLabel = new Label
+        {
+            Text = "プレビュー",
+            Location = new Point(16, 152),
+            AutoSize = true
+        };
+        var previewTextBox = new TextBox
+        {
+            Location = new Point(16, 174),
+            Size = new Size(580, 236),
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Both,
+            WordWrap = false,
+            Font = displayFont ?? CreateDefaultDisplayFont()
+        };
 
-        form.Controls.AddRange([okButton, cancelButton]);
+        DataLoadOptions CurrentOptions()
+        {
+            var separatorMode = noLineBreakRadio.Checked
+                ? RecordSeparatorMode.None
+                : RecordSeparatorMode.CrLfOrLf;
+            var nationalTextEncoding = buttons.First(button => button.Checked).Tag is NationalTextEncoding encoding
+                ? encoding
+                : NationalTextEncoding.ShiftJis;
+            return new DataLoadOptions(separatorMode, nationalTextEncoding);
+        }
+
+        void UpdatePreview()
+        {
+            try
+            {
+                var options = CurrentOptions();
+                EnsureKnownSampleSelection(dataPath, options.SeparatorMode, options.NationalTextEncoding);
+                var previewFields = BuildFieldsForNationalTextEncoding(options.NationalTextEncoding);
+                var previewRecords = FixedLengthDataReader.Read(
+                    dataPath,
+                    previewFields,
+                    options.SeparatorMode,
+                    currentDataEncodingProfile,
+                    options.NationalTextEncoding);
+                previewTextBox.Text = BuildDataPreviewText(previewFields, previewRecords);
+            }
+            catch (Exception ex)
+            {
+                previewTextBox.Text = $"プレビューエラー: {ex.Message}";
+            }
+        }
+
+        previewButton.Click += (_, _) => UpdatePreview();
+        foreach (var radioButton in buttons.Concat([lineBreakRadio, noLineBreakRadio]))
+        {
+            radioButton.CheckedChanged += (_, _) =>
+            {
+                if (((RadioButton)radioButton).Checked)
+                {
+                    UpdatePreview();
+                }
+            };
+        }
+
+        form.Controls.AddRange([separatorGroup, nationalEncodingGroup, previewLabel, previewTextBox, previewButton, okButton, cancelButton]);
         form.AcceptButton = okButton;
         form.CancelButton = cancelButton;
+        UpdatePreview();
 
         if (form.ShowDialog(this) != DialogResult.OK)
         {
             return null;
         }
 
-        return buttons.First(button => button.Checked).Tag is NationalTextEncoding encoding
-            ? encoding
-            : NationalTextEncoding.ShiftJis;
+        return CurrentOptions();
+    }
+
+    private List<FieldDefinition> BuildFieldsForNationalTextEncoding(NationalTextEncoding nationalTextEncoding)
+    {
+        var byteWidth = NationalTextEncodingHelper.FixedByteWidth(nationalTextEncoding);
+        return fields
+            .Select(field => field.Type == FieldDataType.FullWidthText
+                ? field with { NationalByteWidth = byteWidth }
+                : field)
+            .ToList();
+    }
+
+    private static string BuildDataPreviewText(IReadOnlyList<FieldDefinition> previewFields, IReadOnlyList<List<string>> previewRecords)
+    {
+        if (previewRecords.Count == 0)
+        {
+            return "レコードがありません。";
+        }
+
+        var displayFieldIndexes = previewFields
+            .Select((field, index) => (field, index))
+            .Where(item => !item.field.IsRedefines)
+            .Take(8)
+            .Select(item => item.index)
+            .ToList();
+        var lines = new List<string>
+        {
+            string.Join(" | ", displayFieldIndexes.Select(index => previewFields[index].Name))
+        };
+        foreach (var record in previewRecords.Take(5))
+        {
+            lines.Add(string.Join(" | ", displayFieldIndexes.Select(index => FormatValueForDisplay(previewFields[index], record[index]))));
+        }
+
+        if (previewRecords.Count > 5)
+        {
+            lines.Add($"... 他 {previewRecords.Count - 5} レコード");
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     private List<string> CreateEmptyRecord()
@@ -1992,6 +2071,10 @@ public sealed class MainForm : Form
             return string.Equals(fileName, DefinitionFileName, StringComparison.OrdinalIgnoreCase);
         }
     }
+
+    private sealed record DataLoadOptions(
+        RecordSeparatorMode SeparatorMode,
+        NationalTextEncoding NationalTextEncoding);
 
     private static DataGridViewTextBoxColumn CreateReadOnlyColumn(string name, string header, int width, bool frozen)
     {
