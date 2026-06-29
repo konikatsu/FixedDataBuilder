@@ -6,7 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-national-encoding-v0.1.24.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-sample-rules-v0.1.25.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示し、最近使ったファイルをそれぞれ直近 20 件まで履歴から選べます。
 
@@ -14,7 +14,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
 
-zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv`、`samples/definition.cbl`、`samples/definition-english.cbl`、`samples/sample-records.csv`、`samples/sample.dat`、`samples/sample-shiftjis.dat`、`samples/sample-copybook-utf16.dat` も同梱しています。
+zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/definition.csv`、`samples/definition.cbl`、`samples/definition-english.cbl`、`samples/sample-records.csv`、`samples/sample.dat`、`samples/sample-shiftjis.dat`、`samples/sample-copybook-*.dat` も同梱しています。
 
 ## 定義書 CSV / COBOL コピー句
 
@@ -133,12 +133,22 @@ S9(3) COMP-3  -123 -> 12 3D
 
 ### COBOL コピー句サンプル
 
-`samples/definition-english.cbl` と `samples/sample-copybook-utf16.dat` は、コピー句読み込み確認用のサンプルです。
+`samples/definition-english.cbl` と `samples/sample-copybook-*.dat` は、コピー句読み込み確認用のサンプルです。
 
 - コピー句ファイルは UTF-8 です
-- データファイルの X/9/S9/COMP-3 項目は UTF-8 です
-- N 項目は UTF-16LE です。データ読み込み時は、改行コード選択の後に表示される `型N 文字コード` 画面で `UTF-16LE` を選択してください
-- レコード区切りは `改行あり (CRLF/LF)` です
+- データファイル名の `crlf` は `改行あり (CRLF/LF)`、`none` は `改行なし` を表します
+- データファイル名の `nutf8` / `nutf16` / `nutf32` / `nsjis` は、型N文字コードの選択値を表します
+- 以下の表にない組み合わせは、エラーまたは文字化けになります
+
+| データファイル | 定義ファイル | 改行区切り | 型N文字コード |
+| --- | --- | --- | --- |
+| `sample-copybook-utf16.dat` | `definition-english.cbl` | 改行あり (CRLF/LF) | UTF-16LE |
+| `sample-copybook-crlf-utf8-nutf16.dat` | `definition-english.cbl` | 改行あり (CRLF/LF) | UTF-16LE |
+| `sample-copybook-crlf-utf8-nutf8.dat` | `definition-english.cbl` | 改行あり (CRLF/LF) | UTF-8 |
+| `sample-copybook-none-sjis-nsjis.dat` | `definition-english.cbl` | 改行なし | Shift_JIS |
+| `sample-copybook-none-utf8-nutf8.dat` | `definition-english.cbl` | 改行なし | UTF-8 |
+| `sample-copybook-none-utf8-nutf16.dat` | `definition-english.cbl` | 改行なし | UTF-16LE |
+| `sample-copybook-none-utf8-nutf32.dat` | `definition-english.cbl` | 改行なし | UTF-32LE |
 
 このサンプルでは、顧客名、英名、年齢、金額の 3 レコードを確認できます。金額は `S9(9) COMP-3` の packed decimal で、3 レコード目は `-9999` です。
 

@@ -19,10 +19,21 @@ public sealed class MainForm : Form
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "FixedDataBuilder",
         "settings.txt");
+    private static readonly SamplePattern[] CopybookSamplePatterns =
+    [
+        new("sample-copybook-utf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
+        new("sample-copybook-crlf-utf8-nutf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
+        new("sample-copybook-crlf-utf8-nutf8.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
+        new("sample-copybook-none-sjis-nsjis.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.ShiftJis),
+        new("sample-copybook-none-utf8-nutf8.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf8),
+        new("sample-copybook-none-utf8-nutf16.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf16),
+        new("sample-copybook-none-utf8-nutf32.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf32)
+    ];
 
     private readonly ComboBox definitionPathComboBox = new();
     private readonly ComboBox dataPathComboBox = new();
     private readonly TextBox separatorModeTextBox = new();
+    private readonly TextBox sampleHintTextBox = new();
     private readonly TextBox hexTextBox = new();
     private readonly DataGridView grid = new();
     private readonly ToolStrip toolStrip = new();
@@ -84,7 +95,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 3,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(8, 6, 8, 4)
         };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
@@ -93,10 +104,12 @@ public sealed class MainForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
 
         ConfigurePathComboBox(definitionPathComboBox);
         ConfigurePathComboBox(dataPathComboBox);
         ConfigureReadOnlyTextBox(separatorModeTextBox);
+        ConfigureReadOnlyTextBox(sampleHintTextBox);
         RefreshRecentFileItems();
 
         definitionPathComboBox.SelectionChangeCommitted += (_, _) => LoadDefinitionFromHistory();
@@ -112,6 +125,10 @@ public sealed class MainForm : Form
         panel.Controls.Add(CreatePathButton("選択", (_, _) => OpenData()), 2, 1);
         panel.Controls.Add(CreatePathLabel("レコード区切り"), 0, 2);
         panel.Controls.Add(separatorModeTextBox, 1, 2);
+        panel.SetColumnSpan(separatorModeTextBox, 2);
+        panel.Controls.Add(CreatePathLabel("サンプル条件"), 0, 3);
+        panel.Controls.Add(sampleHintTextBox, 1, 3);
+        panel.SetColumnSpan(sampleHintTextBox, 2);
         return panel;
     }
 
@@ -533,6 +550,7 @@ public sealed class MainForm : Form
         SetPathText(definitionPathComboBox, path);
         AddRecentFile(recentDefinitionFiles, path);
         UpdateSeparatorModeText();
+        UpdateSampleHintText();
     }
 
     private static bool IsCopybookPath(string path)
@@ -545,6 +563,7 @@ public sealed class MainForm : Form
 
     private void LoadData(string path, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
     {
+        EnsureKnownSampleSelection(path, separatorMode, nationalTextEncoding);
         ApplyNationalTextEncoding(nationalTextEncoding);
 
         records.Clear();
@@ -555,6 +574,7 @@ public sealed class MainForm : Form
         SetPathText(dataPathComboBox, path);
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
+        UpdateSampleHintText();
     }
 
     private void ApplyNationalTextEncoding(NationalTextEncoding nationalTextEncoding)
@@ -568,6 +588,43 @@ public sealed class MainForm : Form
                 fields[index] = fields[index] with { NationalByteWidth = byteWidth };
             }
         }
+        UpdateSampleHintText();
+    }
+
+    private void EnsureKnownSampleSelection(string dataPath, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
+    {
+        var samplePattern = FindCopybookSamplePattern(dataPath);
+        if (samplePattern is null)
+        {
+            return;
+        }
+
+        var definitionFileName = Path.GetFileName(GetCurrentDefinitionPath());
+        var required = new List<string>();
+        if (!samplePattern.MatchesDefinition(definitionFileName))
+        {
+            required.Add($"定義={samplePattern.DefinitionFileName}");
+        }
+
+        if (separatorMode != samplePattern.SeparatorMode)
+        {
+            required.Add($"改行={FormatSeparatorMode(samplePattern.SeparatorMode)}");
+        }
+
+        if (nationalTextEncoding != samplePattern.NationalTextEncoding)
+        {
+            required.Add($"型N={NationalTextEncodingHelper.DisplayName(samplePattern.NationalTextEncoding)}");
+        }
+
+        if (required.Count == 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"{samplePattern.FileName} は {samplePattern.DefinitionFileName} + {FormatSeparatorMode(samplePattern.SeparatorMode)} + 型N={NationalTextEncodingHelper.DisplayName(samplePattern.NationalTextEncoding)} 用です。\r\n" +
+            "既存サンプルと追加サンプルの対応パターン以外は、エラーまたは文字化けになります。\r\n" +
+            $"必要な選択: {string.Join(" / ", required)}");
     }
 
     private void SetPathText(ComboBox comboBox, string path)
@@ -1853,6 +1910,61 @@ public sealed class MainForm : Form
             ? "改行なし"
             : "改行あり (CRLF/LF)";
         separatorModeTextBox.Text = $"{separatorText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
+        UpdateSampleHintText();
+    }
+
+    private void UpdateSampleHintText()
+    {
+        var samplePattern = FindCopybookSamplePattern(GetCurrentDataPath());
+        sampleHintTextBox.Text = samplePattern is null
+            ? "コピー句サンプルは、ファイル名に合う定義・改行・型N文字コードで読み込んでください。対象外はエラーまたは文字化けします。"
+            : $"{samplePattern.FileName}: {samplePattern.DefinitionFileName} + {FormatSeparatorMode(samplePattern.SeparatorMode)} + 型N={NationalTextEncodingHelper.DisplayName(samplePattern.NationalTextEncoding)} 用 / 対象外はエラーまたは文字化けします。";
+        sampleHintTextBox.SelectionStart = sampleHintTextBox.TextLength;
+    }
+
+    private string? GetCurrentDefinitionPath()
+    {
+        return definitionPathComboBox.Text;
+    }
+
+    private string? GetCurrentDataPath()
+    {
+        return dataPathComboBox.Text;
+    }
+
+    private static SamplePattern? FindCopybookSamplePattern(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        var fileName = Path.GetFileName(path);
+        return CopybookSamplePatterns.FirstOrDefault(pattern => pattern.MatchesFile(fileName));
+    }
+
+    private static string FormatSeparatorMode(RecordSeparatorMode separatorMode)
+    {
+        return separatorMode == RecordSeparatorMode.None
+            ? "改行なし"
+            : "改行あり (CRLF/LF)";
+    }
+
+    private sealed record SamplePattern(
+        string FileName,
+        string DefinitionFileName,
+        RecordSeparatorMode SeparatorMode,
+        NationalTextEncoding NationalTextEncoding)
+    {
+        public bool MatchesFile(string? fileName)
+        {
+            return string.Equals(fileName, FileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public bool MatchesDefinition(string? fileName)
+        {
+            return string.Equals(fileName, DefinitionFileName, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private static DataGridViewTextBoxColumn CreateReadOnlyColumn(string name, string header, int width, bool frozen)
