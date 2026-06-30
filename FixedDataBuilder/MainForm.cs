@@ -22,18 +22,14 @@ public sealed class MainForm : Form
     private static readonly SamplePattern[] CopybookSamplePatterns =
     [
         new("copybook-basic-data-crlf-utf8-n-utf16le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
-        new("copybook-basic-data-crlf-utf8-n-utf8.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
         new("copybook-basic-data-none-sjis-n-sjis.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.ShiftJis),
-        new("copybook-basic-data-none-utf8-n-utf8.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf8),
         new("copybook-basic-data-none-utf8-n-utf16le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf16),
         new("copybook-basic-data-none-utf8-n-utf32le.dat", "copybook-basic-definition.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf32),
-        new("copybook-occurs-data-crlf-utf8-n-utf8.dat", "copybook-occurs-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
-        new("copybook-group-occurs-data-crlf-utf8-n-utf8.dat", "copybook-group-occurs-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
+        new("copybook-occurs-data-crlf-utf8-n-utf16le.dat", "copybook-occurs-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
+        new("copybook-group-occurs-data-crlf-utf8-n-utf16le.dat", "copybook-group-occurs-definition.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
         new("sample-copybook-utf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
         new("sample-copybook-crlf-utf8-nutf16.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf16),
-        new("sample-copybook-crlf-utf8-nutf8.dat", "definition-english.cbl", RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.Utf8),
         new("sample-copybook-none-sjis-nsjis.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.ShiftJis),
-        new("sample-copybook-none-utf8-nutf8.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf8),
         new("sample-copybook-none-utf8-nutf16.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf16),
         new("sample-copybook-none-utf8-nutf32.dat", "definition-english.cbl", RecordSeparatorMode.None, NationalTextEncoding.Utf32)
     ];
@@ -834,7 +830,6 @@ public sealed class MainForm : Form
         return value.Trim().ToLowerInvariant().Replace("_", "").Replace("-", "") switch
         {
             "shiftjis" or "sjis" => NationalTextEncoding.ShiftJis,
-            "utf8" => NationalTextEncoding.Utf8,
             "utf16" or "utf16le" => NationalTextEncoding.Utf16,
             "utf32" or "utf32le" => NationalTextEncoding.Utf32,
             _ => null
@@ -898,7 +893,6 @@ public sealed class MainForm : Form
         var options = new[]
         {
             (Encoding: NationalTextEncoding.ShiftJis, Text: "Shift_JIS"),
-            (Encoding: NationalTextEncoding.Utf8, Text: "UTF-8"),
             (Encoding: NationalTextEncoding.Utf16, Text: "UTF-16LE"),
             (Encoding: NationalTextEncoding.Utf32, Text: "UTF-32LE")
         };

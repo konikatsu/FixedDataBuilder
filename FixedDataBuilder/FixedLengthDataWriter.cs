@@ -173,7 +173,6 @@ public enum DataEncodingProfile
 public enum NationalTextEncoding
 {
     ShiftJis,
-    Utf8,
     Utf16,
     Utf32
 }
@@ -186,7 +185,6 @@ public static class NationalTextEncodingHelper
         return encoding switch
         {
             NationalTextEncoding.ShiftJis => Encoding.GetEncoding(932),
-            NationalTextEncoding.Utf8 => Encoding.UTF8,
             NationalTextEncoding.Utf16 => Encoding.Unicode,
             NationalTextEncoding.Utf32 => Encoding.UTF32,
             _ => throw new InvalidOperationException($"未対応の型N文字コードです: {encoding}")
@@ -198,7 +196,6 @@ public static class NationalTextEncodingHelper
         return encoding switch
         {
             NationalTextEncoding.ShiftJis => 2,
-            NationalTextEncoding.Utf8 => 3,
             NationalTextEncoding.Utf16 => 2,
             NationalTextEncoding.Utf32 => 4,
             _ => throw new InvalidOperationException($"未対応の型N文字コードです: {encoding}")
@@ -210,7 +207,6 @@ public static class NationalTextEncodingHelper
         return encoding switch
         {
             NationalTextEncoding.ShiftJis => "Shift_JIS",
-            NationalTextEncoding.Utf8 => "UTF-8",
             NationalTextEncoding.Utf16 => "UTF-16LE",
             NationalTextEncoding.Utf32 => "UTF-32LE",
             _ => encoding.ToString()

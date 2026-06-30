@@ -18,17 +18,17 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.30`
+- 現在の最新 Release: `v0.1.31`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.30` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.30 の Release ビルド済み
-- `FixedDataBuilder-v0.1.30.zip` を作成済み
+- `v0.1.31` を GitHub Release 済み
+- `release/FixedDataBuilder.exe` は v0.1.31 の Release ビルド済み
+- `FixedDataBuilder-v0.1.31.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-group-occurs-v0.1.30.png` と `docs/screen-image-data-load-options-v0.1.28.png` を参照
+- README は `docs/screen-image-group-occurs-v0.1.31.png` と `docs/screen-image-data-load-options-v0.1.31.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
@@ -42,6 +42,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.28 で、上部の操作ボタン群を一般的なWindowsアプリ寄りの `ファイル` / `編集` / `定義` / `表示` / `ツール` メニューへ整理する。`データ読込条件` ダイアログはリサイズ可能にし、プレビューを表形式にする。README スクリーンショットも v0.1.28 に更新する。
 - v0.1.29 で、画面上部の `サンプル条件` 行を削除し、定義/データのファイル欄を読み取り専用表示にする。最近使ったファイルは `ファイル` メニュー配下の `最近使った定義ファイル` / `最近使ったデータファイル` へ移動する。サンプル名は `basic-*` / `copybook-basic-*` / `copybook-occurs-*` の分かりやすい別名を追加し、基本項目OCCURSサンプルを追加する。集団項目OCCURSは未対応としてREADMEに明記する。
 - v0.1.30 で、集団項目OCCURSの限定対応を追加する。対応範囲は、非REDEFINES配下の単一集団項目 `OCCURS n TIMES` と、その配下の通常PIC項目の展開。REDEFINES配下OCCURS、多重OCCURS、OCCURS DEPENDING ON は未対応。`copybook-group-occurs-definition.cbl` と `copybook-group-occurs-data-crlf-utf8-n-utf8.dat` を追加する。
+- v0.1.31 で、型N文字コードの選択肢からUTF-8を削除する。型Nは固定長領域なので、可変長のUTF-8は扱わない。選択肢は `Shift_JIS` / `UTF-16LE` / `UTF-32LE`。型N UTF-8サンプルは削除し、OCCURS系サンプルはUTF-16LE版に置き換える。
 
 最後に push 済みの重要コミット:
 
@@ -125,7 +126,8 @@ S9(3) COMP-3  -123 -> 12 3D
 
 - CSV定義由来の固定長データは Shift_JIS 前提
 - コピー句由来の固定長データは X/9/S9/COMP-3 を UTF-8、N項目を選択した文字コードで扱う
-- 型Nの選択肢は `Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE`
+- 型Nの選択肢は `Shift_JIS` / `UTF-16LE` / `UTF-32LE`
+- 型Nは固定長領域のため、可変長のUTF-8は選択肢に入れない
 - `N(n)` は全角 n 文字領域として扱い、保存時の不足分は全角スペース
 - `X(n)` は定義上は半角文字として扱う想定
 
@@ -135,14 +137,12 @@ READMEでは新しい分かりやすい名前を主に説明します。旧名�
 
 | 定義ファイル | データファイル | 改行区切り | 型N文字コード |
 | --- | --- | --- | --- |
-| `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
 | `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-sjis-n-sjis.dat` | 改行なし | Shift_JIS |
-| `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf8.dat` | 改行なし | UTF-8 |
 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf16le.dat` | 改行なし | UTF-16LE |
 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf32le.dat` | 改行なし | UTF-32LE |
-| `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
-| `copybook-group-occurs-definition.cbl` | `copybook-group-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
+| `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
+| `copybook-group-occurs-definition.cbl` | `copybook-group-occurs-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
 
 OCCURSはPIC付き基本項目の同一行指定と、限定的な集団項目OCCURSに対応します。REDEFINES配下OCCURS、多重OCCURS、OCCURS DEPENDING ON は未対応です。
 
@@ -196,12 +196,12 @@ OCCURSはPIC付き基本項目の同一行指定と、限定的な集団項目OC
   - コピー句基本サンプル用の固定長データ。ファイル名で改行有無と型N文字コードを表す
 - `samples/copybook-occurs-definition.cbl`
   - PIC付き基本項目OCCURSのサンプル
-- `samples/copybook-occurs-data-crlf-utf8-n-utf8.dat`
-  - OCCURSサンプル用のUTF-8・改行あり固定長データ
+- `samples/copybook-occurs-data-crlf-utf8-n-utf16le.dat`
+  - OCCURSサンプル用の、X/9/S9/COMP-3はUTF-8・型NはUTF-16LE・改行あり固定長データ
 - `samples/copybook-group-occurs-definition.cbl`
   - 集団項目OCCURSの限定対応サンプル
-- `samples/copybook-group-occurs-data-crlf-utf8-n-utf8.dat`
-  - 集団項目OCCURSサンプル用のUTF-8・改行あり固定長データ
+- `samples/copybook-group-occurs-data-crlf-utf8-n-utf16le.dat`
+  - 集団項目OCCURSサンプル用の、X/9/S9/COMP-3はUTF-8・型NはUTF-16LE・改行あり固定長データ
 - `samples/definition.csv` / `samples/sample.dat` / `samples/sample-copybook-*.dat`
   - 旧名互換用。READMEでは新しい名前を主に案内する
 - `docs/release-checklist.md`

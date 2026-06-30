@@ -6,7 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-group-occurs-v0.1.30.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-group-occurs-v0.1.31.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
@@ -76,10 +76,10 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - 定義書 CSV 作成時、文字型の小数桁は入力不可
 - `定義作成` は空の新規作成、`定義修正` は読み込み済み定義の編集
 - 固定長データ読み込み
-- 読み込み時の改行あり / 改行なしと型N文字コード選択。`データ読込条件` 画面で、`Shift_JIS` / `UTF-8` / `UTF-16LE` / `UTF-32LE` を選べます。既定値は `Shift_JIS` です
+- 読み込み時の改行あり / 改行なしと型N文字コード選択。`データ読込条件` 画面で、`Shift_JIS` / `UTF-16LE` / `UTF-32LE` を選べます。既定値は `Shift_JIS` です
 - `データ読込条件` 画面で、選択中の条件によるデータプレビューを確認できます
 
-![データ読込条件画面](docs/screen-image-data-load-options-v0.1.28.png)
+![データ読込条件画面](docs/screen-image-data-load-options-v0.1.31.png)
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
@@ -141,19 +141,18 @@ S9(3) COMP-3  -123 -> 12 3D
 
 - コピー句ファイルは UTF-8 です
 - データファイル名の `crlf` は `改行あり (CRLF/LF)`、`none` は `改行なし` を表します
-- データファイル名の `n-utf8` / `n-utf16le` / `n-utf32le` / `n-sjis` は、型N文字コードの選択値を表します
+- データファイル名の `n-utf16le` / `n-utf32le` / `n-sjis` は、型N文字コードの選択値を表します
+- 型Nは固定長領域として扱うため、可変長のUTF-8は選択肢から外しています
 - 以下の表にない組み合わせは、エラーまたは文字化けになります
 
 | 用途 | 定義ファイル | データファイル | 改行区切り | 型N文字コード |
 | --- | --- | --- | --- | --- |
-| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-sjis-n-sjis.dat` | 改行なし | Shift_JIS |
-| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf8.dat` | 改行なし | UTF-8 |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf16le.dat` | 改行なし | UTF-16LE |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf32le.dat` | 改行なし | UTF-32LE |
-| 基本項目OCCURS | `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
-| 集団項目OCCURS | `copybook-group-occurs-definition.cbl` | `copybook-group-occurs-data-crlf-utf8-n-utf8.dat` | 改行あり (CRLF/LF) | UTF-8 |
+| 基本項目OCCURS | `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
+| 集団項目OCCURS | `copybook-group-occurs-definition.cbl` | `copybook-group-occurs-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
 
 基本コピー句サンプルでは、顧客名、英名、年齢、金額の 3 レコードを確認できます。金額は `S9(9) COMP-3` の packed decimal で、3 レコード目は `-9999` です。
 
