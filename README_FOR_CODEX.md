@@ -18,17 +18,17 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.31`
+- 現在の最新 Release: `v0.1.32`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.31` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.31 の Release ビルド済み
-- `FixedDataBuilder-v0.1.31.zip` を作成済み
+- `v0.1.32` を GitHub Release 済み
+- `release/FixedDataBuilder.exe` は v0.1.32 の Release ビルド済み
+- `FixedDataBuilder-v0.1.32.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-group-occurs-v0.1.31.png` と `docs/screen-image-data-load-options-v0.1.31.png` を参照
+- README は `docs/screen-image-occurs-visual-field-v0.1.32.png`、`docs/screen-image-occurs-visual-record-v0.1.32.png`、`docs/screen-image-data-load-options-v0.1.31.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
@@ -41,8 +41,9 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.27 で、データ読み込み時の「改行区切り」と「型N文字コード」を1つの `データ読込条件` ダイアログに統合し、選択条件で先頭レコードを試し読みするプレビュー欄を追加する。既知のコピー句サンプルは対応条件を初期選択する。
 - v0.1.28 で、上部の操作ボタン群を一般的なWindowsアプリ寄りの `ファイル` / `編集` / `定義` / `表示` / `ツール` メニューへ整理する。`データ読込条件` ダイアログはリサイズ可能にし、プレビューを表形式にする。README スクリーンショットも v0.1.28 に更新する。
 - v0.1.29 で、画面上部の `サンプル条件` 行を削除し、定義/データのファイル欄を読み取り専用表示にする。最近使ったファイルは `ファイル` メニュー配下の `最近使った定義ファイル` / `最近使ったデータファイル` へ移動する。サンプル名は `basic-*` / `copybook-basic-*` / `copybook-occurs-*` の分かりやすい別名を追加し、基本項目OCCURSサンプルを追加する。集団項目OCCURSは未対応としてREADMEに明記する。
-- v0.1.30 で、集団項目OCCURSの限定対応を追加する。対応範囲は、非REDEFINES配下の単一集団項目 `OCCURS n TIMES` と、その配下の通常PIC項目の展開。REDEFINES配下OCCURS、多重OCCURS、OCCURS DEPENDING ON は未対応。`copybook-group-occurs-definition.cbl` と `copybook-group-occurs-data-crlf-utf8-n-utf8.dat` を追加する。
+- v0.1.30 で、集団項目OCCURSの限定対応を追加する。対応範囲は、非REDEFINES配下の単一集団項目 `OCCURS n TIMES` と、その配下の通常PIC項目の展開。REDEFINES配下OCCURS、多重OCCURS、OCCURS DEPENDING ON は未対応。
 - v0.1.31 で、型N文字コードの選択肢からUTF-8を削除する。型Nは固定長領域なので、可変長のUTF-8は扱わない。選択肢は `Shift_JIS` / `UTF-16LE` / `UTF-32LE`。型N UTF-8サンプルは削除し、OCCURS系サンプルはUTF-16LE版に置き換える。
+- v0.1.32 で、OCCURS 展開項目の視覚的なまとまりを追加する。項目縦表示では `明細-1` / `明細-2` のような見出し行を挟み、子項目をインデントする。レコード縦表示では各 OCCURS グループの先頭に見出し列を挟み、OCCURS列を淡色背景にする。スクリーンショット作成用に起動引数 `--layout record` / `--layout field` も使える。
 
 最後に push 済みの重要コミット:
 

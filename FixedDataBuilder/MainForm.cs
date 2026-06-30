@@ -8,6 +8,10 @@ public sealed class MainForm : Form
 {
     private static readonly Color DefinitionBackColor = Color.FromArgb(226, 242, 226);
     private static readonly Color DefinitionHeaderBackColor = Color.FromArgb(204, 232, 204);
+    private static readonly Color OccursHeaderBackColor = Color.FromArgb(223, 235, 248);
+    private static readonly Color OccursHeaderForeColor = Color.FromArgb(35, 62, 102);
+    private static readonly Color OccursGroupBackColor = Color.FromArgb(243, 248, 255);
+    private static readonly Color OccursGroupAlternateBackColor = Color.FromArgb(247, 244, 255);
     private static readonly Color ErrorBackColor = Color.FromArgb(255, 225, 225);
     private static readonly Color HalfWidthSpaceBackColor = Color.FromArgb(255, 250, 205);
     private static readonly Encoding ShiftJisEncoding = Encoding.GetEncoding("shift_jis");
@@ -51,6 +55,9 @@ public sealed class MainForm : Form
     private readonly List<FieldDefinition> fields = [];
     private readonly List<List<string>> records = [];
     private readonly HashSet<int> hiddenFieldIndexes = [];
+    private readonly List<FieldGridRow> fieldGridRows = [];
+    private readonly List<int> recordGridColumnFieldIndexes = [];
+    private readonly Dictionary<int, OccursDisplayInfo> occursDisplayInfos = [];
     private string? saveDataPath;
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
     private DataEncodingProfile currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
@@ -510,6 +517,12 @@ public sealed class MainForm : Form
                 LoadData(dataPath, separatorMode, nationalTextEncoding);
             }
 
+            var startupLayout = ParseStartupLayout(GetOptionValue(args, "--layout"));
+            if (startupLayout is not null)
+            {
+                layout = startupLayout.Value;
+            }
+
             RefreshGrid();
             SetStatus(string.IsNullOrWhiteSpace(dataPath)
                 ? "定義ファイルを読み込みました。"
@@ -818,6 +831,21 @@ public sealed class MainForm : Form
         }
 
         return null;
+    }
+
+    private static GridLayout? ParseStartupLayout(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim().ToLowerInvariant().Replace("_", "-") switch
+        {
+            "record" or "record-rows" => GridLayout.RecordRows,
+            "field" or "field-rows" => GridLayout.FieldRows,
+            _ => null
+        };
     }
 
     private static NationalTextEncoding? ParseNationalTextEncoding(string? value)
@@ -1401,7 +1429,7 @@ public sealed class MainForm : Form
     {
         return layout == GridLayout.FieldRows
             ? columnIndex < 2
-            : columnIndex == 0;
+            : columnIndex == 0 || FieldIndexFromRecordColumn(columnIndex) < 0;
     }
 
     private static void OpenGeneratedFile(string path)
@@ -1537,6 +1565,20 @@ public sealed class MainForm : Form
         return -1;
     }
 
+    private int FieldIndexFromFieldRow(int rowIndex)
+    {
+        return rowIndex >= 0 && rowIndex < fieldGridRows.Count
+            ? fieldGridRows[rowIndex].FieldIndex
+            : -1;
+    }
+
+    private int FieldIndexFromRecordColumn(int columnIndex)
+    {
+        return columnIndex >= 0 && columnIndex < recordGridColumnFieldIndexes.Count
+            ? recordGridColumnFieldIndexes[columnIndex]
+            : -1;
+    }
+
     private void ChangeLayout(GridLayout nextLayout)
     {
         if (layout == nextLayout)
@@ -1560,7 +1602,7 @@ public sealed class MainForm : Form
 
         if (layout == GridLayout.FieldRows)
         {
-            var fieldRowsFieldIndex = FieldIndexFromVisibleIndex(rowIndex);
+            var fieldRowsFieldIndex = FieldIndexFromFieldRow(rowIndex);
             if (columnIndex < 2 || fieldRowsFieldIndex < 0)
             {
                 return;
@@ -1591,7 +1633,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        var fieldIndex = FieldIndexFromVisibleIndex(columnIndex - 1);
+        var fieldIndex = FieldIndexFromRecordColumn(columnIndex);
         if (fieldIndex < 0 || fieldIndex >= fields.Count)
         {
             return;
@@ -1630,8 +1672,8 @@ public sealed class MainForm : Form
         }
 
         return layout == GridLayout.FieldRows
-            ? FieldIndexFromVisibleIndex(grid.CurrentCell.RowIndex)
-            : grid.CurrentCell.ColumnIndex >= 1 ? FieldIndexFromVisibleIndex(grid.CurrentCell.ColumnIndex - 1) : -1;
+            ? FieldIndexFromFieldRow(grid.CurrentCell.RowIndex)
+            : FieldIndexFromRecordColumn(grid.CurrentCell.ColumnIndex);
     }
 
     private void SelectRecord(int recordIndex)
@@ -1641,9 +1683,26 @@ public sealed class MainForm : Form
             return;
         }
 
-        grid.CurrentCell = layout == GridLayout.FieldRows
-            ? grid[recordIndex + 2, 0]
-            : grid[1, recordIndex];
+        if (layout == GridLayout.FieldRows)
+        {
+            var firstFieldRowIndex = fieldGridRows.FindIndex(row => !row.IsOccursHeader && row.FieldIndex >= 0);
+            if (firstFieldRowIndex < 0 || recordIndex + 2 >= grid.Columns.Count)
+            {
+                return;
+            }
+
+            grid.CurrentCell = grid[recordIndex + 2, firstFieldRowIndex];
+        }
+        else
+        {
+            var firstFieldColumnIndex = recordGridColumnFieldIndexes.FindIndex(fieldIndex => fieldIndex >= 0);
+            if (firstFieldColumnIndex < 0)
+            {
+                return;
+            }
+
+            grid.CurrentCell = grid[firstFieldColumnIndex, recordIndex];
+        }
         UpdateHexView();
     }
 
@@ -1655,6 +1714,9 @@ public sealed class MainForm : Form
             NormalizeRecords();
             grid.Columns.Clear();
             grid.Rows.Clear();
+            fieldGridRows.Clear();
+            recordGridColumnFieldIndexes.Clear();
+            RebuildOccursDisplayInfos();
             UpdateLayoutButtons();
 
             if (layout == GridLayout.FieldRows)
@@ -1690,21 +1752,57 @@ public sealed class MainForm : Form
             grid.Columns.Add(CreateEditableColumn($"Record{recordIndex + 1}", $"Rec {recordIndex + 1}", 140));
         }
 
+        string? lastGroupInstanceKey = null;
         foreach (var fieldIndex in VisibleFieldIndexes())
         {
             var field = fields[fieldIndex];
+            occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
+            if (occursInfo is not null && !string.Equals(lastGroupInstanceKey, occursInfo.GroupInstanceKey, StringComparison.Ordinal))
+            {
+                AddOccursHeaderRow(occursInfo);
+                lastGroupInstanceKey = occursInfo.GroupInstanceKey;
+            }
+            else if (occursInfo is null)
+            {
+                lastGroupInstanceKey = null;
+            }
+
             var rowIndex = grid.Rows.Add();
+            fieldGridRows.Add(new FieldGridRow(fieldIndex, occursInfo, IsOccursHeader: false));
             var row = grid.Rows[rowIndex];
-            row.Cells[0].Value = field.Name;
+            row.Cells[0].Value = occursInfo is null ? field.Name : $"  {occursInfo.ChildName}";
+            row.Cells[0].ToolTipText = field.Name;
             row.Cells[1].Value = field.DisplayDefinition;
+            if (occursInfo is not null)
+            {
+                row.DefaultCellStyle.BackColor = OccursBackColor(occursInfo);
+            }
 
             for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
             {
                 var value = FormatValueForDisplay(field, records[recordIndex][fieldIndex]);
                 row.Cells[recordIndex + 2].Value = value;
                 row.Cells[recordIndex + 2].ReadOnly = field.IsRedefines;
-                ApplyCellValidationStyle(row.Cells[recordIndex + 2], field, value);
+                ApplyCellValidationStyle(row.Cells[recordIndex + 2], field, value, occursInfo is null ? null : OccursBackColor(occursInfo));
             }
+        }
+    }
+
+    private void AddOccursHeaderRow(OccursDisplayInfo occursInfo)
+    {
+        var rowIndex = grid.Rows.Add();
+        fieldGridRows.Add(new FieldGridRow(FieldIndex: -1, occursInfo, IsOccursHeader: true));
+        var row = grid.Rows[rowIndex];
+        row.ReadOnly = true;
+        row.DefaultCellStyle.BackColor = OccursHeaderBackColor;
+        row.DefaultCellStyle.ForeColor = OccursHeaderForeColor;
+        row.DefaultCellStyle.SelectionBackColor = OccursHeaderBackColor;
+        row.DefaultCellStyle.SelectionForeColor = OccursHeaderForeColor;
+        row.Cells[0].Value = $"▼ {occursInfo.GroupName}";
+        row.Cells[1].Value = $"OCCURS {occursInfo.OccurrenceIndex}/{occursInfo.OccurrenceCount}";
+        for (var columnIndex = 2; columnIndex < grid.Columns.Count; columnIndex++)
+        {
+            row.Cells[columnIndex].Value = string.Empty;
         }
     }
 
@@ -1713,22 +1811,44 @@ public sealed class MainForm : Form
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
         grid.ColumnHeadersHeight = 64;
         grid.Columns.Add(CreateReadOnlyColumn("Record", "レコード", 90, frozen: true));
+        recordGridColumnFieldIndexes.Add(-1);
         ApplyDefinitionColumnStyle(grid.Columns[0]);
 
         var byteStart = 1;
+        string? lastGroupInstanceKey = null;
         for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
         {
             var field = fields[fieldIndex];
             var byteEnd = byteStart + field.StorageByteLength - 1;
             if (IsDisplayableField(field) && !hiddenFieldIndexes.Contains(fieldIndex))
             {
+                occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
+                if (occursInfo is not null && !string.Equals(lastGroupInstanceKey, occursInfo.GroupInstanceKey, StringComparison.Ordinal))
+                {
+                    AddOccursRecordGroupColumn(occursInfo);
+                    lastGroupInstanceKey = occursInfo.GroupInstanceKey;
+                }
+                else if (occursInfo is null)
+                {
+                    lastGroupInstanceKey = null;
+                }
+
                 var ruler = $"byte {byteStart}-{byteEnd}";
+                var header = occursInfo is null
+                    ? $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}"
+                    : $"{occursInfo.ChildName}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}";
                 var column = CreateEditableColumn(
                     $"Field{fieldIndex + 1}",
-                    $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}",
+                    header,
                     170);
-                column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
+                column.HeaderCell.Style.BackColor = occursInfo is null ? DefinitionHeaderBackColor : OccursHeaderBackColor;
+                if (occursInfo is not null)
+                {
+                    column.DefaultCellStyle.BackColor = OccursBackColor(occursInfo);
+                }
+
                 grid.Columns.Add(column);
+                recordGridColumnFieldIndexes.Add(fieldIndex);
             }
 
             if (!field.IsRedefines)
@@ -1737,23 +1857,48 @@ public sealed class MainForm : Form
             }
         }
 
-        var visibleFieldIndexes = VisibleFieldIndexes();
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
         {
             var rowIndex = grid.Rows.Add();
             var row = grid.Rows[rowIndex];
             row.Cells[0].Value = $"Rec {recordIndex + 1}";
 
-            for (var visibleIndex = 0; visibleIndex < visibleFieldIndexes.Count; visibleIndex++)
+            for (var columnIndex = 1; columnIndex < grid.Columns.Count; columnIndex++)
             {
-                var fieldIndex = visibleFieldIndexes[visibleIndex];
+                var fieldIndex = FieldIndexFromRecordColumn(columnIndex);
+                if (fieldIndex < 0)
+                {
+                    row.Cells[columnIndex].ReadOnly = true;
+                    row.Cells[columnIndex].Value = string.Empty;
+                    continue;
+                }
+
                 var field = fields[fieldIndex];
                 var value = FormatValueForDisplay(field, records[recordIndex][fieldIndex]);
-                row.Cells[visibleIndex + 1].Value = value;
-                row.Cells[visibleIndex + 1].ReadOnly = field.IsRedefines;
-                ApplyCellValidationStyle(row.Cells[visibleIndex + 1], field, value);
+                row.Cells[columnIndex].Value = value;
+                row.Cells[columnIndex].ReadOnly = field.IsRedefines;
+                occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
+                ApplyCellValidationStyle(row.Cells[columnIndex], field, value, occursInfo is null ? null : OccursBackColor(occursInfo));
             }
         }
+    }
+
+    private void AddOccursRecordGroupColumn(OccursDisplayInfo occursInfo)
+    {
+        var column = CreateReadOnlyColumn(
+            $"OccursGroup{recordGridColumnFieldIndexes.Count}",
+            $"{occursInfo.GroupName}{Environment.NewLine}OCCURS{Environment.NewLine}{occursInfo.OccurrenceIndex}/{occursInfo.OccurrenceCount}",
+            84,
+            frozen: false);
+        column.DefaultCellStyle.BackColor = OccursHeaderBackColor;
+        column.DefaultCellStyle.ForeColor = OccursHeaderForeColor;
+        column.DefaultCellStyle.SelectionBackColor = OccursHeaderBackColor;
+        column.DefaultCellStyle.SelectionForeColor = OccursHeaderForeColor;
+        column.HeaderCell.Style.BackColor = OccursHeaderBackColor;
+        column.HeaderCell.Style.ForeColor = OccursHeaderForeColor;
+        column.DividerWidth = 2;
+        grid.Columns.Add(column);
+        recordGridColumnFieldIndexes.Add(-1);
     }
 
     private void UpdateHexView()
@@ -1782,12 +1927,12 @@ public sealed class MainForm : Form
         }
     }
 
-    private static void ApplyCellValidationStyle(DataGridViewCell cell, FieldDefinition field, string value)
+    private static void ApplyCellValidationStyle(DataGridViewCell cell, FieldDefinition field, string value, Color? validBackColor = null)
     {
         var error = GetValidationError(field, value);
         cell.Style.BackColor = error is not null
             ? ErrorBackColor
-            : Color.Empty;
+            : validBackColor.GetValueOrDefault(Color.Empty);
         cell.ToolTipText = error ?? string.Empty;
     }
 
@@ -1917,7 +2062,7 @@ public sealed class MainForm : Form
     {
         if (layout == GridLayout.FieldRows)
         {
-            var fieldIndex = FieldIndexFromVisibleIndex(rowIndex);
+            var fieldIndex = FieldIndexFromFieldRow(rowIndex);
             if (columnIndex >= 2 && fieldIndex >= 0)
             {
                 field = fields[fieldIndex];
@@ -1926,7 +2071,7 @@ public sealed class MainForm : Form
         }
         else if (columnIndex >= 1)
         {
-            var fieldIndex = FieldIndexFromVisibleIndex(columnIndex - 1);
+            var fieldIndex = FieldIndexFromRecordColumn(columnIndex);
             if (fieldIndex >= 0 && fieldIndex < fields.Count)
             {
                 field = fields[fieldIndex];
@@ -2018,6 +2163,87 @@ public sealed class MainForm : Form
             : "改行あり (CRLF/LF)";
     }
 
+    private void RebuildOccursDisplayInfos()
+    {
+        occursDisplayInfos.Clear();
+        var parsedNames = new List<ParsedOccursName>();
+        var occurrenceIndexesByBaseName = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
+
+        for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+        {
+            if (!TryParseOccursFieldName(fields[fieldIndex].Name, out var parsedName))
+            {
+                continue;
+            }
+
+            parsedName = parsedName with { FieldIndex = fieldIndex };
+            parsedNames.Add(parsedName);
+            if (!occurrenceIndexesByBaseName.TryGetValue(parsedName.BaseName, out var occurrenceIndexes))
+            {
+                occurrenceIndexes = [];
+                occurrenceIndexesByBaseName[parsedName.BaseName] = occurrenceIndexes;
+            }
+
+            occurrenceIndexes.Add(parsedName.OccurrenceIndex);
+        }
+
+        foreach (var parsedName in parsedNames)
+        {
+            var occurrenceCount = occurrenceIndexesByBaseName[parsedName.BaseName].Count;
+            if (occurrenceCount <= 1)
+            {
+                continue;
+            }
+
+            occursDisplayInfos[parsedName.FieldIndex] = new OccursDisplayInfo(
+                GroupName: parsedName.GroupName,
+                GroupInstanceKey: $"{parsedName.BaseName}:{parsedName.OccurrenceIndex.ToString(CultureInfo.InvariantCulture)}",
+                ChildName: parsedName.ChildName,
+                OccurrenceIndex: parsedName.OccurrenceIndex,
+                OccurrenceCount: occurrenceCount);
+        }
+    }
+
+    private static bool TryParseOccursFieldName(string fieldName, out ParsedOccursName parsedName)
+    {
+        parsedName = default;
+        var separatorIndex = fieldName.IndexOf('.');
+        if (separatorIndex <= 0 || separatorIndex == fieldName.Length - 1)
+        {
+            return false;
+        }
+
+        var groupName = fieldName[..separatorIndex];
+        var childName = fieldName[(separatorIndex + 1)..];
+        var occurrenceSeparatorIndex = groupName.LastIndexOf('-');
+        if (occurrenceSeparatorIndex <= 0 || occurrenceSeparatorIndex == groupName.Length - 1)
+        {
+            return false;
+        }
+
+        var occurrenceText = groupName[(occurrenceSeparatorIndex + 1)..];
+        if (!int.TryParse(occurrenceText, NumberStyles.None, CultureInfo.InvariantCulture, out var occurrenceIndex)
+            || occurrenceIndex <= 0)
+        {
+            return false;
+        }
+
+        parsedName = new ParsedOccursName(
+            FieldIndex: -1,
+            BaseName: groupName[..occurrenceSeparatorIndex],
+            GroupName: groupName,
+            ChildName: childName,
+            OccurrenceIndex: occurrenceIndex);
+        return true;
+    }
+
+    private static Color OccursBackColor(OccursDisplayInfo occursInfo)
+    {
+        return occursInfo.OccurrenceIndex % 2 == 0
+            ? OccursGroupAlternateBackColor
+            : OccursGroupBackColor;
+    }
+
     private sealed record SamplePattern(
         string FileName,
         string DefinitionFileName,
@@ -2038,6 +2264,25 @@ public sealed class MainForm : Form
     private sealed record DataLoadOptions(
         RecordSeparatorMode SeparatorMode,
         NationalTextEncoding NationalTextEncoding);
+
+    private sealed record FieldGridRow(
+        int FieldIndex,
+        OccursDisplayInfo? OccursInfo,
+        bool IsOccursHeader);
+
+    private readonly record struct ParsedOccursName(
+        int FieldIndex,
+        string BaseName,
+        string GroupName,
+        string ChildName,
+        int OccurrenceIndex);
+
+    private sealed record OccursDisplayInfo(
+        string GroupName,
+        string GroupInstanceKey,
+        string ChildName,
+        int OccurrenceIndex,
+        int OccurrenceCount);
 
     private static DataGridViewTextBoxColumn CreateReadOnlyColumn(string name, string header, int width, bool frozen)
     {
