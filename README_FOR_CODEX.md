@@ -18,17 +18,17 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.32`
+- 現在の最新 Release: `v0.1.33`
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.32` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.32 の Release ビルド済み
-- `FixedDataBuilder-v0.1.32.zip` を作成済み
+- `v0.1.33` を GitHub Release 済み
+- `release/FixedDataBuilder.exe` は v0.1.33 の Release ビルド済み
+- `FixedDataBuilder-v0.1.33.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-occurs-visual-field-v0.1.32.png`、`docs/screen-image-occurs-visual-record-v0.1.32.png`、`docs/screen-image-data-load-options-v0.1.31.png` を参照
+- README は `docs/screen-image-occurs-visual-field-v0.1.33.png`、`docs/screen-image-occurs-visual-record-v0.1.33.png`、`docs/screen-image-data-load-options-v0.1.31.png` を参照
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み
@@ -44,6 +44,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - v0.1.30 で、集団項目OCCURSの限定対応を追加する。対応範囲は、非REDEFINES配下の単一集団項目 `OCCURS n TIMES` と、その配下の通常PIC項目の展開。REDEFINES配下OCCURS、多重OCCURS、OCCURS DEPENDING ON は未対応。
 - v0.1.31 で、型N文字コードの選択肢からUTF-8を削除する。型Nは固定長領域なので、可変長のUTF-8は扱わない。選択肢は `Shift_JIS` / `UTF-16LE` / `UTF-32LE`。型N UTF-8サンプルは削除し、OCCURS系サンプルはUTF-16LE版に置き換える。
 - v0.1.32 で、OCCURS 展開項目の視覚的なまとまりを追加する。項目縦表示では `明細-1` / `明細-2` のような見出し行を挟み、子項目をインデントする。レコード縦表示では各 OCCURS グループの先頭に見出し列を挟み、OCCURS列を淡色背景にする。スクリーンショット作成用に起動引数 `--layout record` / `--layout field` も使える。
+- v0.1.33 で、レコード縦表示の OCCURS 表示を見出し列方式から OCCURS 専用行の帯表示に変更する。OCCURS 行だけグループ内の縦線を消してまとまりを見せ、データセル背景は通常色に戻す。
 
 最後に push 済みの重要コミット:
 

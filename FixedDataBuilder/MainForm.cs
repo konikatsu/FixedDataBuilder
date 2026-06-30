@@ -1579,6 +1579,16 @@ public sealed class MainForm : Form
             : -1;
     }
 
+    private int RecordRowsDataStartIndex()
+    {
+        return occursDisplayInfos.Count > 0 ? 1 : 0;
+    }
+
+    private int RecordIndexFromGridRow(int rowIndex)
+    {
+        return rowIndex - RecordRowsDataStartIndex();
+    }
+
     private void ChangeLayout(GridLayout nextLayout)
     {
         if (layout == nextLayout)
@@ -1628,7 +1638,8 @@ public sealed class MainForm : Form
             return;
         }
 
-        if (columnIndex < 1 || rowIndex >= records.Count)
+        var recordRowsRecordIndex = RecordIndexFromGridRow(rowIndex);
+        if (columnIndex < 1 || recordRowsRecordIndex < 0 || recordRowsRecordIndex >= records.Count)
         {
             return;
         }
@@ -1646,7 +1657,7 @@ public sealed class MainForm : Form
         }
 
         var recordRowsFormattedValue = FormatValueForDisplay(recordRowsField, grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty);
-        records[rowIndex][fieldIndex] = recordRowsFormattedValue;
+        records[recordRowsRecordIndex][fieldIndex] = recordRowsFormattedValue;
         grid[columnIndex, rowIndex].Value = recordRowsFormattedValue;
         ApplyCellValidationStyle(grid[columnIndex, rowIndex], recordRowsField, recordRowsFormattedValue);
         UpdateHexView();
@@ -1661,7 +1672,7 @@ public sealed class MainForm : Form
 
         return layout == GridLayout.FieldRows
             ? grid.CurrentCell.ColumnIndex >= 2 ? grid.CurrentCell.ColumnIndex - 2 : records.Count - 1
-            : grid.CurrentCell.RowIndex;
+            : RecordIndexFromGridRow(grid.CurrentCell.RowIndex);
     }
 
     private int CurrentFieldIndex()
@@ -1701,7 +1712,7 @@ public sealed class MainForm : Form
                 return;
             }
 
-            grid.CurrentCell = grid[firstFieldColumnIndex, recordIndex];
+            grid.CurrentCell = grid[firstFieldColumnIndex, recordIndex + RecordRowsDataStartIndex()];
         }
         UpdateHexView();
     }
@@ -1815,7 +1826,6 @@ public sealed class MainForm : Form
         ApplyDefinitionColumnStyle(grid.Columns[0]);
 
         var byteStart = 1;
-        string? lastGroupInstanceKey = null;
         for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
         {
             var field = fields[fieldIndex];
@@ -1823,16 +1833,6 @@ public sealed class MainForm : Form
             if (IsDisplayableField(field) && !hiddenFieldIndexes.Contains(fieldIndex))
             {
                 occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
-                if (occursInfo is not null && !string.Equals(lastGroupInstanceKey, occursInfo.GroupInstanceKey, StringComparison.Ordinal))
-                {
-                    AddOccursRecordGroupColumn(occursInfo);
-                    lastGroupInstanceKey = occursInfo.GroupInstanceKey;
-                }
-                else if (occursInfo is null)
-                {
-                    lastGroupInstanceKey = null;
-                }
-
                 var ruler = $"byte {byteStart}-{byteEnd}";
                 var header = occursInfo is null
                     ? $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}"
@@ -1842,10 +1842,6 @@ public sealed class MainForm : Form
                     header,
                     170);
                 column.HeaderCell.Style.BackColor = occursInfo is null ? DefinitionHeaderBackColor : OccursHeaderBackColor;
-                if (occursInfo is not null)
-                {
-                    column.DefaultCellStyle.BackColor = OccursBackColor(occursInfo);
-                }
 
                 grid.Columns.Add(column);
                 recordGridColumnFieldIndexes.Add(fieldIndex);
@@ -1855,6 +1851,11 @@ public sealed class MainForm : Form
             {
                 byteStart = byteEnd + 1;
             }
+        }
+
+        if (occursDisplayInfos.Count > 0)
+        {
+            AddOccursRecordHeaderRow();
         }
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
@@ -1877,28 +1878,44 @@ public sealed class MainForm : Form
                 var value = FormatValueForDisplay(field, records[recordIndex][fieldIndex]);
                 row.Cells[columnIndex].Value = value;
                 row.Cells[columnIndex].ReadOnly = field.IsRedefines;
-                occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
-                ApplyCellValidationStyle(row.Cells[columnIndex], field, value, occursInfo is null ? null : OccursBackColor(occursInfo));
+                ApplyCellValidationStyle(row.Cells[columnIndex], field, value);
             }
         }
     }
 
-    private void AddOccursRecordGroupColumn(OccursDisplayInfo occursInfo)
+    private void AddOccursRecordHeaderRow()
     {
-        var column = CreateReadOnlyColumn(
-            $"OccursGroup{recordGridColumnFieldIndexes.Count}",
-            $"{occursInfo.GroupName}{Environment.NewLine}OCCURS{Environment.NewLine}{occursInfo.OccurrenceIndex}/{occursInfo.OccurrenceCount}",
-            84,
-            frozen: false);
-        column.DefaultCellStyle.BackColor = OccursHeaderBackColor;
-        column.DefaultCellStyle.ForeColor = OccursHeaderForeColor;
-        column.DefaultCellStyle.SelectionBackColor = OccursHeaderBackColor;
-        column.DefaultCellStyle.SelectionForeColor = OccursHeaderForeColor;
-        column.HeaderCell.Style.BackColor = OccursHeaderBackColor;
-        column.HeaderCell.Style.ForeColor = OccursHeaderForeColor;
-        column.DividerWidth = 2;
-        grid.Columns.Add(column);
-        recordGridColumnFieldIndexes.Add(-1);
+        var rowIndex = grid.Rows.Add();
+        var row = grid.Rows[rowIndex];
+        row.ReadOnly = true;
+        row.DefaultCellStyle.BackColor = OccursHeaderBackColor;
+        row.DefaultCellStyle.ForeColor = OccursHeaderForeColor;
+        row.DefaultCellStyle.SelectionBackColor = OccursHeaderBackColor;
+        row.DefaultCellStyle.SelectionForeColor = OccursHeaderForeColor;
+        row.Cells[0].Value = "OCCURS";
+
+        string? lastGroupInstanceKey = null;
+        for (var columnIndex = 1; columnIndex < grid.Columns.Count; columnIndex++)
+        {
+            var fieldIndex = FieldIndexFromRecordColumn(columnIndex);
+            if (fieldIndex < 0 || !occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo))
+            {
+                row.Cells[columnIndex].Value = string.Empty;
+                continue;
+            }
+
+            row.Cells[columnIndex].Style.BackColor = OccursBackColor(occursInfo);
+            row.Cells[columnIndex].Style.SelectionBackColor = OccursBackColor(occursInfo);
+            if (!string.Equals(lastGroupInstanceKey, occursInfo.GroupInstanceKey, StringComparison.Ordinal))
+            {
+                row.Cells[columnIndex].Value = $"{occursInfo.GroupName}  {occursInfo.OccurrenceIndex}/{occursInfo.OccurrenceCount}";
+                lastGroupInstanceKey = occursInfo.GroupInstanceKey;
+            }
+            else
+            {
+                row.Cells[columnIndex].Value = string.Empty;
+            }
+        }
     }
 
     private void UpdateHexView()
@@ -1938,10 +1955,16 @@ public sealed class MainForm : Form
 
     private void PaintTextPaddingArea(DataGridViewCellPaintingEventArgs e)
     {
+        if (TryPaintOccursRecordHeaderArea(e))
+        {
+            return;
+        }
+
         if (e.RowIndex < 0
             || e.ColumnIndex < 0
             || e.Graphics is null
             || e.CellStyle is null
+            || (layout == GridLayout.RecordRows && RecordIndexFromGridRow(e.RowIndex) < 0)
             || !TryGetCellField(e.RowIndex, e.ColumnIndex, out var field)
             || field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText))
         {
@@ -1985,6 +2008,132 @@ public sealed class MainForm : Form
             e.CellStyle.ForeColor,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         e.Handled = true;
+    }
+
+    private bool TryPaintOccursRecordHeaderArea(DataGridViewCellPaintingEventArgs e)
+    {
+        if (layout != GridLayout.RecordRows
+            || occursDisplayInfos.Count == 0
+            || e.RowIndex != 0
+            || e.ColumnIndex < 0
+            || e.Graphics is null
+            || e.CellStyle is null)
+        {
+            return false;
+        }
+
+        if (e.ColumnIndex == 0)
+        {
+            using var background = new SolidBrush(DefinitionBackColor);
+            e.Graphics.FillRectangle(background, e.CellBounds);
+            DrawCellBorder(e.Graphics, e.CellBounds, drawLeft: true, drawRight: true);
+            TextRenderer.DrawText(
+                e.Graphics,
+                "OCCURS",
+                e.CellStyle.Font ?? grid.Font,
+                e.CellBounds,
+                OccursHeaderForeColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            e.Handled = true;
+            return true;
+        }
+
+        var fieldIndex = FieldIndexFromRecordColumn(e.ColumnIndex);
+        if (fieldIndex < 0 || !occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo))
+        {
+            using var background = new SolidBrush(e.CellStyle.BackColor.IsEmpty ? grid.DefaultCellStyle.BackColor : e.CellStyle.BackColor);
+            e.Graphics.FillRectangle(background, e.CellBounds);
+            DrawCellBorder(e.Graphics, e.CellBounds, drawLeft: true, drawRight: true);
+            e.Handled = true;
+            return true;
+        }
+
+        var firstColumnIndex = FirstRecordColumnInOccursGroup(e.ColumnIndex, occursInfo);
+        if (e.ColumnIndex != firstColumnIndex)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        var spanBounds = OccursGroupBounds(e.RowIndex, firstColumnIndex, occursInfo);
+        using var groupBackground = new SolidBrush(OccursBackColor(occursInfo));
+        e.Graphics.FillRectangle(groupBackground, spanBounds);
+        DrawCellBorder(e.Graphics, spanBounds, drawLeft: true, drawRight: true);
+
+        TextRenderer.DrawText(
+            e.Graphics,
+            $"{occursInfo.GroupName}  {occursInfo.OccurrenceIndex}/{occursInfo.OccurrenceCount}",
+            e.CellStyle.Font ?? grid.Font,
+            spanBounds,
+            OccursHeaderForeColor,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+        e.Handled = true;
+        return true;
+    }
+
+    private int FirstRecordColumnInOccursGroup(int columnIndex, OccursDisplayInfo occursInfo)
+    {
+        for (var currentColumnIndex = columnIndex - 1; currentColumnIndex >= 1; currentColumnIndex--)
+        {
+            var fieldIndex = FieldIndexFromRecordColumn(currentColumnIndex);
+            if (fieldIndex < 0
+                || !occursDisplayInfos.TryGetValue(fieldIndex, out var currentOccursInfo)
+                || !string.Equals(currentOccursInfo.GroupInstanceKey, occursInfo.GroupInstanceKey, StringComparison.Ordinal))
+            {
+                return currentColumnIndex + 1;
+            }
+        }
+
+        return 1;
+    }
+
+    private int LastRecordColumnInOccursGroup(int columnIndex, OccursDisplayInfo occursInfo)
+    {
+        for (var currentColumnIndex = columnIndex + 1; currentColumnIndex < grid.Columns.Count; currentColumnIndex++)
+        {
+            var fieldIndex = FieldIndexFromRecordColumn(currentColumnIndex);
+            if (fieldIndex < 0
+                || !occursDisplayInfos.TryGetValue(fieldIndex, out var currentOccursInfo)
+                || !string.Equals(currentOccursInfo.GroupInstanceKey, occursInfo.GroupInstanceKey, StringComparison.Ordinal))
+            {
+                return currentColumnIndex - 1;
+            }
+        }
+
+        return grid.Columns.Count - 1;
+    }
+
+    private Rectangle OccursGroupBounds(int rowIndex, int firstColumnIndex, OccursDisplayInfo occursInfo)
+    {
+        var lastColumnIndex = LastRecordColumnInOccursGroup(firstColumnIndex, occursInfo);
+        var firstBounds = grid.GetCellDisplayRectangle(firstColumnIndex, rowIndex, cutOverflow: false);
+        var lastBounds = grid.GetCellDisplayRectangle(lastColumnIndex, rowIndex, cutOverflow: false);
+        if (firstBounds.Width <= 0 || lastBounds.Width <= 0)
+        {
+            return grid.GetCellDisplayRectangle(firstColumnIndex, rowIndex, cutOverflow: true);
+        }
+
+        return new Rectangle(
+            firstBounds.Left,
+            firstBounds.Top,
+            lastBounds.Right - firstBounds.Left,
+            firstBounds.Height);
+    }
+
+    private static void DrawCellBorder(Graphics graphics, Rectangle bounds, bool drawLeft, bool drawRight)
+    {
+        using var pen = new Pen(SystemColors.ControlDark);
+        graphics.DrawLine(pen, bounds.Left, bounds.Top, bounds.Right - 1, bounds.Top);
+        graphics.DrawLine(pen, bounds.Left, bounds.Bottom - 1, bounds.Right - 1, bounds.Bottom - 1);
+        if (drawLeft)
+        {
+            graphics.DrawLine(pen, bounds.Left, bounds.Top, bounds.Left, bounds.Bottom - 1);
+        }
+
+        if (drawRight)
+        {
+            graphics.DrawLine(pen, bounds.Right - 1, bounds.Top, bounds.Right - 1, bounds.Bottom - 1);
+        }
     }
 
     private static void PaintVisibleSpaceHighlights(Graphics graphics, Font font, Rectangle textBounds, string visibleValue)
