@@ -2,6 +2,7 @@
 
 ## v0.1.34 追記：汎用XML定義
 
+- 2026-10-22の最新指示で、この機能は隠し機能として扱う。実装は維持するが、ユーザー向けREADME.mdには説明・対応機能一覧・XML例・起動引数・サンプル案内・専用画像を掲載しない。将来のREADME更新でも再掲載しない。
 - 表示名・追加コード・公開サンプル・説明には「汎用XML定義」を使う。特定製品名を追加しない。
 - `XmlDefinitionReader.cs` が `FileDefinitions / File / Record / Column` 形式を解析する。固定長SEQ、型X/9、UTF-8/Shift_JIS、改行なし/CRLFに対応する。
 - 複数の対応レイアウトがある場合は `XmlLayoutSelectionForm.cs` で選ぶ。1つだけなら自動選択。起動引数 `--xml-layout ID` も利用できる。
@@ -37,7 +38,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - `release/FixedDataBuilder.exe` は v0.1.34 の Release ビルド済み
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README 冒頭は `docs/screen-image-generic-xml-v0.1.34.png` を参照。XMLの選択画面は `docs/screen-image-xml-layout-selection-v0.1.34.png`。既存機能の画像も対応する節に残している。
+- README 冒頭は既存の `docs/screen-image-occurs-visual-field-v0.1.33.png` を参照。隠し機能の画面画像はREADMEに掲載しない。
 - XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
