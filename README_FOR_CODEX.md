@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.34 追記：汎用XML定義
+
+- 表示名・追加コード・公開サンプル・説明には「汎用XML定義」を使う。特定製品名を追加しない。
+- `XmlDefinitionReader.cs` が `FileDefinitions / File / Record / Column` 形式を解析する。固定長SEQ、型X/9、UTF-8/Shift_JIS、改行なし/CRLFに対応する。
+- 複数の対応レイアウトがある場合は `XmlLayoutSelectionForm.cs` で選ぶ。1つだけなら自動選択。起動引数 `--xml-layout ID` も利用できる。
+- 実用定義や業務データは公開リポジトリに追加しない。公開サンプルは `samples/generic-xml-*` の架空データを使う。
+- 検証は `dotnet run --project tests/FixedDataBuilder.Tests -c Release -- <リポジトリの絶対パス>`。`--capture <PNGの絶対パス>` を追加するとサンプル表示と選択画面を保存する。
+- XMLは読み込みのみ。`定義修正` で保存する定義はCSV。文字コードを変える場合は対象の定義を読み直す。
+
 このファイルは、次の Codex がチャット履歴なしで FixedDataBuilder の作業を再開するための引き継ぎメモです。
 
 ## プロジェクト概要
@@ -18,17 +27,18 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の最新 Release: `v0.1.33`
+- 現在の開発バージョン: `v0.1.34`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
 最新の成功状態:
 
-- `v0.1.33` を GitHub Release 済み
-- `release/FixedDataBuilder.exe` は v0.1.33 の Release ビルド済み
-- `FixedDataBuilder-v0.1.33.zip` を作成済み
+- `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
+- `release/FixedDataBuilder.exe` は v0.1.34 の Release ビルド済み
+- `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README は `docs/screen-image-occurs-visual-field-v0.1.33.png`、`docs/screen-image-occurs-visual-record-v0.1.33.png`、`docs/screen-image-data-load-options-v0.1.31.png` を参照
+- README 冒頭は `docs/screen-image-generic-xml-v0.1.34.png` を参照。XMLの選択画面は `docs/screen-image-xml-layout-selection-v0.1.34.png`。既存機能の画像も対応する節に残している。
+- XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
 - v0.1.20 で、履歴選択時の落ちやすさを抑制し、半角/全角スペースを記号化して空白部分だけ薄黄色で表示する改善を実装済み

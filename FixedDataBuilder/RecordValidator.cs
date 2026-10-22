@@ -4,10 +4,14 @@ namespace FixedDataBuilder;
 
 public static class RecordValidator
 {
-    public static IReadOnlyList<string> Validate(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<List<string>> records)
+    public static IReadOnlyList<string> Validate(
+        IReadOnlyList<FieldDefinition> fields,
+        IReadOnlyList<List<string>> records,
+        DataEncodingProfile encodingProfile = DataEncodingProfile.ShiftJis)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var shiftJis = Encoding.GetEncoding(932);
+        var textEncoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
+            ? Encoding.UTF8 : Encoding.GetEncoding(932);
         var errors = new List<string>();
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
@@ -32,9 +36,9 @@ public static class RecordValidator
                         break;
 
                     case FieldDataType.Text:
-                        if (shiftJis.GetByteCount(value) > field.Length)
+                        if (textEncoding.GetByteCount(value) > field.Length)
                         {
-                            errors.Add($"{location}: Shift_JIS バイト長 {field.Length} を超えています。");
+                            errors.Add($"{location}: {textEncoding.WebName} バイト長 {field.Length} を超えています。");
                         }
                         break;
 

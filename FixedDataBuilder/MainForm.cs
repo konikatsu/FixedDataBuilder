@@ -39,6 +39,7 @@ public sealed class MainForm : Form
     ];
 
     private readonly TextBox definitionPathTextBox = new();
+    private readonly TextBox xmlLayoutTextBox = new();
     private readonly TextBox dataPathTextBox = new();
     private readonly TextBox separatorModeTextBox = new();
     private readonly TextBox hexTextBox = new();
@@ -62,7 +63,9 @@ public sealed class MainForm : Form
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
     private DataEncodingProfile currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
     private NationalTextEncoding currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
-    private bool definitionLoadedFromCopybook;
+    private XmlLayoutDefinition? currentXmlLayout;
+    private Encoding TextDataEncoding => currentDataEncodingProfile == DataEncodingProfile.Utf8WithNationalText
+        ? Encoding.UTF8 : ShiftJisEncoding;
     private GridLayout layout = GridLayout.FieldRows;
     private bool isRefreshingGrid;
     private Font? displayFont;
@@ -107,7 +110,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 2,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(8, 6, 8, 4)
         };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
@@ -115,8 +118,10 @@ public sealed class MainForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
 
         ConfigureReadOnlyTextBox(definitionPathTextBox);
+        ConfigureReadOnlyTextBox(xmlLayoutTextBox);
         ConfigureReadOnlyTextBox(dataPathTextBox);
         ConfigureReadOnlyTextBox(separatorModeTextBox);
 
@@ -126,6 +131,8 @@ public sealed class MainForm : Form
         panel.Controls.Add(dataPathTextBox, 1, 1);
         panel.Controls.Add(CreatePathLabel("レコード区切り"), 0, 2);
         panel.Controls.Add(separatorModeTextBox, 1, 2);
+        panel.Controls.Add(CreatePathLabel("XMLレイアウト"), 0, 3);
+        panel.Controls.Add(xmlLayoutTextBox, 1, 3);
         return panel;
     }
 
@@ -430,7 +437,7 @@ public sealed class MainForm : Form
     {
         using var dialog = new OpenFileDialog
         {
-            Filter = "定義ファイル (*.csv;*.cbl;*.cpy)|*.csv;*.cbl;*.cpy|CSV ファイル (*.csv)|*.csv|COBOL コピー句 (*.cbl;*.cpy)|*.cbl;*.cpy|すべてのファイル (*.*)|*.*",
+            Filter = "定義ファイル (*.csv;*.cbl;*.cpy;*.xml)|*.csv;*.cbl;*.cpy;*.xml|汎用XML定義 (*.xml)|*.xml|CSV ファイル (*.csv)|*.csv|COBOL コピー句 (*.cbl;*.cpy)|*.cbl;*.cpy|すべてのファイル (*.*)|*.*",
             Title = "定義ファイルを選択"
         };
 
@@ -441,7 +448,7 @@ public sealed class MainForm : Form
 
         try
         {
-            LoadDefinition(dialog.FileName);
+            if (!LoadDefinition(dialog.FileName)) return;
             ClearPathText(dataPathTextBox);
             saveDataPath = null;
             records.Clear();
@@ -502,16 +509,19 @@ public sealed class MainForm : Form
 
         try
         {
-            LoadDefinition(definitionPath);
+            if (!LoadDefinition(definitionPath, GetOptionValue(args, "--xml-layout"))) return;
             records.Clear();
             records.Add(CreateEmptyRecord());
 
             var dataPath = GetOptionValue(args, "--data");
             if (!string.IsNullOrWhiteSpace(dataPath))
             {
-                var separatorMode = string.Equals(GetOptionValue(args, "--separator"), "none", StringComparison.OrdinalIgnoreCase)
-                    ? RecordSeparatorMode.None
-                    : RecordSeparatorMode.CrLfOrLf;
+                var separatorOption = GetOptionValue(args, "--separator");
+                var separatorMode = separatorOption is null && currentXmlLayout is not null
+                    ? currentSeparatorMode
+                    : string.Equals(separatorOption, "none", StringComparison.OrdinalIgnoreCase)
+                        ? RecordSeparatorMode.None
+                        : RecordSeparatorMode.CrLfOrLf;
                 var nationalTextEncoding = ParseNationalTextEncoding(GetOptionValue(args, "--national-encoding"))
                     ?? currentNationalTextEncoding;
                 LoadData(dataPath, separatorMode, nationalTextEncoding);
@@ -534,21 +544,58 @@ public sealed class MainForm : Form
         }
     }
 
-    private void LoadDefinition(string path)
+    private bool LoadDefinition(string path, string? xmlLayoutId = null)
     {
-        definitionLoadedFromCopybook = IsCopybookPath(path);
-        currentDataEncodingProfile = definitionLoadedFromCopybook
+        XmlLayoutDefinition? xmlLayout = null;
+        var fromCopybook = IsCopybookPath(path);
+        IReadOnlyList<FieldDefinition> loadedFields;
+        if (Path.GetExtension(path).Equals(".xml", StringComparison.OrdinalIgnoreCase))
+        {
+            var layouts = XmlDefinitionReader.Read(path);
+            var supported = layouts.Where(layout => layout.IsSupported).ToList();
+            if (xmlLayoutId is not null)
+            {
+                xmlLayout = layouts.FirstOrDefault(layout => layout.Id == xmlLayoutId)
+                    ?? throw new InvalidDataException($"XMLレイアウトIDが見つかりません: {xmlLayoutId}");
+                if (!xmlLayout.IsSupported) throw new InvalidDataException(xmlLayout.UnsupportedReason);
+            }
+            else if (supported.Count == 1)
+            {
+                xmlLayout = supported[0];
+            }
+            else if (supported.Count == 0)
+            {
+                throw new InvalidDataException("取り込み可能な固定長レイアウトがありません。\r\n" +
+                    string.Join("\r\n", layouts.Select(layout => $"{layout.Name}: {layout.UnsupportedReason}")));
+            }
+            else
+            {
+                using var dialog = new XmlLayoutSelectionForm(layouts);
+                if (dialog.ShowDialog(this) != DialogResult.OK) return false;
+                xmlLayout = dialog.SelectedLayout!;
+            }
+            loadedFields = xmlLayout.Fields;
+        }
+        else
+        {
+            loadedFields = fromCopybook ? CopybookDefinitionReader.Read(path) : DefinitionCsvReader.Read(path);
+        }
+
+        // 読み込み・選択が完了してから現在の定義を置き換える。
+        currentXmlLayout = xmlLayout;
+        currentDataEncodingProfile = xmlLayout?.EncodingProfile ?? (fromCopybook
             ? DataEncodingProfile.Utf8WithNationalText
-            : DataEncodingProfile.ShiftJis;
+            : DataEncodingProfile.ShiftJis);
+        if (xmlLayout is not null) currentSeparatorMode = xmlLayout.SeparatorMode;
         currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
         fields.Clear();
-        fields.AddRange(definitionLoadedFromCopybook
-            ? CopybookDefinitionReader.Read(path)
-            : DefinitionCsvReader.Read(path));
+        fields.AddRange(loadedFields);
         hiddenFieldIndexes.Clear();
         SetPathText(definitionPathTextBox, path);
+        xmlLayoutTextBox.Text = xmlLayout is null ? "—" : $"{xmlLayout.Name} [{xmlLayout.Id}] / {xmlLayout.RecordLength} バイト";
         AddRecentFile(recentDefinitionFiles, path);
         UpdateSeparatorModeText();
+        return true;
     }
 
     private static bool IsCopybookPath(string path)
@@ -634,7 +681,7 @@ public sealed class MainForm : Form
     {
         try
         {
-            LoadDefinition(path);
+            if (!LoadDefinition(path)) return;
             ClearPathText(dataPathTextBox);
             saveDataPath = null;
             records.Clear();
@@ -1151,7 +1198,7 @@ public sealed class MainForm : Form
 
         try
         {
-            LoadDefinition(form.SavedPath);
+            if (!LoadDefinition(form.SavedPath)) return;
             ClearPathText(dataPathTextBox);
             saveDataPath = null;
             records.Clear();
@@ -1345,23 +1392,7 @@ public sealed class MainForm : Form
 
         try
         {
-            var imported = ExcelImporter.Read(dialog.FileName);
-            ValidateImportedDefinition(imported.Fields);
-
-            definitionLoadedFromCopybook = false;
-            currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
-            currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
-            fields.Clear();
-            fields.AddRange(imported.Fields);
-            hiddenFieldIndexes.Clear();
-            records.Clear();
-            records.AddRange(imported.Records.Select(record => record.ToList()));
-            saveDataPath = null;
-            SetPathText(definitionPathTextBox, $"(Excel) {dialog.FileName}");
-            SetPathText(dataPathTextBox, dialog.FileName);
-            layout = imported.LayoutName == "レコード縦" ? GridLayout.RecordRows : GridLayout.FieldRows;
-            NormalizeRecords();
-            RefreshGrid();
+            LoadExcel(dialog.FileName);
             ValidateRecords(showSuccess: false);
             SetStatus($"Excelから取り込みました: {Path.GetFileName(dialog.FileName)}");
         }
@@ -1369,6 +1400,30 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(this, ex.Message, "Excel取込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private void LoadExcel(string path)
+    {
+        var imported = ExcelImporter.Read(path);
+        ValidateImportedDefinition(imported.Fields);
+        // 読み込み済みXMLと同じ項目構造のExcelなら、文字コードと区切りを継承する。
+        if (currentXmlLayout is null)
+        {
+            currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
+            currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
+        }
+        fields.Clear();
+        fields.AddRange(imported.Fields);
+        hiddenFieldIndexes.Clear();
+        records.Clear();
+        records.AddRange(imported.Records.Select(record => record.ToList()));
+        saveDataPath = null;
+        SetPathText(definitionPathTextBox, $"(Excel) {path}");
+        SetPathText(dataPathTextBox, path);
+        layout = imported.LayoutName == "レコード縦" ? GridLayout.RecordRows : GridLayout.FieldRows;
+        NormalizeRecords();
+        UpdateSeparatorModeText();
+        RefreshGrid();
     }
 
     private void ValidateImportedDefinition(IReadOnlyList<FieldDefinition> importedFields)
@@ -1490,7 +1545,7 @@ public sealed class MainForm : Form
     private bool ValidateRecords(bool showSuccess)
     {
         grid.EndEdit();
-        var errors = RecordValidator.Validate(fields, records);
+        var errors = RecordValidator.Validate(fields, records, currentDataEncodingProfile);
         if (errors.Count == 0)
         {
             SetStatus("検証 OK");
@@ -1944,7 +1999,7 @@ public sealed class MainForm : Form
         }
     }
 
-    private static void ApplyCellValidationStyle(DataGridViewCell cell, FieldDefinition field, string value, Color? validBackColor = null)
+    private void ApplyCellValidationStyle(DataGridViewCell cell, FieldDefinition field, string value, Color? validBackColor = null)
     {
         var error = GetValidationError(field, value);
         cell.Style.BackColor = error is not null
@@ -1981,7 +2036,7 @@ public sealed class MainForm : Form
         {
             FieldDataType.FullWidthText => value.Length,
             FieldDataType.HalfWidthText => value.Length,
-            _ => ShiftJisEncoding.GetByteCount(value)
+            _ => TextDataEncoding.GetByteCount(value)
         };
         var remainingLength = field.Length - usedLength;
         if (remainingLength <= 0 && !ContainsVisibleSpace(value))
@@ -2232,7 +2287,7 @@ public sealed class MainForm : Form
         return false;
     }
 
-    private static string? GetValidationError(FieldDefinition field, string value)
+    private string? GetValidationError(FieldDefinition field, string value)
     {
         value = value.Trim();
         switch (field.Type)
@@ -2250,9 +2305,9 @@ public sealed class MainForm : Form
                     : signedError;
 
             case FieldDataType.Text:
-                return ShiftJisEncoding.GetByteCount(value) <= field.Length
+                return TextDataEncoding.GetByteCount(value) <= field.Length
                     ? null
-                    : $"Shift_JIS バイト長 {field.Length} を超えています。";
+                    : $"{TextDataEncoding.WebName} バイト長 {field.Length} を超えています。";
 
             case FieldDataType.HalfWidthText:
                 if (Encoding.ASCII.GetByteCount(value) != value.Length)
@@ -2281,7 +2336,10 @@ public sealed class MainForm : Form
         var separatorText = currentSeparatorMode == RecordSeparatorMode.None
             ? "改行なし"
             : "改行あり (CRLF/LF)";
-        separatorModeTextBox.Text = $"{separatorText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
+        var encodingText = currentXmlLayout is not null
+            ? currentXmlLayout.EncodingName
+            : currentDataEncodingProfile == DataEncodingProfile.Utf8WithNationalText ? "UTF-8" : "Shift_JIS";
+        separatorModeTextBox.Text = $"{separatorText} / X・数字: {encodingText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
     }
 
     private string? GetCurrentDefinitionPath()

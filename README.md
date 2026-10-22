@@ -2,11 +2,11 @@
 
 FixedDataBuilder は、COBOL 固定長データのテストデータを作成・編集するための C# WinForms / .NET 8 ツールです。
 
-定義書 CSV を読み込み、項目とレコードを表形式で見比べながら編集できます。COMP-3 / packed decimal 項目は、画面上では通常の数値として表示・入力し、保存時に packed decimal のバイト列へ変換します。
+定義書 CSV・COBOL コピー句・汎用XML定義を読み込み、項目とレコードを表形式で見比べながら編集できます。COMP-3 / packed decimal 項目は、画面上では通常の数値として表示・入力し、保存時に packed decimal のバイト列へ変換します。
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-occurs-visual-field-v0.1.33.png)
+![汎用XML定義を読み込んだ画面](docs/screen-image-generic-xml-v0.1.34.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
@@ -15,6 +15,44 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
+
+## 汎用XML定義
+
+`ファイル` → `定義を開く...` で `.xml` を選択できます。複数の固定長レイアウトがあれば、取り込むレイアウトを選びます。対応するものが1つだけなら自動で読み込みます。画面上部に選択した名前・ID・レコード長を表示します。
+
+![汎用XML定義のレイアウト選択](docs/screen-image-xml-layout-selection-v0.1.34.png)
+
+次の `FileDefinitions / File / Record / Column` 構造に対応しています。
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<FileDefinitions>
+  <File id="sample" name="サンプル" type="SEQ" isVariable="false"
+        charSet="UTF-8" existBOM="false">
+    <Record type="data" columnCount="2" length="16">
+      <Column index="1" name="番号" type="9" length="6" size="6" />
+      <Column index="2" name="名称" type="X" length="10" size="10" />
+    </Record>
+  </File>
+</FileDefinitions>
+```
+
+- `type="SEQ"` の固定長レイアウトを取り込みます。CSV・可変長の定義は対象外として表示します。
+- `Column` の `index` 順に、`name`（項目名）、`type`（`X` または `9`）、`length`（バイト数）を読み込みます。`index` は1から連続する番号で指定します。
+- `X` は指定バイト数の文字領域、`9` は符号・小数点なしの数字領域です。数字の `size` を指定する場合は `length` と同じ値にします。
+- `charSet` は `UTF-8` または `Shift_JIS` に対応します。読み込み・保存・検証・HEX表示で、選択した文字コードを使います。UTF-8では日本語1文字が通常3バイトになるため、文字数ではなくバイト数で検証します。
+- `lfType` の省略または `NONE` は改行なし、`CRLF` は改行ありです。データ読込時の既定値にも反映します。改行ありで読み込めるのはCRLF/LF、保存時はCRLFです。
+- `Record` の `length`・`columnCount` を指定した場合、項目の合計長・項目数との一致を確認します。
+- 1つの `File` に1つのデータ用 `Record` を持つ形式に対応します。BOM、シフトコード、複数レコード様式、ヘッダー・トレーラー、`X` / `9` 以外の型は未対応です。
+- XMLの `Format` 等に記載された変換処理は実行しません。保存時は文字を右側の半角空白、数字を左側のゼロで埋めます。XMLの出力には対応していません。`定義修正` の保存先はCSVです。
+
+サンプルは `samples/generic-xml-definition.xml` です。「顧客情報」を選択して `generic-xml-customer-data-utf8-none.dat` を開くと、UTF-8・改行なし・40バイト×2件のデータを表示できます。「商品情報」には `generic-xml-product-data-sjis-crlf.dat` を使います（Shift_JIS・改行あり・16バイト×2件）。
+
+起動引数でレイアウトIDを指定することもできます。XMLの場合、`--separator` を省略するとXMLの改行設定を使います。
+
+```powershell
+.\FixedDataBuilder.exe --definition samples/generic-xml-definition.xml --xml-layout customer-fixed --data samples/generic-xml-customer-data-utf8-none.dat
+```
 
 ## 定義書 CSV / COBOL コピー句
 
@@ -71,6 +109,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 ## できること
 
 - 定義書 CSV 読み込み
+- 汎用XML定義読み込み、レイアウト選択、文字コード・改行設定の取り込み
 - 定義書 CSV 作成
 - 定義書 CSV 作成時の型選択
 - 定義書 CSV 作成時、文字型の小数桁は入力不可
@@ -99,7 +138,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - 画面表示形式の Excel 出力
 - Excel 出力後に作成したブックを開く
 - FixedDataBuilder が出力した Excel の取り込み
-- Shift_JIS 前提の固定長データ保存
+- 定義に応じた Shift_JIS / UTF-8 の固定長データ保存
 - `N(n)` の未入力値は全角スペースで保存
 - `S9(n)` / `S9(nVm)` の表示数値は末尾桁の ASCII ゾーン符号で保存
 - COMP-3 / packed decimal の暫定エンコード・デコード

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FileDefinitions>
+  <!-- CSVは固定長ではないため選択対象外になります。 -->
+  <File id="customer-csv" name="顧客CSV" type="CSV" isVariable="true" charSet="UTF-8">
+    <Record type="data" columnCount="1" length="6">
+      <Column index="1" name="顧客番号" type="9" length="6" size="6" />
+    </Record>
+  </File>
+  <File id="customer-fixed" name="顧客情報" type="SEQ" isVariable="false"
+        charSet="UTF-8" existBOM="false" existShiftCode="false">
+    <Record type="data" columnCount="4" length="40">
+      <Column index="1" name="顧客番号" type="9" length="6" size="6" />
+      <Column index="2" name="氏名" type="X" length="18" size="18" />
+      <Column index="3" name="更新年月日" type="X" length="8" size="8" />
+      <Column index="4" name="数量" type="9" length="8" size="8" />
+    </Record>
+  </File>
+  <File id="product-fixed" name="商品情報" type="SEQ" isVariable="false"
+        charSet="Shift_JIS" lfType="CRLF" existBOM="false">
+    <Record type="data" columnCount="2" length="16">
+      <Column index="1" name="商品コード" type="X" length="10" size="10" />
+      <Column index="2" name="単価" type="9" length="6" size="6" />
+    </Record>
+  </File>
+</FileDefinitions>
