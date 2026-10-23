@@ -128,8 +128,9 @@ public static class ExcelExporter
         writer.WriteStartElement("fills");
         writer.WriteAttributeString("count", "3");
         WriteFill(writer, null);
-        WriteFill(writer, "FFDCECDC");
-        WriteFill(writer, "FFCCE8CC");
+        // Excelの標準fill 0/1は予約したまま、実際の塗りつぶしにはfill 2を使う。
+        WriteFill(writer, null, patternType: "gray125");
+        WriteFill(writer, "FFDDEBF7");
         writer.WriteEndElement();
 
         writer.WriteStartElement("borders");
@@ -152,7 +153,7 @@ public static class ExcelExporter
         writer.WriteAttributeString("count", "3");
         WriteCellFormat(writer, fontId: 0, fillId: 0, applyFill: false, applyFont: false);
         WriteCellFormat(writer, fontId: 1, fillId: 2, applyFill: true, applyFont: true);
-        WriteCellFormat(writer, fontId: 0, fillId: 1, applyFill: true, applyFont: false);
+        WriteCellFormat(writer, fontId: 0, fillId: 2, applyFill: true, applyFont: false);
         writer.WriteEndElement();
 
         writer.WriteEndElement();
@@ -175,11 +176,11 @@ public static class ExcelExporter
         writer.WriteEndElement();
     }
 
-    private static void WriteFill(XmlWriter writer, string? color)
+    private static void WriteFill(XmlWriter writer, string? color, string? patternType = null)
     {
         writer.WriteStartElement("fill");
         writer.WriteStartElement("patternFill");
-        writer.WriteAttributeString("patternType", color is null ? "none" : "solid");
+        writer.WriteAttributeString("patternType", patternType ?? (color is null ? "none" : "solid"));
         if (color is not null)
         {
             writer.WriteStartElement("fgColor");

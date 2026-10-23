@@ -55,13 +55,23 @@ CSV保存は全列を引用符で囲み、引用符を `""` に変換し、CRLF�
 
 同梱の `samples/csv-import-definition.csv` と `samples/csv-import-data-utf8.csv` で試せます。
 
+## Excel出力の背景色
+
+Excelへ出力した見出し・行番号・項目名・定義欄は、水色のベタ塗りで表示します。レコード縦・項目縦の両方に適用し、データ部分は白背景です。
+
+![レコード縦のExcel出力（水色の見出しと行番号）](docs/excel-record-lightblue-v0.1.40.png)
+
+![項目縦のExcel出力（水色の項目名と定義欄）](docs/excel-field-lightblue-v0.1.40.png)
+
+変更は新しく出力するExcelに反映されます。以前に出力したファイルは、再度Excel出力してください。
+
 ## ダウンロード
 
-最新版 **v0.1.39** は v0.1.37 をベースに、固定長／可変長 CSV の読み込み・出力形式選択を追加しました。v0.1.38 の固定長データ文字コード選択・F5再読み込みは含みません。左寄せ表示・列幅自動調整・ドラッグ＆ドロップは継続しています。
+最新版 **v0.1.40** では、Excel出力の見出し・行番号・定義欄を、網掛けのない水色の背景に変更しました。v0.1.39の固定長／可変長CSVの入出力にも引き続き対応しています。
 
-[FixedDataBuilder-v0.1.39.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.39/FixedDataBuilder-v0.1.39.zip)
+[FixedDataBuilder-v0.1.40.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.40/FixedDataBuilder-v0.1.40.zip)
 
-[v0.1.39 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.39) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.40 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.40) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 

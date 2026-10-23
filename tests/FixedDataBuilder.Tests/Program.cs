@@ -23,6 +23,16 @@ internal static partial class Program
         try
         {
             var repo = Path.GetFullPath(args[0]);
+            if (args.Length >= 4 && args[1] == "--capture-excel")
+            {
+                using var exportForm = new MainForm([
+                    "--definition", Path.Combine(repo, "samples", "csv-import-definition.csv"),
+                    "--data", Path.Combine(repo, "samples", "csv-import-data-utf8.csv"), "--layout", "record"]);
+                ExcelExporter.Write(args[2], "レコード縦", (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(exportForm, "BuildExcelRows")!);
+                Get<ToolStripMenuItem>(exportForm, "fieldRowsButton").PerformClick();
+                ExcelExporter.Write(args[3], "項目縦", (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(exportForm, "BuildExcelRows")!);
+                return 0;
+            }
             if (args.Length >= 5 && args[1] == "--capture-csv-only")
             {
                 CaptureCsv(repo, args[2], args[3]);

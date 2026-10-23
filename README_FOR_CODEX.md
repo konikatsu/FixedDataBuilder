@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.40 追記：Excel出力の水色背景
+
+- Excel出力の行番号・項目名・定義欄・見出しを、水色 `#DDEBF7` のベタ塗りに統一した。データ部分は塗りつぶしなし。
+- Excel標準のfill 0/1をnone/gray125として予約し、実セルの見出し・定義スタイルはfill 2だけを参照する。以前のfill 1参照を避け、実セルにgray125を適用しない。
+- 固定長・CSVの処理やメイン画面の色は変更していない。既存53件の検証成功。両レイアウトの出力xlsxで実セルのパターン参照が0件、水色と白の使い分け、元データ値の保持を確認した。
+- `--capture-excel <レコード縦xlsx> <項目縦xlsx>` で架空5件のExcel出力を作れる。READMEに両レイアウトの出力プレビューを追加。冒頭の従来メイン画像は維持する。
+- 番号を行の横・項目の上に付ける資料作成の依頼はユーザーが取消済み。今回の対象はExcel出力の背景色のみ。
+- v0.1.39はユーザーPCで警告なしに起動できたとの報告あり。SACの一般的な拒否原因の確定とは区別する。
+
 ## v0.1.39 追記：v0.1.37ベースの固定長／可変長CSV入出力
 
 - ユーザーの明示指示で、コードはv0.1.37を基にした。v0.1.38の固定長UTF-8選択・BOM除去・F5リロードを引き継がない。固定長Reader/Writer、RecordValidator、CopybookDefinitionReaderはv0.1.37と同一。
@@ -69,7 +78,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.39`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.40`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
@@ -81,7 +90,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.39 の Release ビルドを使う
+- `release/FixedDataBuilder.exe` は v0.1.40 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
 - README 冒頭は `docs/screen-image-cell-display-v0.1.39.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
