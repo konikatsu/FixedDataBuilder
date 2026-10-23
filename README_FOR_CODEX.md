@@ -1,5 +1,17 @@
 # README_FOR_CODEX
 
+## v0.1.39 追記：v0.1.37ベースの固定長／可変長CSV入出力
+
+- ユーザーの明示指示で、コードはv0.1.37を基にした。v0.1.38の固定長UTF-8選択・BOM除去・F5リロードを引き継がない。固定長Reader/Writer、RecordValidator、CopybookDefinitionReaderはv0.1.37と同一。
+- 読込条件に固定長／可変長CSVの選択を追加。CSVは定義の物理項目順、ヘッダーなし。UTF-8（BOM可）／Shift_JIS、引用符、カンマ、引用符内改行、空欄を解析する。REDEFINESはCSV列から除外し、非表示項目は保持する。
+- 保存条件でも形式を選択し、読込形式を初期値とする。上書き保存は現在の形式。CSVは全列引用符・CRLF・UTF-8 BOMなし、またはShift_JIS。変換不能文字では書込前に失敗させる。固定長保存は従来の補完・型検証・エンコーダを使用する。
+- 空欄、先頭・末尾の半角／全角空白、数値の先頭ゼロをCSVでは保持。数値や空白の桁埋めを表示・保存で追加しない。空白記号は実在する空白だけ。CSV見出しはCSV列番号、HEXは選択値のCSV文字コードによるバイト列。
+- 既存37件とCSV13件の計50件、提供された定義とCSVのローカル統合確認1件の計51件が成功。提供データは10行×29項目で、CSV往復の値一致と元ファイル未変更を確認した。実データ・業務定義は公開しない。
+- 公開用は架空の5行CSVサンプルのみ。README冒頭は従来の5行表示確認サンプルの構成を保ってv0.1.39として撮影。CSV読込・メイン・保存条件画像を別に掲載する。
+- ユーザーはAntigravity CLI Gemini 4 Argon Highでのファイルベースのレビューを明示依頼。依頼書と結果は版付きで、ローカルreviewsに保存。認証情報や無関係な個人情報を含めず、提供業務ファイルは検証・レビューだけに使う。
+- COPY句でうまく動かない場合があるとの追加報告あり。既存サンプルは通るが、問題のCOPY句と具体的症状は未提供で、未解決として引き継ぐ。今回、推測によるパーサ変更はしない。
+- v0.1.38のSAC問題レビューは別途ローカル保存。v0.1.39がSACで許可されることを、この環境のテスト成功から保証しない。
+
 ## v0.1.37 追記：行番号と位置見出し
 
 - レコード縦表示とデータ読込プレビューの左端見出しを「行」、値を `1`、`2`…に変更。項目縦表示の列見出し `Rec 1` 等は今回の対象外。
@@ -56,7 +68,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.37`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.39`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
@@ -68,10 +80,10 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.37 の Release ビルドを使う
+- `release/FixedDataBuilder.exe` は v0.1.39 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README 冒頭は `docs/screen-image-row-labels-v0.1.37.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
+- README 冒頭は `docs/screen-image-cell-display-v0.1.39.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
 - XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み

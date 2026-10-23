@@ -105,7 +105,8 @@ internal static partial class Program
             File.Copy(definition, customDefinition, overwrite: true);
             using var form = new MainForm();
             Drop(Get<TextBox>(form, "definitionPathTextBox"), customDefinition);
-            WithDialog("データ読込条件", DialogResult.OK, () => Drop(Get<TextBox>(form, "dataPathTextBox"), csvData));
+            WithDialog("データ読込条件", DialogResult.OK, () => Drop(Get<TextBox>(form, "dataPathTextBox"), csvData),
+                dialog => Descendants(dialog).OfType<ComboBox>().Single(control => control.Name == "DataFormat").SelectedIndex = 0);
             Equal(3, Get<List<List<string>>>(form, "records").Count);
             Equal(customDefinition, Get<TextBox>(form, "definitionPathTextBox").Text);
             Equal(csvData, Get<TextBox>(form, "dataPathTextBox").Text);
@@ -223,7 +224,7 @@ internal static partial class Program
     private static void RaiseDrag(Control control, string method, DragEventArgs e) =>
         typeof(Control).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(control, [e]);
 
-    private static void WithDialog(string title, DialogResult result, Action action)
+    private static void WithDialog(string title, DialogResult result, Action action, Action<Form>? inspect = null)
     {
         var shown = 0;
         using var timer = new System.Windows.Forms.Timer { Interval = 20 };
@@ -231,7 +232,9 @@ internal static partial class Program
         {
             var dialog = Application.OpenForms.Cast<Form>().FirstOrDefault(form => form.Text == title);
             if (dialog is null) return;
+            timer.Stop();
             shown++;
+            inspect?.Invoke(dialog);
             dialog.DialogResult = result;
         };
         timer.Start();
