@@ -170,7 +170,22 @@ internal static partial class Program
             {
                 if (layoutName == "レコード縦") Get<ToolStripMenuItem>(source, "recordRowsButton").PerformClick();
                 var path = Path.Combine(temporaryDirectory, layoutName + ".XLSX");
-                ExcelExporter.Write(path, layoutName, (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(source, "BuildExcelRows")!);
+                var rows = (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(source, "BuildExcelRows")!;
+                ExcelExporter.Write(path, layoutName, rows);
+                if (layoutName == "レコード縦")
+                {
+                    Equal("行", rows[0][0].Text);
+                    Equal("1", rows[1][0].Text);
+                    var legacyRows = rows.Select(row => row.ToArray()).ToArray();
+                    legacyRows[0][0] = new ExcelCell("レコード", ExcelCellKind.Header);
+                    for (var index = 1; index < legacyRows.Length; index++)
+                        legacyRows[index][0] = new ExcelCell($"Rec {index}", ExcelCellKind.Definition);
+                    var legacyPath = Path.Combine(temporaryDirectory, "legacy-record-rows.xlsx");
+                    ExcelExporter.Write(legacyPath, layoutName, legacyRows);
+                    var legacy = ExcelImporter.Read(legacyPath);
+                    Equal(3, legacy.Records.Count);
+                    Equal(true, legacy.Records[0].SequenceEqual(Get<List<List<string>>>(source, "records")[0]));
+                }
                 using var target = new MainForm();
                 Drop(Get<TextBox>(target, "dataPathTextBox"), path);
                 Equal(3, Get<List<List<string>>>(target, "records").Count);

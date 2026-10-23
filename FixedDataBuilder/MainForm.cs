@@ -1221,7 +1221,7 @@ public sealed class MainForm : Form
             .Select(item => item.index)
             .ToList();
 
-        previewGrid.Columns.Add(CreateReadOnlyColumn("Record", "レコード", 80, frozen: false));
+        previewGrid.Columns.Add(CreateReadOnlyColumn("Record", "行", 50, frozen: false));
         foreach (var fieldIndex in displayFieldIndexes)
         {
             previewGrid.Columns.Add(CreateReadOnlyColumn($"Field{fieldIndex}", previewFields[fieldIndex].Name, 120, frozen: false));
@@ -1232,7 +1232,7 @@ public sealed class MainForm : Form
             var record = previewRecords[recordIndex];
             var rowIndex = previewGrid.Rows.Add();
             var row = previewGrid.Rows[rowIndex];
-            row.Cells[0].Value = $"Rec {recordIndex + 1}";
+            row.Cells[0].Value = (recordIndex + 1).ToString(CultureInfo.InvariantCulture);
             for (var visibleIndex = 0; visibleIndex < displayFieldIndexes.Count; visibleIndex++)
             {
                 var fieldIndex = displayFieldIndexes[visibleIndex];
@@ -1989,7 +1989,7 @@ public sealed class MainForm : Form
     {
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
         grid.ColumnHeadersHeight = 64;
-        grid.Columns.Add(CreateReadOnlyColumn("Record", "レコード", 90, frozen: true));
+        grid.Columns.Add(CreateReadOnlyColumn("Record", "行", 50, frozen: true));
         recordGridColumnFieldIndexes.Add(-1);
         ApplyDefinitionColumnStyle(grid.Columns[0]);
 
@@ -2001,7 +2001,7 @@ public sealed class MainForm : Form
             if (IsDisplayableField(field) && !hiddenFieldIndexes.Contains(fieldIndex))
             {
                 occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
-                var ruler = $"byte {byteStart}-{byteEnd}";
+                var ruler = $"[{byteStart}-{byteEnd}]";
                 var header = occursInfo is null
                     ? $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}"
                     : $"{occursInfo.ChildName}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}";
@@ -2030,7 +2030,7 @@ public sealed class MainForm : Form
         {
             var rowIndex = grid.Rows.Add();
             var row = grid.Rows[rowIndex];
-            row.Cells[0].Value = $"Rec {recordIndex + 1}";
+            row.Cells[0].Value = (recordIndex + 1).ToString(CultureInfo.InvariantCulture);
 
             for (var columnIndex = 1; columnIndex < grid.Columns.Count; columnIndex++)
             {

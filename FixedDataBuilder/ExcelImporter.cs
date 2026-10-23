@@ -26,7 +26,7 @@ public static class ExcelImporter
             return ReadFieldRows(rows);
         }
 
-        if (Cell(rows, 0, 0) == "レコード")
+        if (Cell(rows, 0, 0) is "行" or "レコード")
         {
             return ReadRecordRows(rows);
         }

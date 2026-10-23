@@ -36,6 +36,17 @@ internal static partial class Program
                 foreach (DataGridViewRow row in grid.Rows)
                 foreach (DataGridViewCell cell in row.Cells)
                     Equal(DataGridViewContentAlignment.MiddleLeft, cell.InheritedStyle.Alignment);
+                if (recordRows)
+                {
+                    Equal("行", grid.Columns[0].HeaderText);
+                    for (var rowIndex = 0; rowIndex < grid.Rows.Count; rowIndex++)
+                    {
+                        Equal((rowIndex + 1).ToString(), grid[0, rowIndex].Value);
+                        Equal(true, grid[0, rowIndex].ReadOnly);
+                    }
+                    Equal("識別番号" + Environment.NewLine + "X(22)" + Environment.NewLine + "[1-22]", grid.Columns[1].HeaderText);
+                    Equal("番号" + Environment.NewLine + "X(15)" + Environment.NewLine + "[23-37]", grid.Columns[2].HeaderText);
+                }
             }
         });
         Test("Columns fit loaded data and complete headings in both layouts", () =>
@@ -49,7 +60,7 @@ internal static partial class Program
                     Equal(true, column.Width >= column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false));
                 if (recordRows)
                 {
-                    var headerWidth = TextRenderer.MeasureText("レコード", grid.ColumnHeadersDefaultCellStyle.Font,
+                    var headerWidth = TextRenderer.MeasureText(grid.Columns[0].HeaderText, grid.ColumnHeadersDefaultCellStyle.Font,
                         Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
                     Equal(true, grid.Columns[0].Width >= headerWidth);
                 }
