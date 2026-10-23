@@ -6,13 +6,13 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-cell-display-v0.1.39.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-position-length-v0.1.42.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
 文字・数値・見出しは左寄せで表示します。読み込み直後の列幅は、見出しと表示データが収まる幅に自動調整します。空白を示す `･` / `□` も幅に含めます。読み込み後は列の境界をドラッグして手動調整できます。
 
-レコード縦表示の左端は「行」を見出しとし、`1`、`2`、`3`…の番号だけを表示します。各項目のバイト位置は `[1-22]` の形式で表示します。データ読込プレビューも「行」と番号だけの表示です。
+レコード縦表示の左端は「行」を見出しとし、`1`、`2`、`3`…の番号だけを表示します。各項目の位置は `[開始位置,長さ]` の形式で表示します。開始位置は1始まり、長さはバイト数です。たとえば先頭22バイトの項目は `[1,22]`、続く15バイトの項目は `[23,15]` となり、Excel出力の見出しにも同じ形式を使います。データ読込プレビューも「行」と番号だけの表示です。
 
 ## ドラッグ＆ドロップで開く
 
@@ -69,11 +69,11 @@ Excelへ出力した見出し・行番号・項目名・定義欄は、水色の
 
 ## ダウンロード
 
-最新版 **v0.1.41** では、Excel出力のファイル名の先頭に元のデータファイル名を付けるようにしました。水色のExcel背景、固定長／可変長CSVの入出力にも引き続き対応しています。
+最新版 **v0.1.42** では、固定長の見出しを `[開始位置,長さ]` に変更しました。Excel出力にも反映されます。Excel出力名の元ファイル名プレフィクス、水色のExcel背景、固定長／可変長CSVの入出力にも引き続き対応しています。
 
-[FixedDataBuilder-v0.1.41.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.41/FixedDataBuilder-v0.1.41.zip)
+[FixedDataBuilder-v0.1.42.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.42/FixedDataBuilder-v0.1.42.zip)
 
-[v0.1.41 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.41) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.42 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.42) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 

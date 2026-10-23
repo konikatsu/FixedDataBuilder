@@ -1,5 +1,12 @@
 # README_FOR_CODEX
 
+## v0.1.42 追記：固定長見出しを開始位置・長さに変更
+
+- レコード縦表示の位置見出しを `[開始-終了]` から `[開始位置,長さ]` へ変更。1始まりのバイト位置・バイト数を表示し、例は `[1,22]`、`[23,15]`。Excel出力も同じ見出しを使う。
+- 表示文字列だけの変更。固定長データの読込・保存、CSVの `CSV列1` 等の見出しは維持。読込プレビューには従来から位置見出しがなく、項目名だけなので変更しない。
+- 既存の位置表示アサーションを更新し、53件すべて成功。今回は検証EXEが正常に起動し、WinForms画面を撮影できた。v0.1.41の拒否原因が解消・確定したと一般化しない。
+- README冒頭を `docs/screen-image-position-length-v0.1.42.png` に更新。架空5行の従来表示確認サンプルの構成を維持する。
+
 ## v0.1.41 追記：Excel出力名の元ファイルプレフィクス
 
 - Excel出力の既定名を `元データファイル名_FixedDataBuilder_項目縦.xlsx` / `元データファイル名_FixedDataBuilder_レコード縦.xlsx` に変更。元ファイルの拡張子は除く。データファイルがなければ定義名、どちらもなければ従来の名前へフォールバックする。
@@ -85,7 +92,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.41`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.42`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
@@ -97,10 +104,10 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.41 の Release ビルドを使う
+- `release/FixedDataBuilder.exe` は v0.1.42 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README 冒頭は `docs/screen-image-cell-display-v0.1.39.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
+- README 冒頭は `docs/screen-image-position-length-v0.1.42.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
 - XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み
