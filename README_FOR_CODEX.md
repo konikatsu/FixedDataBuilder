@@ -1,5 +1,11 @@
 # README_FOR_CODEX
 
+## v0.1.41 追記：Excel出力名の元ファイルプレフィクス
+
+- Excel出力の既定名を `元データファイル名_FixedDataBuilder_項目縦.xlsx` / `元データファイル名_FixedDataBuilder_レコード縦.xlsx` に変更。元ファイルの拡張子は除く。データファイルがなければ定義名、どちらもなければ従来の名前へフォールバックする。
+- 保存ダイアログの既定名だけを変更し、利用者が編集できる。Excelのデータ内容・水色背景は維持する。
+- このプレフィクスは、画面上で現在選択されているデータファイル名から取得する。名前を付けてデータ保存した後は、その保存先名になる。
+
 ## v0.1.40 追記：Excel出力の水色背景
 
 - Excel出力の行番号・項目名・定義欄・見出しを、水色 `#DDEBF7` のベタ塗りに統一した。データ部分は塗りつぶしなし。
@@ -78,7 +84,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.40`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.41`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
@@ -90,7 +96,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.40 の Release ビルドを使う
+- `release/FixedDataBuilder.exe` は v0.1.41 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
 - README 冒頭は `docs/screen-image-cell-display-v0.1.39.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。

@@ -55,7 +55,9 @@ CSV保存は全列を引用符で囲み、引用符を `""` に変換し、CRLF�
 
 同梱の `samples/csv-import-definition.csv` と `samples/csv-import-data-utf8.csv` で試せます。
 
-## Excel出力の背景色
+## Excel出力
+
+Excel出力の既定ファイル名には、現在のデータファイル名（拡張子を除く）を先頭に付けます。たとえば `入力データ.csv` のレコード縦出力は `入力データ_FixedDataBuilder_レコード縦.xlsx`、項目縦出力は `入力データ_FixedDataBuilder_項目縦.xlsx` です。保存ダイアログで名前を変更できます。定義だけを開いてデータを作成した場合は、定義ファイル名を使います。
 
 Excelへ出力した見出し・行番号・項目名・定義欄は、水色のベタ塗りで表示します。レコード縦・項目縦の両方に適用し、データ部分は白背景です。
 
@@ -67,11 +69,11 @@ Excelへ出力した見出し・行番号・項目名・定義欄は、水色の
 
 ## ダウンロード
 
-最新版 **v0.1.40** では、Excel出力の見出し・行番号・定義欄を、網掛けのない水色の背景に変更しました。v0.1.39の固定長／可変長CSVの入出力にも引き続き対応しています。
+最新版 **v0.1.41** では、Excel出力のファイル名の先頭に元のデータファイル名を付けるようにしました。水色のExcel背景、固定長／可変長CSVの入出力にも引き続き対応しています。
 
-[FixedDataBuilder-v0.1.40.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.40/FixedDataBuilder-v0.1.40.zip)
+[FixedDataBuilder-v0.1.41.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.41/FixedDataBuilder-v0.1.41.zip)
 
-[v0.1.40 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.40) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.41 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.41) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 

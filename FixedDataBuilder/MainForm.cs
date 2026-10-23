@@ -1530,7 +1530,7 @@ public sealed class MainForm : Form
         {
             Filter = "Excel ブック (*.xlsx)|*.xlsx",
             Title = "Excelへ出力",
-            FileName = $"FixedDataBuilder_{layoutName}.xlsx"
+            FileName = BuildExcelFileName(layoutName)
         };
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -1548,6 +1548,15 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(this, ex.Message, "Excel出力エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private string BuildExcelFileName(string layoutName)
+    {
+        var sourcePath = GetCurrentDataPath();
+        if (string.IsNullOrWhiteSpace(sourcePath)) sourcePath = GetCurrentDefinitionPath();
+        var sourceName = Path.GetFileNameWithoutExtension(sourcePath);
+        var prefix = string.IsNullOrWhiteSpace(sourceName) ? string.Empty : $"{sourceName}_";
+        return $"{prefix}FixedDataBuilder_{layoutName}.xlsx";
     }
 
     private void ImportExcel()

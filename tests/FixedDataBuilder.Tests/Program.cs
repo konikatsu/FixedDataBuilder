@@ -28,9 +28,17 @@ internal static partial class Program
                 using var exportForm = new MainForm([
                     "--definition", Path.Combine(repo, "samples", "csv-import-definition.csv"),
                     "--data", Path.Combine(repo, "samples", "csv-import-data-utf8.csv"), "--layout", "record"]);
+                Console.WriteLine($"CSV record: {Invoke(exportForm, "BuildExcelFileName", "レコード縦")}");
                 ExcelExporter.Write(args[2], "レコード縦", (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(exportForm, "BuildExcelRows")!);
                 Get<ToolStripMenuItem>(exportForm, "fieldRowsButton").PerformClick();
+                Console.WriteLine($"CSV field: {Invoke(exportForm, "BuildExcelFileName", "項目縦")}");
                 ExcelExporter.Write(args[3], "項目縦", (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(exportForm, "BuildExcelRows")!);
+                using var fixedForm = CreateBasicForm(repo);
+                Console.WriteLine($"Fixed: {Invoke(fixedForm, "BuildExcelFileName", "レコード縦")}");
+                using var definitionForm = new MainForm(["--definition", Path.Combine(repo, "samples", "csv-import-definition.csv")]);
+                Console.WriteLine($"Definition only: {Invoke(definitionForm, "BuildExcelFileName", "項目縦")}");
+                using var emptyForm = new MainForm();
+                Console.WriteLine($"No file: {Invoke(emptyForm, "BuildExcelFileName", "項目縦")}");
                 return 0;
             }
             if (args.Length >= 5 && args[1] == "--capture-csv-only")
