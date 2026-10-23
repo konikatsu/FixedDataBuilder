@@ -47,6 +47,7 @@ public sealed class MainForm : Form
     private readonly MenuStrip menuStrip = new();
     private readonly ToolStripMenuItem recentDefinitionFilesMenu = new("最近使った定義ファイル");
     private readonly ToolStripMenuItem recentDataFilesMenu = new("最近使ったデータファイル");
+    private readonly ToolStripMenuItem reloadDataMenuItem = new("再読み込み") { ShortcutKeys = Keys.F5, Enabled = false };
     private readonly StatusStrip statusStrip = new();
     private readonly ToolStripStatusLabel statusLabel = new();
     private readonly ToolStripMenuItem fieldRowsButton;
@@ -60,6 +61,7 @@ public sealed class MainForm : Form
     private readonly List<int> recordGridColumnFieldIndexes = [];
     private readonly Dictionary<int, OccursDisplayInfo> occursDisplayInfos = [];
     private string? saveDataPath;
+    private List<List<string>>? loadedRecordsSnapshot;
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
     private DataEncodingProfile currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
     private NationalTextEncoding currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
@@ -291,9 +293,11 @@ public sealed class MainForm : Form
     private void BuildMenuStrip()
     {
         menuStrip.Dock = DockStyle.Top;
+        reloadDataMenuItem.Click += (_, _) => ReloadData();
         menuStrip.Items.Add(CreateMenu("ファイル",
             CreateMenuItem("定義を開く...", (_, _) => OpenDefinition()),
             CreateMenuItem("データを開く...", (_, _) => OpenData()),
+            reloadDataMenuItem,
             new ToolStripSeparator(),
             recentDefinitionFilesMenu,
             recentDataFilesMenu,
@@ -664,6 +668,7 @@ public sealed class MainForm : Form
 
         // 読み込み・選択が完了してから現在の定義を置き換える。
         currentXmlLayout = xmlLayout;
+        loadedRecordsSnapshot = null;
         currentDataEncodingProfile = xmlLayout?.EncodingProfile ?? (fromCopybook
             ? DataEncodingProfile.Utf8WithNationalText
             : DataEncodingProfile.ShiftJis);
@@ -689,9 +694,16 @@ public sealed class MainForm : Form
 
     private void LoadData(string path, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
     {
+        LoadDataWithEncoding(path, separatorMode, nationalTextEncoding, currentDataEncodingProfile);
+    }
+
+    private void LoadDataWithEncoding(string path, RecordSeparatorMode separatorMode,
+        NationalTextEncoding nationalTextEncoding, DataEncodingProfile encodingProfile)
+    {
         EnsureKnownSampleSelection(path, separatorMode, nationalTextEncoding);
         var loadedFields = BuildFieldsForNationalTextEncoding(nationalTextEncoding);
-        var loadedRecords = FixedLengthDataReader.Read(path, loadedFields, separatorMode, currentDataEncodingProfile, nationalTextEncoding);
+        var loadedRecords = FixedLengthDataReader.Read(path, loadedFields, separatorMode, encodingProfile, nationalTextEncoding);
+        currentDataEncodingProfile = encodingProfile;
         ApplyNationalTextEncoding(nationalTextEncoding);
 
         records.Clear();
@@ -702,6 +714,56 @@ public sealed class MainForm : Form
         SetPathText(dataPathTextBox, path);
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
+        RememberLoadedRecords();
+    }
+
+    private void RememberLoadedRecords()
+    {
+        loadedRecordsSnapshot = records.Select(record => record.ToList()).ToList();
+    }
+
+    private bool HasUnsavedDataChanges()
+    {
+        return loadedRecordsSnapshot is not null
+            && (records.Count != loadedRecordsSnapshot.Count
+                || records.Where((record, index) => !record.SequenceEqual(loadedRecordsSnapshot[index])).Any());
+    }
+
+    private void ReloadData()
+    {
+        if (!reloadDataMenuItem.Enabled) return;
+        grid.EndEdit();
+        if (HasUnsavedDataChanges()
+            && MessageBox.Show(this, "未保存の変更を破棄して、ファイルを再読み込みしますか？", "再読み込み",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+        try
+        {
+            ReloadDataFromDisk();
+            SetStatus($"再読み込みしました: {Path.GetFileName(dataPathTextBox.Text)}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "再読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ReloadDataFromDisk()
+    {
+        var path = dataPathTextBox.Text;
+        if (saveDataPath is null && IsExcelPath(path))
+        {
+            var previousLayout = layout;
+            var previousHiddenFields = hiddenFieldIndexes.ToArray();
+            LoadExcel(path);
+            layout = previousLayout;
+            hiddenFieldIndexes.UnionWith(previousHiddenFields);
+            RefreshGrid();
+        }
+        else
+        {
+            LoadData(path, currentSeparatorMode, currentNationalTextEncoding);
+            RefreshGrid();
+        }
     }
 
     private void ApplyNationalTextEncoding(NationalTextEncoding nationalTextEncoding)
@@ -796,7 +858,7 @@ public sealed class MainForm : Form
                 return;
             }
 
-            LoadData(path, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding);
+            LoadDataWithEncoding(path, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding, loadOptions.EncodingProfile);
             RefreshGrid();
             SetStatus(statusMessage);
         }
@@ -1015,14 +1077,14 @@ public sealed class MainForm : Form
             MinimizeBox = false,
             MaximizeBox = true,
             ClientSize = new Size(760, 540),
-            MinimumSize = new Size(680, 500)
+            MinimumSize = new Size(780, 500)
         };
 
         var separatorGroup = new GroupBox
         {
             Text = "1. レコード区切り",
             Location = new Point(16, 14),
-            Size = new Size(340, 86),
+            Size = new Size(220, 126),
             Anchor = AnchorStyles.Top | AnchorStyles.Left
         };
 
@@ -1042,11 +1104,34 @@ public sealed class MainForm : Form
         };
         separatorGroup.Controls.AddRange([lineBreakRadio, noLineBreakRadio]);
 
+        var dataEncodingGroup = new GroupBox
+        {
+            Text = "2. データ文字コード（X・数字）",
+            Location = new Point(252, 14),
+            Size = new Size(232, 126),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left
+        };
+        var shiftJisRadio = new RadioButton
+        {
+            Text = "Shift_JIS",
+            Checked = currentDataEncodingProfile == DataEncodingProfile.ShiftJis,
+            Location = new Point(14, 24),
+            AutoSize = true
+        };
+        var utf8Radio = new RadioButton
+        {
+            Text = "UTF-8",
+            Checked = currentDataEncodingProfile == DataEncodingProfile.Utf8WithNationalText,
+            Location = new Point(14, 52),
+            AutoSize = true
+        };
+        dataEncodingGroup.Controls.AddRange([shiftJisRadio, utf8Radio]);
+
         var nationalEncodingGroup = new GroupBox
         {
-            Text = "2. 型N 文字コード",
-            Location = new Point(380, 14),
-            Size = new Size(340, 126),
+            Text = "3. 型N 文字コード",
+            Location = new Point(500, 14),
+            Size = new Size(240, 126),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
 
@@ -1139,7 +1224,8 @@ public sealed class MainForm : Form
             var nationalTextEncoding = buttons.First(button => button.Checked).Tag is NationalTextEncoding encoding
                 ? encoding
                 : NationalTextEncoding.ShiftJis;
-            return new DataLoadOptions(separatorMode, nationalTextEncoding);
+            return new DataLoadOptions(separatorMode, nationalTextEncoding,
+                utf8Radio.Checked ? DataEncodingProfile.Utf8WithNationalText : DataEncodingProfile.ShiftJis);
         }
 
         void UpdatePreview()
@@ -1153,7 +1239,7 @@ public sealed class MainForm : Form
                     dataPath,
                     previewFields,
                     options.SeparatorMode,
-                    currentDataEncodingProfile,
+                    options.EncodingProfile,
                     options.NationalTextEncoding);
                 ShowDataPreview(previewGrid, previewStatusLabel, previewFields, previewRecords);
             }
@@ -1164,7 +1250,7 @@ public sealed class MainForm : Form
         }
 
         previewButton.Click += (_, _) => UpdatePreview();
-        foreach (var radioButton in buttons.Concat([lineBreakRadio, noLineBreakRadio]))
+        foreach (var radioButton in buttons.Concat([lineBreakRadio, noLineBreakRadio, shiftJisRadio, utf8Radio]))
         {
             radioButton.CheckedChanged += (_, _) =>
             {
@@ -1175,7 +1261,7 @@ public sealed class MainForm : Form
             };
         }
 
-        form.Controls.AddRange([separatorGroup, nationalEncodingGroup, previewLabel, previewStatusLabel, previewGrid, previewButton, okButton, cancelButton]);
+        form.Controls.AddRange([separatorGroup, dataEncodingGroup, nationalEncodingGroup, previewLabel, previewStatusLabel, previewGrid, previewButton, okButton, cancelButton]);
         form.AcceptButton = okButton;
         form.CancelButton = cancelButton;
         UpdatePreview();
@@ -1386,6 +1472,7 @@ public sealed class MainForm : Form
         try
         {
             FixedLengthDataWriter.Write(saveDataPath, fields, records, currentSeparatorMode, currentDataEncodingProfile, currentNationalTextEncoding);
+            RememberLoadedRecords();
             SetStatus($"上書き保存しました: {Path.GetFileName(saveDataPath)}");
         }
         catch (Exception ex)
@@ -1420,6 +1507,7 @@ public sealed class MainForm : Form
             saveDataPath = dialog.FileName;
             SetPathText(dataPathTextBox, dialog.FileName);
             AddRecentFile(recentDataFiles, dialog.FileName);
+            RememberLoadedRecords();
             SetStatus($"保存しました: {Path.GetFileName(dialog.FileName)}");
         }
         catch (Exception ex)
@@ -1496,14 +1584,15 @@ public sealed class MainForm : Form
     {
         var imported = ExcelImporter.Read(path);
         ValidateImportedDefinition(imported.Fields);
-        // 読み込み済みXMLと同じ項目構造のExcelなら、文字コードと区切りを継承する。
-        if (currentXmlLayout is null)
+        // 読み込み済み定義と同じ項目構造なら、選択した文字コードを引き継ぐ。
+        if (fields.Count == 0)
         {
             currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
             currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
         }
         fields.Clear();
         fields.AddRange(imported.Fields);
+        ApplyNationalTextEncoding(currentNationalTextEncoding);
         hiddenFieldIndexes.Clear();
         records.Clear();
         records.AddRange(imported.Records.Select(record => record.ToList()));
@@ -1513,6 +1602,7 @@ public sealed class MainForm : Form
         layout = imported.LayoutName == "レコード縦" ? GridLayout.RecordRows : GridLayout.FieldRows;
         NormalizeRecords();
         UpdateSeparatorModeText();
+        RememberLoadedRecords();
         RefreshGrid();
     }
 
@@ -2355,7 +2445,7 @@ public sealed class MainForm : Form
 
     private string GetVisibleTextValue(FieldDefinition field, string value)
     {
-        var usedLength = field.Type is FieldDataType.FullWidthText or FieldDataType.HalfWidthText
+        var usedLength = field.Type == FieldDataType.FullWidthText
             ? value.Length : TextDataEncoding.GetByteCount(value);
         return BuildVisibleTextValue(field, value, field.Length - usedLength);
     }
@@ -2416,17 +2506,10 @@ public sealed class MainForm : Form
                     : signedError;
 
             case FieldDataType.Text:
+            case FieldDataType.HalfWidthText:
                 return TextDataEncoding.GetByteCount(value) <= field.Length
                     ? null
                     : $"{TextDataEncoding.WebName} バイト長 {field.Length} を超えています。";
-
-            case FieldDataType.HalfWidthText:
-                if (Encoding.ASCII.GetByteCount(value) != value.Length)
-                {
-                    return "半角文字のみ入力してください。";
-                }
-
-                return value.Length <= field.Length ? null : $"桁数 {field.Length} を超えています。";
 
             case FieldDataType.FullWidthText:
                 return value.Length <= field.Length ? null : $"桁数 {field.Length} を超えています。";
@@ -2583,7 +2666,8 @@ public sealed class MainForm : Form
 
     private sealed record DataLoadOptions(
         RecordSeparatorMode SeparatorMode,
-        NationalTextEncoding NationalTextEncoding);
+        NationalTextEncoding NationalTextEncoding,
+        DataEncodingProfile EncodingProfile);
 
     private sealed record FieldGridRow(
         int FieldIndex,
@@ -2649,6 +2733,7 @@ public sealed class MainForm : Form
     private void SetStatus(string message)
     {
         statusLabel.Text = message;
+        reloadDataMenuItem.Enabled = fields.Count > 0 && !string.IsNullOrWhiteSpace(dataPathTextBox.Text);
     }
 
     private enum GridLayout

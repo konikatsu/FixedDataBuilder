@@ -36,20 +36,10 @@ public static class RecordValidator
                         break;
 
                     case FieldDataType.Text:
+                    case FieldDataType.HalfWidthText:
                         if (textEncoding.GetByteCount(value) > field.Length)
                         {
                             errors.Add($"{location}: {textEncoding.WebName} バイト長 {field.Length} を超えています。");
-                        }
-                        break;
-
-                    case FieldDataType.HalfWidthText:
-                        if (Encoding.ASCII.GetByteCount(value) != value.Length)
-                        {
-                            errors.Add($"{location}: 半角文字のみ入力してください。");
-                        }
-                        if (value.Length > field.Length)
-                        {
-                            errors.Add($"{location}: 桁数 {field.Length} を超えています。");
                         }
                         break;
 

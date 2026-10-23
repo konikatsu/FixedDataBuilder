@@ -1,5 +1,15 @@
 # README_FOR_CODEX
 
+## v0.1.38 追記：UTF-8選択と再読み込み
+
+- データ読込条件に `2. データ文字コード（X・数字）` を追加し、Shift_JIS / UTF-8を選べるようにした。型Nは独立した既存の3択を維持する。既存の「型N UTF-8は非対応」という方針は変更していない。
+- 選択した文字コードをプレビュー・読み込み・保存・再読み込み・同一定義のExcel取込で維持する。文字コード変更は定義を読み直さず読込条件で指定できる。UTF-8はBOMあり/なしの入力を読み、保存はBOMなし。不正なUTF-8はエラーにし、現在のデータを保持する。
+- X項目の長さ検証と補完空白数は選択した文字コードでバイト数を数える。型Nは従来どおり文字数と固定幅を使う。
+- `ファイル → 再読み込み` / F5で現在のデータまたはExcelを読み直す。改行・文字コード・表示形式・項目表示を保持し、未保存の編集があれば破棄を確認する。定義だけの状態では再読込メニューを無効にする。
+- `EncodingAndReloadTests.cs` に10件を追加し、計47件成功を確認する。UIの選択・プレビュー・キャンセル、UTF-8の往復保存/BOM/バイト長/不正入力、Excel経由の文字コード、F5・失敗時保持・未保存検出・Excelリロードを検証する。
+- `--capture-encoding <読込条件PNG> <メインPNG>` で架空のUTF-8データを使った画像を作る。README参照画像は `screen-image-data-load-options-v0.1.38.png` と `screen-image-utf8-reload-v0.1.38.png`。
+- v0.1.38の実行ファイル・ZIP・READMEを更新し、GitHubへpush・Releases公開する。
+
 ## v0.1.37 追記：行番号と位置見出し
 
 - レコード縦表示とデータ読込プレビューの左端見出しを「行」、値を `1`、`2`…に変更。項目縦表示の列見出し `Rec 1` 等は今回の対象外。
@@ -56,22 +66,23 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.37`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.38`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
 最新の成功状態:
 
+- `v0.1.38` でデータ文字コードのShift_JIS/UTF-8選択とF5再読み込みを追加。既存37件に10件の検証を追加する。
 - `v0.1.37` で左端を「行」と番号に、バイト位置を `[開始-終了]` 表示に変更。READMEと配布物も更新する。
 - `v0.1.36` で文字の左端を統一し、読込時の列幅を自動調整。表示検証6件を含む37件のテストが成功。
 - READMEの冒頭画像・ダウンロード案内と `release/` の配布物は v0.1.36 に更新する。
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.37 の Release ビルドを使う
+- `release/FixedDataBuilder.exe` は v0.1.38 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README 冒頭は `docs/screen-image-row-labels-v0.1.37.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
+- README 冒頭は `docs/screen-image-utf8-reload-v0.1.38.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
 - XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み

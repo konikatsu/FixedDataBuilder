@@ -174,6 +174,28 @@ internal static partial class Program
 
             RunCellDisplayTests(repo);
             RunDragDropTests(repo);
+            RunEncodingAndReloadTests();
+
+            if (args.Length >= 3 && args[1] == "--capture-encoding")
+            {
+                var fixture = CreateEncodingFixture(DataEncodingProfile.Utf8WithNationalText);
+                using var form = new MainForm(["--definition", fixture.DefinitionPath]);
+                SelectEncodingInDialog(DataEncodingProfile.Utf8WithNationalText, NationalTextEncoding.ShiftJis,
+                    DialogResult.OK, () => Invoke(form, "LoadDataFromPath", fixture.DataPath, "UTF-8データを読み込みました。"),
+                    dialog =>
+                    {
+                        using var bitmap = new Bitmap(dialog.Width, dialog.Height);
+                        dialog.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+                        bitmap.Save(args[2], ImageFormat.Png);
+                    });
+                if (args.Length >= 4)
+                {
+                    Get<TextBox>(form, "definitionPathTextBox").Text = "（UTF-8・表示確認用CSV）";
+                    Get<TextBox>(form, "dataPathTextBox").Text = "（架空のUTF-8データ）";
+                    Get<ToolStripMenuItem>(form, "recordRowsButton").PerformClick();
+                    Capture(form, args[3], expectedHex: null);
+                }
+            }
 
             if (args.Length >= 3 && args[1] == "--capture-display")
             {
