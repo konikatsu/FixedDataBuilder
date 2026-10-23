@@ -23,6 +23,15 @@ internal static partial class Program
         try
         {
             var repo = Path.GetFullPath(args[0]);
+            if (args.Length >= 5 && args[1] == "--capture-csv-only")
+            {
+                CaptureCsv(repo, args[2], args[3]);
+                using var displayForm = CreateCellDisplayForm(recordRows: true);
+                Get<TextBox>(displayForm, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(displayForm, "dataPathTextBox").Text = "（架空データ・5レコード）";
+                Capture(displayForm, args[4], expectedHex: null);
+                return 0;
+            }
             var sample = Path.Combine(repo, "samples", "generic-xml-definition.xml");
             var layouts = XmlDefinitionReader.Read(sample);
             var customer = layouts.Single(layout => layout.Id == "customer-fixed");
@@ -174,27 +183,30 @@ internal static partial class Program
 
             RunCellDisplayTests(repo);
             RunDragDropTests(repo);
-            RunEncodingAndReloadTests();
+            RunCsvDataTests(repo);
 
-            if (args.Length >= 3 && args[1] == "--capture-encoding")
+            if (args.Length >= 4 && args[1] == "--capture-csv")
+                CaptureCsv(repo, args[2], args[3]);
+
+            if (args.Length >= 4 && args[1] == "--verify-csv")
             {
-                var fixture = CreateEncodingFixture(DataEncodingProfile.Utf8WithNationalText);
-                using var form = new MainForm(["--definition", fixture.DefinitionPath]);
-                SelectEncodingInDialog(DataEncodingProfile.Utf8WithNationalText, NationalTextEncoding.ShiftJis,
-                    DialogResult.OK, () => Invoke(form, "LoadDataFromPath", fixture.DataPath, "UTF-8データを読み込みました。"),
-                    dialog =>
-                    {
-                        using var bitmap = new Bitmap(dialog.Width, dialog.Height);
-                        dialog.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
-                        bitmap.Save(args[2], ImageFormat.Png);
-                    });
-                if (args.Length >= 4)
+                Test("Provided CSV layout and 10 records read through UI with all 29 columns", () =>
                 {
-                    Get<TextBox>(form, "definitionPathTextBox").Text = "（UTF-8・表示確認用CSV）";
-                    Get<TextBox>(form, "dataPathTextBox").Text = "（架空のUTF-8データ）";
-                    Get<ToolStripMenuItem>(form, "recordRowsButton").PerformClick();
-                    Capture(form, args[3], expectedHex: null);
-                }
+                    var providedFields = DefinitionCsvReader.Read(args[2]);
+                    var sourceBytes = File.ReadAllBytes(args[3]);
+                    var providedRows = CsvDataReader.Read(args[3], providedFields);
+                    Equal(29, providedFields.Count);
+                    Equal(10, providedRows.Count);
+                    Equal(true, providedRows.All(row => row.Count == 29));
+                    using var form = new MainForm(["--definition", args[2], "--data", args[3], "--layout", "record"]);
+                    Equal(true, providedRows.SelectMany(row => row).SequenceEqual(Get<List<List<string>>>(form, "records").SelectMany(row => row)));
+                    Equal(args[3], Get<string?>(form, "saveDataPath"));
+                    var csvCopy = Path.Combine(temporaryDirectory, "provided-roundtrip.csv");
+                    Invoke(form, "WriteData", csvCopy, new DataSaveOptions(DataFileFormat.Csv, CsvTextEncoding.Utf8,
+                        RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis));
+                    Equal(true, providedRows.SelectMany(row => row).SequenceEqual(CsvDataReader.Read(csvCopy, providedFields).SelectMany(row => row)));
+                    Equal(true, sourceBytes.SequenceEqual(File.ReadAllBytes(args[3])));
+                });
             }
 
             if (args.Length >= 3 && args[1] == "--capture-display")

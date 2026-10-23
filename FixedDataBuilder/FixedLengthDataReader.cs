@@ -18,14 +18,9 @@ public static class FixedLengthDataReader
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
-            ? new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+            ? Encoding.UTF8
             : Encoding.GetEncoding(932);
         var bytes = File.ReadAllBytes(path);
-        if (encodingProfile == DataEncodingProfile.Utf8WithNationalText
-            && bytes.AsSpan().StartsWith(Encoding.UTF8.GetPreamble()))
-        {
-            bytes = bytes[Encoding.UTF8.GetPreamble().Length..];
-        }
         var recordLength = fields.Sum(field => field.StorageByteLength);
         if (recordLength <= 0)
         {
