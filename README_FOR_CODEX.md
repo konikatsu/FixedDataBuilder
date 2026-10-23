@@ -9,6 +9,7 @@
 - データ読込は解析成功後にレコードと型N文字コードを更新する。読込失敗時に既存データを消さない。
 - `tests/FixedDataBuilder.Tests/DragDropTests.cs` に15件を追加。既存16件と合わせ31件成功。`--capture-drop <PNG絶対パス>` で通常サンプルを実際のドロップ処理経由で開いた画面を保存できる。
 - READMEの冒頭画像は `docs/screen-image-file-drop-v0.1.35.png`。XMLを隠し機能とする既存方針は維持する。
+- 後続指示でGitHub Releasesへの公開とREADME更新も依頼された。v0.1.35のZIPをReleaseアセットとして公開し、READMEのダウンロード欄にバージョン・ZIP直リンク・変更内容へのリンクを記載する。
 - ビルド用SDKがなかったため、Microsoft公式スクリプトで .NET SDK 8.0.426 を `%LOCALAPPDATA%\Microsoft\dotnet` に管理者権限なしで導入した。PATHを変更していないので、この環境では同フォルダーの `dotnet.exe` を明示してビルド・テストする。
 
 ## v0.1.34 追記：汎用XML定義

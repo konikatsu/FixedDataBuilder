@@ -24,7 +24,11 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-最新版は [GitHub Releases](https://github.com/konikatsu/FixedDataBuilder/releases/latest) からダウンロードできます。
+最新版 **v0.1.35** は、定義・固定長データ・Excel のドラッグ＆ドロップ読み込みに対応しています。
+
+[FixedDataBuilder-v0.1.35.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.35/FixedDataBuilder-v0.1.35.zip)
+
+[v0.1.35 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.35) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 
