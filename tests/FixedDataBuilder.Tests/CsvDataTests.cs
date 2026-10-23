@@ -173,6 +173,61 @@ internal static partial class Program
             Throws<TargetInvocationException>(() => Invoke(form, "WriteData", target, options));
             Equal(true, previousBytes.SequenceEqual(File.ReadAllBytes(target)));
             Equal(previousPath, Get<string>(form, "saveDataPath"));
+            var grid = Get<DataGridView>(form, "grid");
+            grid.CurrentCell = grid[2, 1];
+            Invoke(form, "UpdateHexView");
+            Equal(true, Get<TextBox>(form, "hexTextBox").Text.StartsWith("HEX 表示エラー:"));
+        });
+        Test("Numeric REDEFINES never blocks CSV to fixed conversion or adds output columns", () =>
+        {
+            foreach (var type in new[] { FieldDataType.PlainNumber, FieldDataType.SignedNumber, FieldDataType.PackedUnsigned, FieldDataType.PackedSigned })
+            {
+                using var form = new MainForm(["--definition", definition]);
+                var formFields = Get<List<FieldDefinition>>(form, "fields");
+                formFields.Insert(1, new FieldDefinition("別数値", type, 6, RedefinesName: fields[0].Name));
+                Invoke(form, "LoadCsvData", data, CsvTextEncoding.Utf8);
+                Equal("0", Get<List<List<string>>>(form, "records")[0][1]);
+                var target = Path.Combine(temporaryDirectory, "numeric-redefines.dat");
+                Invoke(form, "WriteData", target, new DataSaveOptions(DataFileFormat.FixedLength, CsvTextEncoding.Utf8,
+                    RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis));
+                Equal(5, FixedLengthDataReader.Read(target, fields, RecordSeparatorMode.CrLfOrLf).Count);
+                var csvTarget = Path.Combine(temporaryDirectory, "numeric-redefines.csv");
+                Invoke(form, "WriteData", csvTarget, new DataSaveOptions(DataFileFormat.Csv, CsvTextEncoding.Utf8,
+                    RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis));
+                Equal(4, CsvDataReader.Read(csvTarget, fields)[0].Count);
+            }
+        });
+        Test("New CSV rows use empty cells for text, N and numbers while fixed defaults remain unchanged", () =>
+        {
+            var newDefinition = Path.Combine(temporaryDirectory, "new-row-definition.csv");
+            File.WriteAllText(newDefinition, "項目名,定義\n文字,X(6)\n全角,N(4)\n数字,9(3)\n");
+            File.WriteAllText(scratch, "\"code\",\"\",\"\"\r\n");
+            using var form = new MainForm(["--definition", newDefinition, "--data", scratch]);
+            Invoke(form, "AddRecord");
+            var rows = Get<List<List<string>>>(form, "records");
+            Equal(true, rows[1].All(value => value == ""));
+            var target = Path.Combine(temporaryDirectory, "new-empty-row.csv");
+            Invoke(form, "WriteData", target, Invoke(form, "CurrentSaveOptions"));
+            Equal(true, CsvDataReader.Read(target, Get<List<FieldDefinition>>(form, "fields"))[1].All(value => value == ""));
+            using var fixedForm = new MainForm(["--definition", newDefinition]);
+            Equal("　　　　", Get<List<List<string>>>(fixedForm, "records")[0][1]);
+            Equal("0", Get<List<List<string>>>(fixedForm, "records")[0][2]);
+        });
+        Test("Saving the same format retains manual column widths and selected cell in both modes", () =>
+        {
+            foreach (var csvMode in new[] { false, true })
+            {
+                using var form = csvMode ? new MainForm(["--definition", definition, "--data", data]) : CreateBasicForm(repo);
+                var grid = Get<DataGridView>(form, "grid");
+                grid.Columns[2].Width += 71;
+                var width = grid.Columns[2].Width;
+                grid.CurrentCell = grid[2, 1];
+                var target = Path.Combine(temporaryDirectory, csvMode ? "width.csv" : "width.dat");
+                Invoke(form, "WriteData", target, Invoke(form, "CurrentSaveOptions"));
+                Equal(width, grid.Columns[2].Width);
+                Equal(2, grid.CurrentCell.ColumnIndex);
+                Equal(1, grid.CurrentCell.RowIndex);
+            }
         });
     }
 

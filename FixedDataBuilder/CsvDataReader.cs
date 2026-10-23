@@ -39,7 +39,11 @@ public static class CsvDataReader
                 throw new InvalidDataException($"CSV {records.Count + 1} 行目（ファイル {recordStartLine} 行目）: "
                     + $"列数が定義と一致しません。必要 {columnCount} 列 / 実際 {cells.Count} 列。");
             var column = 0;
-            records.Add(fields.Select(field => field.IsRedefines ? string.Empty : cells[column++]).ToList());
+            // CSV列を持たない数値REDEFINESには、従来の固定長検証で有効な内部初期値を置く。
+            records.Add(fields.Select(field => field.IsRedefines
+                ? field.Type is FieldDataType.PlainNumber or FieldDataType.SignedNumber
+                    or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned ? "0" : string.Empty
+                : cells[column++]).ToList());
             cells.Clear();
             cell.Clear();
             state = State.Start;

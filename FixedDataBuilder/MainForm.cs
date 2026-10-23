@@ -1313,7 +1313,7 @@ public sealed class MainForm : Form
 
     private List<string> CreateEmptyRecord()
     {
-        return fields.Select(field => field.Type switch
+        return fields.Select(field => IsCsv && !field.IsRedefines ? string.Empty : field.Type switch
         {
             FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned => "0",
             FieldDataType.FullWidthText => new string('\u3000', field.Length),
@@ -1370,7 +1370,7 @@ public sealed class MainForm : Form
             while (record.Count < fields.Count)
             {
                 var field = fields[record.Count];
-                record.Add(field.Type switch
+                record.Add(IsCsv && !field.IsRedefines ? string.Empty : field.Type switch
                 {
                     FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned => "0",
                     FieldDataType.FullWidthText => new string('\u3000', field.Length),
@@ -1488,6 +1488,8 @@ public sealed class MainForm : Form
 
     private void WriteData(string path, DataSaveOptions options)
     {
+        var refreshNeeded = options.Format != currentDataFileFormat
+            || (options.Format == DataFileFormat.FixedLength && options.NationalEncoding != currentNationalTextEncoding);
         if (options.Format == DataFileFormat.Csv)
         {
             CsvDataWriter.Write(path, fields, records, options.CsvEncoding);
@@ -1510,7 +1512,8 @@ public sealed class MainForm : Form
         SetPathText(dataPathTextBox, path);
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
-        RefreshGrid();
+        if (refreshNeeded) RefreshGrid();
+        else UpdateHexView();
     }
 
     private void ExportExcel()
@@ -2184,7 +2187,9 @@ public sealed class MainForm : Form
         {
             var field = fields[fieldIndex];
             var bytes = IsCsv
-                ? (currentCsvEncoding == CsvTextEncoding.Utf8 ? Encoding.UTF8 : ShiftJisEncoding).GetBytes(records[recordIndex][fieldIndex])
+                ? (currentCsvEncoding == CsvTextEncoding.Utf8 ? new UTF8Encoding(false, true)
+                    : Encoding.GetEncoding(932, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback))
+                    .GetBytes(records[recordIndex][fieldIndex])
                 : FixedLengthDataWriter.EncodeField(field, records[recordIndex][fieldIndex], currentDataEncodingProfile, currentNationalTextEncoding);
             hexTextBox.Text = string.Join(" ", bytes.Select(value => value.ToString("X2")));
         }
