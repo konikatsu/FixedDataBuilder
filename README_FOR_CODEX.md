@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.36 追記：文字位置の統一と初期列幅
+
+- 空白を記号で表示するセルだけ通常セルより3px右にずれることを画素比較で再現し、標準セルと同じ余白・描画フラグに修正した。フォント変更で対処する問題ではなかった。
+- ユーザー方針に合わせ文字・数値・見出しを左寄せに統一。選択中は選択色で文字と空白記号を表示する。
+- グリッド再構築時と表示フォント変更時に、見出し・データ・補完される空白記号まで収まる列幅へ調整する。自動サイズモードはNoneのままにして、読込後の手動幅調整とセル編集時の幅を保持する。
+- `tests/FixedDataBuilder.Tests/CellDisplayTests.cs` に表示回帰テスト6件を追加し、計37件成功。項目縦/レコード縦、MS Gothic/Consolas、12pt/18ptで文字開始位置を比較し、列幅・選択色・手動幅保持も検証した。
+- `--capture-display <PNG絶対パス>` は実データを使わず架空5レコードで表示確認画像を作成する。README冒頭画像は `docs/screen-image-cell-display-v0.1.36.png`。
+- v0.1.36の実行ファイル・サンプル入りZIP・READMEのダウンロードリンクを更新する。継続してGitHubへのpushとReleasesへの公開を行う。
+
 ## v0.1.35 追記：ファイルのドラッグ＆ドロップ
 
 - 2026-10-23、ユーザー指示でGitHubの最新 `da24013` を取得してから実装。ローカルの既存差分の破棄と、修正完了後のGitHubへのpushはユーザー承認済み。
@@ -40,19 +49,21 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.35`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.36`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
 最新の成功状態:
 
+- `v0.1.36` で文字の左端を統一し、読込時の列幅を自動調整。表示検証6件を含む37件のテストが成功。
+- READMEの冒頭画像・ダウンロード案内と `release/` の配布物は v0.1.36 に更新する。
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.35 の Release ビルド済み
+- `release/FixedDataBuilder.exe` は v0.1.36 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README 冒頭は `docs/screen-image-file-drop-v0.1.35.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
+- README 冒頭は `docs/screen-image-cell-display-v0.1.36.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
 - XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み

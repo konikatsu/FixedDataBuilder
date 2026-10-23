@@ -6,9 +6,11 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-file-drop-v0.1.35.png)
+![FixedDataBuilder のスクリーンショット](docs/screen-image-cell-display-v0.1.36.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
+
+文字・数値・見出しは左寄せで表示します。読み込み直後の列幅は、見出しと表示データが収まる幅に自動調整します。空白を示す `･` / `□` も幅に含めます。読み込み後は列の境界をドラッグして手動調整できます。
 
 ## ドラッグ＆ドロップで開く
 
@@ -24,11 +26,11 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-最新版 **v0.1.35** は、定義・固定長データ・Excel のドラッグ＆ドロップ読み込みに対応しています。
+最新版 **v0.1.36** では、空白を含むセルの文字開始位置を修正し、読み込み時に列幅をデータに合わせて自動調整します。定義・固定長データ・Excel のドラッグ＆ドロップにも対応しています。
 
-[FixedDataBuilder-v0.1.35.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.35/FixedDataBuilder-v0.1.35.zip)
+[FixedDataBuilder-v0.1.36.zip をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.36/FixedDataBuilder-v0.1.36.zip)
 
-[v0.1.35 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.35) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.36 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.36) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 

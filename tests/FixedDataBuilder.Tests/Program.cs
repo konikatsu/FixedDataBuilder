@@ -172,7 +172,16 @@ internal static partial class Program
                 Equal("product-fixed", dialog.SelectedLayout!.Id);
             });
 
+            RunCellDisplayTests(repo);
             RunDragDropTests(repo);
+
+            if (args.Length >= 3 && args[1] == "--capture-display")
+            {
+                using var form = CreateCellDisplayForm(recordRows: true);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "（架空データ・5レコード）";
+                Capture(form, args[2], expectedHex: null);
+            }
 
             if (args.Length >= 3 && args[1] == "--capture-drop")
             {

@@ -346,6 +346,8 @@ public sealed class MainForm : Form
         grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
         grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
         grid.EnableHeadersVisualStyles = false;
         grid.CellEndEdit += (_, e) =>
         {
@@ -499,6 +501,7 @@ public sealed class MainForm : Form
         grid.DefaultCellStyle.Font = displayFont;
         hexTextBox.Font = displayFont;
         RefreshGridSizing();
+        SizeColumnsToFitData();
     }
 
     private static Font CreateDefaultDisplayFont()
@@ -1883,12 +1886,35 @@ public sealed class MainForm : Form
 
             SetStatus($"{VisibleFieldIndexes().Count} / {DisplayableFieldIndexes().Count} 項目表示 / {records.Count} レコード");
             RefreshGridSizing();
+            SizeColumnsToFitData();
         }
         finally
         {
             isRefreshingGrid = false;
         }
         UpdateHexView();
+    }
+
+    private void SizeColumnsToFitData()
+    {
+        foreach (DataGridViewColumn column in grid.Columns)
+        {
+            var width = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: false);
+            foreach (DataGridViewRow row in grid.Rows)
+            {
+                if (!TryGetCellField(row.Index, column.Index, out var field)
+                    || field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText)) continue;
+                var cell = row.Cells[column.Index];
+                var value = cell.FormattedValue?.ToString() ?? string.Empty;
+                if (GetValidationError(field, value) is not null) continue;
+                var style = cell.InheritedStyle;
+                var visibleValue = GetVisibleTextValue(field, value);
+                var textWidth = TextRenderer.MeasureText(visibleValue, style.Font ?? grid.Font,
+                    Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
+                width = Math.Max(width, textWidth + style.Padding.Horizontal + 2);
+            }
+            column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
+        }
     }
 
     private void RefreshFieldRowsGrid()
@@ -2119,14 +2145,8 @@ public sealed class MainForm : Form
             return;
         }
 
-        var usedLength = field.Type switch
-        {
-            FieldDataType.FullWidthText => value.Length,
-            FieldDataType.HalfWidthText => value.Length,
-            _ => TextDataEncoding.GetByteCount(value)
-        };
-        var remainingLength = field.Length - usedLength;
-        if (remainingLength <= 0 && !ContainsVisibleSpace(value))
+        var visibleValue = GetVisibleTextValue(field, value);
+        if (visibleValue == value)
         {
             return;
         }
@@ -2134,21 +2154,23 @@ public sealed class MainForm : Form
         e.Paint(e.CellBounds, e.PaintParts & ~DataGridViewPaintParts.ContentForeground);
 
         var padding = e.CellStyle.Padding;
+        // 標準のDataGridViewTextBoxCellと同じ余白にする。TextRenderer自身の余白に加算しない。
         var textBounds = new Rectangle(
-            e.CellBounds.Left + padding.Left + 3,
-            e.CellBounds.Top + padding.Top + 1,
-            e.CellBounds.Width - padding.Left - padding.Right - 6,
-            e.CellBounds.Height - padding.Top - padding.Bottom - 2);
+            e.CellBounds.Left + padding.Left,
+            e.CellBounds.Top + padding.Top + 2,
+            e.CellBounds.Width - padding.Horizontal - 1,
+            e.CellBounds.Height - padding.Vertical - 4);
         var font = e.CellStyle.Font ?? grid.Font;
-        var visibleValue = BuildVisibleTextValue(field, value, remainingLength);
-        PaintVisibleSpaceHighlights(e.Graphics, font, textBounds, visibleValue);
+        var selected = (e.State & DataGridViewElementStates.Selected) != 0;
+        if (!selected) PaintVisibleSpaceHighlights(e.Graphics, font, textBounds, visibleValue);
         TextRenderer.DrawText(
             e.Graphics,
             visibleValue,
             font,
             textBounds,
-            e.CellStyle.ForeColor,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            selected ? e.CellStyle.SelectionForeColor : e.CellStyle.ForeColor,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix
+                | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.PreserveGraphicsClipping);
         e.Handled = true;
     }
 
@@ -2208,7 +2230,7 @@ public sealed class MainForm : Form
             e.CellStyle.Font ?? grid.Font,
             spanBounds,
             OccursHeaderForeColor,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
         e.Handled = true;
         return true;
     }
@@ -2331,9 +2353,11 @@ public sealed class MainForm : Form
         return value is '\uFF65' or '\u25A1';
     }
 
-    private static bool ContainsVisibleSpace(string value)
+    private string GetVisibleTextValue(FieldDefinition field, string value)
     {
-        return value.Contains(' ') || value.Contains('\u3000');
+        var usedLength = field.Type is FieldDataType.FullWidthText or FieldDataType.HalfWidthText
+            ? value.Length : TextDataEncoding.GetByteCount(value);
+        return BuildVisibleTextValue(field, value, field.Length - usedLength);
     }
 
     private static string BuildVisibleTextValue(FieldDefinition field, string value, int remainingLength)
