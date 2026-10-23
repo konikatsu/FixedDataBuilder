@@ -99,7 +99,8 @@ public sealed class MainForm : Form
         statusLabel.TextAlign = ContentAlignment.MiddleLeft;
         statusStrip.Items.Add(statusLabel);
         UpdateSeparatorModeText();
-        SetStatus("定義ファイルを選択してください。");
+        EnableFileDrop(this);
+        SetStatus("定義ファイルを選択するか、ファイルをドラッグ＆ドロップしてください。");
         LoadStartupFiles(args ?? []);
     }
 
@@ -110,7 +111,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 2,
-            RowCount = 4,
+            RowCount = 5,
             Padding = new Padding(8, 6, 8, 4)
         };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
@@ -119,6 +120,7 @@ public sealed class MainForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
 
         ConfigureReadOnlyTextBox(definitionPathTextBox);
         ConfigureReadOnlyTextBox(xmlLayoutTextBox);
@@ -133,6 +135,16 @@ public sealed class MainForm : Form
         panel.Controls.Add(separatorModeTextBox, 1, 2);
         panel.Controls.Add(CreatePathLabel("XMLレイアウト"), 0, 3);
         panel.Controls.Add(xmlLayoutTextBox, 1, 3);
+        var dropHint = new Label
+        {
+            Text = "ファイルを画面へドロップして開く（定義＋データの同時ドロップ可／データCSVはデータファイル欄へ）",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = SystemColors.GrayText,
+            AutoEllipsis = true
+        };
+        panel.Controls.Add(dropHint, 0, 4);
+        panel.SetColumnSpan(dropHint, 2);
         return panel;
     }
 
@@ -180,6 +192,100 @@ public sealed class MainForm : Form
         textBox.Dock = DockStyle.Fill;
         textBox.ReadOnly = true;
         textBox.Margin = new Padding(0, 1, 0, 3);
+    }
+
+    private void EnableFileDrop(Control control)
+    {
+        control.AllowDrop = true;
+        control.DragEnter -= FileDragEnter;
+        control.DragEnter += FileDragEnter;
+        control.DragOver -= FileDragEnter;
+        control.DragOver += FileDragEnter;
+        control.DragDrop -= FileDragDrop;
+        control.DragDrop += FileDragDrop;
+        control.ControlAdded -= FileDropControlAdded;
+        control.ControlAdded += FileDropControlAdded;
+        foreach (Control child in control.Controls)
+        {
+            EnableFileDrop(child);
+        }
+    }
+
+    private void FileDropControlAdded(object? sender, ControlEventArgs e)
+    {
+        if (e.Control is not null) EnableFileDrop(e.Control);
+    }
+
+    private void FileDragEnter(object? sender, DragEventArgs e)
+    {
+        e.Effect = (e.AllowedEffect & DragDropEffects.Copy) != 0
+            && TryGetFileDropRequest(sender, e.Data, out _)
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+    }
+
+    private bool TryGetFileDropRequest(object? sender, IDataObject? data, out FileDropRequest? request)
+    {
+        request = null;
+        if (data?.GetData(DataFormats.FileDrop) is not string[] { Length: 1 or 2 } paths
+            || paths.Any(path => !File.Exists(path)))
+        {
+            return false;
+        }
+
+        if (paths.Length == 1)
+        {
+            var path = paths[0];
+            if (IsExcelPath(path))
+                request = new(null, null, path);
+            else if (ReferenceEquals(sender, dataPathTextBox))
+                request = new(null, path, null);
+            else if (ReferenceEquals(sender, definitionPathTextBox) || IsDefinitionPath(path))
+                request = new(path, null, null);
+            else
+                request = new(null, path, null);
+            return true;
+        }
+
+        // 複数ファイルは定義1件とデータ1件だけ受け付け、並び順によらず定義を先に読む。
+        var definitionPaths = paths.Where(IsDefinitionPath).ToArray();
+        if (definitionPaths.Length != 1 || paths.Any(IsExcelPath)) return false;
+        request = new(definitionPaths[0], paths.First(path => path != definitionPaths[0]), null);
+        return true;
+    }
+
+    private static bool IsDefinitionPath(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return extension.Equals(".csv", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".xml", StringComparison.OrdinalIgnoreCase)
+            || IsCopybookPath(path);
+    }
+
+    private static bool IsExcelPath(string path)
+    {
+        return Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void FileDragDrop(object? sender, DragEventArgs e)
+    {
+        e.Effect = DragDropEffects.None;
+        if ((e.AllowedEffect & DragDropEffects.Copy) == 0
+            || !TryGetFileDropRequest(sender, e.Data, out var request)
+            || request is null) return;
+
+        e.Effect = DragDropEffects.Copy;
+        grid.EndEdit();
+        if (request.DefinitionPath is not null
+            && !LoadDefinitionFromPath(request.DefinitionPath, "ドロップした定義ファイルを読み込みました。")) return;
+        if (request.DataPath is not null)
+        {
+            LoadDataFromPath(request.DataPath, "ドロップしたデータファイルを読み込みました。");
+        }
+        else if (request.ExcelPath is not null)
+        {
+            ImportExcelFromPath(request.ExcelPath);
+        }
     }
 
     private void BuildMenuStrip()
@@ -446,20 +552,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        try
-        {
-            if (!LoadDefinition(dialog.FileName)) return;
-            ClearPathText(dataPathTextBox);
-            saveDataPath = null;
-            records.Clear();
-            records.Add(CreateEmptyRecord());
-            RefreshGrid();
-            SetStatus("定義ファイルを読み込みました。");
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "定義読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
+        LoadDefinitionFromPath(dialog.FileName, "定義ファイルを読み込みました。");
     }
 
     private void OpenData()
@@ -481,22 +574,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        try
-        {
-            var loadOptions = SelectDataLoadOptions(dialog.FileName);
-            if (loadOptions is null)
-            {
-                return;
-            }
-
-            LoadData(dialog.FileName, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding);
-            RefreshGrid();
-            SetStatus("データファイルを読み込みました。");
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "データ読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
+        LoadDataFromPath(dialog.FileName, "データファイルを読み込みました。");
     }
 
     private void LoadStartupFiles(string[] args)
@@ -609,10 +687,12 @@ public sealed class MainForm : Form
     private void LoadData(string path, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
     {
         EnsureKnownSampleSelection(path, separatorMode, nationalTextEncoding);
+        var loadedFields = BuildFieldsForNationalTextEncoding(nationalTextEncoding);
+        var loadedRecords = FixedLengthDataReader.Read(path, loadedFields, separatorMode, currentDataEncodingProfile, nationalTextEncoding);
         ApplyNationalTextEncoding(nationalTextEncoding);
 
         records.Clear();
-        records.AddRange(FixedLengthDataReader.Read(path, fields, separatorMode, currentDataEncodingProfile, currentNationalTextEncoding));
+        records.AddRange(loadedRecords);
         NormalizeRecords();
         currentSeparatorMode = separatorMode;
         saveDataPath = path;
@@ -677,21 +757,23 @@ public sealed class MainForm : Form
         textBox.SelectionLength = 0;
     }
 
-    private void LoadDefinitionFromPath(string path, string statusMessage)
+    private bool LoadDefinitionFromPath(string path, string statusMessage)
     {
         try
         {
-            if (!LoadDefinition(path)) return;
+            if (!LoadDefinition(path)) return false;
             ClearPathText(dataPathTextBox);
             saveDataPath = null;
             records.Clear();
             records.Add(CreateEmptyRecord());
             RefreshGrid();
             SetStatus(statusMessage);
+            return true;
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "定義読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
         }
     }
 
@@ -1390,11 +1472,16 @@ public sealed class MainForm : Form
             return;
         }
 
+        ImportExcelFromPath(dialog.FileName);
+    }
+
+    private void ImportExcelFromPath(string path)
+    {
         try
         {
-            LoadExcel(dialog.FileName);
+            LoadExcel(path);
             ValidateRecords(showSuccess: false);
-            SetStatus($"Excelから取り込みました: {Path.GetFileName(dialog.FileName)}");
+            SetStatus($"Excelから取り込みました: {Path.GetFileName(path)}");
         }
         catch (Exception ex)
         {
@@ -2467,6 +2554,8 @@ public sealed class MainForm : Form
             return string.Equals(fileName, DefinitionFileName, StringComparison.OrdinalIgnoreCase);
         }
     }
+
+    private sealed record FileDropRequest(string? DefinitionPath, string? DataPath, string? ExcelPath);
 
     private sealed record DataLoadOptions(
         RecordSeparatorMode SeparatorMode,

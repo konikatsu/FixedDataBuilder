@@ -1,5 +1,16 @@
 # README_FOR_CODEX
 
+## v0.1.35 追記：ファイルのドラッグ＆ドロップ
+
+- 2026-10-23、ユーザー指示でGitHubの最新 `da24013` を取得してから実装。ローカルの既存差分の破棄と、修正完了後のGitHubへのpushはユーザー承認済み。
+- メイン画面と子コントロールで定義・固定長データ・Excelのファイルドロップを受け付ける。定義1件＋データ1件は選択順によらず定義から読み込む。
+- データファイル欄への単独ドロップはデータとして扱い、データの拡張子がCSVでも定義と区別する。定義ファイル欄への単独ドロップでは独自拡張子の定義も扱える。Excelはどの欄でもExcel取込へ送る。
+- フォルダー、3件以上、定義同士・データ同士などの曖昧な組み合わせは受け付けない。メニュー・履歴・ドロップは同じ読込処理を使い、条件・プレビュー・履歴登録・レイアウト選択を維持する。
+- データ読込は解析成功後にレコードと型N文字コードを更新する。読込失敗時に既存データを消さない。
+- `tests/FixedDataBuilder.Tests/DragDropTests.cs` に15件を追加。既存16件と合わせ31件成功。`--capture-drop <PNG絶対パス>` で通常サンプルを実際のドロップ処理経由で開いた画面を保存できる。
+- READMEの冒頭画像は `docs/screen-image-file-drop-v0.1.35.png`。XMLを隠し機能とする既存方針は維持する。
+- ビルド用SDKがなかったため、Microsoft公式スクリプトで .NET SDK 8.0.426 を `%LOCALAPPDATA%\Microsoft\dotnet` に管理者権限なしで導入した。PATHを変更していないので、この環境では同フォルダーの `dotnet.exe` を明示してビルド・テストする。
+
 ## v0.1.34 追記：汎用XML定義
 
 - 2026-10-22の最新指示で、この機能は隠し機能として扱う。実装は維持するが、ユーザー向けREADME.mdには説明・対応機能一覧・XML例・起動引数・サンプル案内・専用画像を掲載しない。将来のREADME更新でも再掲載しない。
@@ -28,17 +39,19 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.34`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.35`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
 最新の成功状態:
 
+- `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
+- `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.34 の Release ビルド済み
+- `release/FixedDataBuilder.exe` は v0.1.35 の Release ビルド済み
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README 冒頭は既存の `docs/screen-image-occurs-visual-field-v0.1.33.png` を参照。隠し機能の画面画像はREADMEに掲載しない。
+- README 冒頭は `docs/screen-image-file-drop-v0.1.35.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
 - XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み

@@ -4,7 +4,7 @@ using System.Text;
 using System.Xml;
 using FixedDataBuilder;
 
-internal static class Program
+internal static partial class Program
 {
     private static int passed;
     private static string temporaryDirectory = "";
@@ -172,6 +172,16 @@ internal static class Program
                 Equal("product-fixed", dialog.SelectedLayout!.Id);
             });
 
+            RunDragDropTests(repo);
+
+            if (args.Length >= 3 && args[1] == "--capture-drop")
+            {
+                using var form = new MainForm();
+                WithDialog("データ読込条件", DialogResult.OK, () => Drop(form,
+                    Path.Combine(repo, "samples", "copybook-group-occurs-definition.cbl"),
+                    Path.Combine(repo, "samples", "copybook-group-occurs-data-crlf-utf8-n-utf16le.dat")));
+                Capture(form, args[2], expectedHex: null);
+            }
             if (args.Length >= 3 && args[1] == "--capture")
             {
                 using var form = CreateSampleForm(repo);
@@ -211,13 +221,13 @@ internal static class Program
     private static MainForm CreateSampleForm(string repo) => new([
         "--definition", Path.Combine(repo, "samples", "generic-xml-definition.xml"), "--xml-layout", "customer-fixed",
         "--data", Path.Combine(repo, "samples", "generic-xml-customer-data-utf8-none.dat"), "--layout", "field"]);
-    private static void Capture(Form form, string path)
+    private static void Capture(Form form, string path, string? expectedHex = "E5 B1 B1")
     {
         if (form is MainForm mainForm)
         {
             form.Text = $"FixedDataBuilder v{typeof(MainForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion}";
             var grid = Get<DataGridView>(mainForm, "grid");
-            grid.CurrentCell = grid[2, 1];
+            grid.CurrentCell = grid[2, expectedHex is null ? 0 : 1];
         }
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(-30000, -30000);
@@ -227,7 +237,8 @@ internal static class Program
         if (form is MainForm displayedForm)
         {
             Invoke(displayedForm, "UpdateHexView");
-            Equal(true, Get<TextBox>(displayedForm, "hexTextBox").Text.Contains("E5 B1 B1"));
+            if (expectedHex is not null)
+                Equal(true, Get<TextBox>(displayedForm, "hexTextBox").Text.Contains(expectedHex));
         }
         using var bitmap = new Bitmap(form.Width, form.Height);
         form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
