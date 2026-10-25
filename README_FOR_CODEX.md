@@ -1,5 +1,15 @@
 # README_FOR_CODEX
 
+## v0.1.44 追記：隠し機能の表示欄を常時非表示にする
+
+- ユーザーが上部の「XMLレイアウト」を見せたくないと指示。ラベル・xmlLayoutTextBoxをVisible=false、該当行の高さを0とし、空き行を残さない。XML読込と内部の選択レイアウト情報は維持する。
+- 公開用README・リリース説明では隠し機能を宣伝しない。「画面上部の表示を整理」と説明し、通常表示とCSV表示の画像をv0.1.44へ更新。旧画像を加工せず、新しいフォームから撮影した。
+- 既存53件すべて成功。SDK8のdotnet run --artifacts-pathはビルド先と起動先が食い違ったため、同コマンドで作成された実際のテストEXEを実行した。最初の失敗はファイル未検出であり、SAC拒否ではない。
+- テストと同じビルド出力をpublish --no-buildで配布し、DLLハッシュ一致を確認。軽量版の製品EXEでもSAC Onの環境でv0.1.44のメイン画面表示を確認した。起動成功したファイルを再ビルドせずZIP化する。
+- ユーザーはダウンロード後の別PC確認を自分で行うと指定済み。未確認の同梱版は公開しない。v0.1.41はSAC比較に必要なため、過去リリースの自動削除はしない。
+- 途中でリロード機能の有無を質問された。現行版にはF5再読み込みはないと回答。追加の依頼はまだなく、今回の変更には含めない。
+- 証拠はローカルreviews/hide-xml-layout-v0.1.44/v001。公開サンプル以外の業務データ・ログをコミットしない。
+
 ## 2026-10-25 v0.1.43軽量版の公開
 
 - ユーザーが同梱版・分離版の公開を依頼した後、「起動を確認できた版だけ公開する」と指定。最終指示は「軽量版の起動は確認済なんだね？じゃ、それを公開してよ」「ダウンロード確認は僕が別のPCでやる」。今回公開するのは起動確認済みの軽量版だけ。
@@ -104,7 +114,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.43`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.44`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
@@ -116,10 +126,10 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.43 の Release ビルドを使う
+- `release/FixedDataBuilder.exe` は v0.1.44 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
-- README 冒頭は `docs/screen-image-cell-display-v0.1.39.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
+- README 冒頭は `docs/screen-image-compact-header-v0.1.44.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
 - XMLの形式チェック、UTF-8/Shift_JISの保存、CSV/コピー句との互換性、キャンセル時の状態保持、Excel経由の文字コード継承を確認。提供された13項目・109バイト定義と10件データの往復保存を含め、17件のテストが成功。
 - README に COMP-3 の現行前提 `正数=C / 負数=D / 符号なし=F` を記載済み
 - `docs/development-history.md` に作成経緯を整理済み

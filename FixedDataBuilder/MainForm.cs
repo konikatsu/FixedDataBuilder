@@ -122,13 +122,14 @@ public sealed class MainForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
 
         ConfigureReadOnlyTextBox(definitionPathTextBox);
         ConfigureReadOnlyTextBox(xmlLayoutTextBox);
         ConfigureReadOnlyTextBox(dataPathTextBox);
         ConfigureReadOnlyTextBox(separatorModeTextBox);
+        xmlLayoutTextBox.Visible = false;
 
         panel.Controls.Add(CreatePathLabel("定義ファイル"), 0, 0);
         panel.Controls.Add(definitionPathTextBox, 1, 0);
@@ -136,7 +137,9 @@ public sealed class MainForm : Form
         panel.Controls.Add(dataPathTextBox, 1, 1);
         panel.Controls.Add(CreatePathLabel("レコード区切り"), 0, 2);
         panel.Controls.Add(separatorModeTextBox, 1, 2);
-        panel.Controls.Add(CreatePathLabel("XMLレイアウト"), 0, 3);
+        var xmlLayoutLabel = CreatePathLabel("XMLレイアウト");
+        xmlLayoutLabel.Visible = false;
+        panel.Controls.Add(xmlLayoutLabel, 0, 3);
         panel.Controls.Add(xmlLayoutTextBox, 1, 3);
         var dropHint = new Label
         {

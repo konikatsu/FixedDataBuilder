@@ -6,9 +6,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 画面イメージ
 
-![FixedDataBuilder のスクリーンショット](docs/screen-image-cell-display-v0.1.39.png)
-
-上の画像は従来版の表示例です。v0.1.43の位置見出しは `[開始位置(長さ)]`（例: `[1(22)]`）です。
+![FixedDataBuilder のスクリーンショット](docs/screen-image-compact-header-v0.1.44.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
@@ -45,7 +43,7 @@ CSVで行を追加した場合も、表示項目の初期値は空欄です。�
 
 列数が定義と一致しない行や、閉じていない引用符、不正な文字コードはエラーにします。REDEFINES項目はCSVの列として数えません。ヘッダー行の自動判定や列名による並べ替えは行いません。拡張子が `.csv` の固定長データは、入力形式を `固定長` に切り替えて読み込めます。
 
-![CSVを読み込んだ画面（架空の5件）](docs/screen-image-csv-import-v0.1.39.png)
+![CSVを読み込んだ画面（架空の5件）](docs/screen-image-csv-compact-header-v0.1.44.png)
 
 `ファイル → 名前を付けて保存` の `データ保存条件` で、出力形式を `固定長` / `可変長 CSV（ヘッダーなし）` から選べます。読み込んだ形式が初期選択されます。`上書き保存` は現在の形式・文字コードを維持します。
 
@@ -71,15 +69,15 @@ Excelへ出力した見出し・行番号・項目名・定義欄は、水色の
 
 ## ダウンロード
 
-最新版 **v0.1.43** はv0.1.41をベースに、固定長の位置見出しを `[開始位置(長さ)]` に変更しました。Excel出力にも反映されます。元ファイル名を付けるExcel出力、水色の背景、固定長／可変長CSVの入出力も利用できます。
+最新版 **v0.1.44** では画面上部の表示を整理し、データ一覧の表示領域を広げました。固定長の位置見出し `[開始位置(長さ)]`、元ファイル名を付けるExcel出力、水色の背景、固定長／可変長CSVの入出力も利用できます。
 
-[v0.1.43 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.43/FixedDataBuilder-v0.1.43-win-x64-framework-dependent.zip)
+[v0.1.44 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.44/FixedDataBuilder-v0.1.44-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
 公開する軽量版は、Smart App ControlがONの環境で製品EXEからメイン画面が開くことを確認したファイルです。ダウンロード後の別PCでの起動確認は、利用者側で行います。.NET同梱版は今回の公開対象に含めていません。
 
-[v0.1.43 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.43) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.44 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.44) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 
