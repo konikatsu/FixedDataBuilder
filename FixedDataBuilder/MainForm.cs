@@ -300,6 +300,7 @@ public sealed class MainForm : Form
         menuStrip.Items.Add(CreateMenu("ファイル",
             CreateMenuItem("定義を開く...", (_, _) => OpenDefinition()),
             CreateMenuItem("データを開く...", (_, _) => OpenData()),
+            new ToolStripMenuItem("再読み込み", null, (_, _) => ReloadCurrentFiles()) { ShortcutKeys = Keys.F5 },
             new ToolStripSeparator(),
             recentDefinitionFilesMenu,
             recentDataFilesMenu,
@@ -639,6 +640,24 @@ public sealed class MainForm : Form
 
     private bool LoadDefinition(string path, string? xmlLayoutId = null)
     {
+        var definition = ReadDefinition(path, xmlLayoutId);
+        if (definition is null) return false;
+        var (loadedFields, xmlLayout) = definition.Value;
+        // 読み込み・選択が完了してから現在の定義を置き換える。
+        currentDataFileFormat = DataFileFormat.FixedLength;
+        currentDataEncodingProfile = xmlLayout?.EncodingProfile ?? (IsCopybookPath(path)
+            ? DataEncodingProfile.Utf8WithNationalText
+            : DataEncodingProfile.ShiftJis);
+        if (xmlLayout is not null) currentSeparatorMode = xmlLayout.SeparatorMode;
+        currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
+        ApplyDefinition(path, loadedFields, xmlLayout);
+        AddRecentFile(recentDefinitionFiles, path);
+        UpdateSeparatorModeText();
+        return true;
+    }
+
+    private (IReadOnlyList<FieldDefinition> Fields, XmlLayoutDefinition? XmlLayout)? ReadDefinition(string path, string? xmlLayoutId)
+    {
         XmlLayoutDefinition? xmlLayout = null;
         var fromCopybook = IsCopybookPath(path);
         IReadOnlyList<FieldDefinition> loadedFields;
@@ -664,7 +683,7 @@ public sealed class MainForm : Form
             else
             {
                 using var dialog = new XmlLayoutSelectionForm(layouts);
-                if (dialog.ShowDialog(this) != DialogResult.OK) return false;
+                if (dialog.ShowDialog(this) != DialogResult.OK) return null;
                 xmlLayout = dialog.SelectedLayout!;
             }
             loadedFields = xmlLayout.Fields;
@@ -674,22 +693,81 @@ public sealed class MainForm : Form
             loadedFields = fromCopybook ? CopybookDefinitionReader.Read(path) : DefinitionCsvReader.Read(path);
         }
 
-        // 読み込み・選択が完了してから現在の定義を置き換える。
+        return (loadedFields, xmlLayout);
+    }
+
+    private void ApplyDefinition(string path, IReadOnlyList<FieldDefinition> loadedFields, XmlLayoutDefinition? xmlLayout)
+    {
         currentXmlLayout = xmlLayout;
-        currentDataFileFormat = DataFileFormat.FixedLength;
-        currentDataEncodingProfile = xmlLayout?.EncodingProfile ?? (fromCopybook
-            ? DataEncodingProfile.Utf8WithNationalText
-            : DataEncodingProfile.ShiftJis);
-        if (xmlLayout is not null) currentSeparatorMode = xmlLayout.SeparatorMode;
-        currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
         fields.Clear();
         fields.AddRange(loadedFields);
         hiddenFieldIndexes.Clear();
         SetPathText(definitionPathTextBox, path);
         xmlLayoutTextBox.Text = xmlLayout is null ? "—" : $"{xmlLayout.Name} [{xmlLayout.Id}] / {xmlLayout.RecordLength} バイト";
-        AddRecentFile(recentDefinitionFiles, path);
+    }
+
+    private void ReloadCurrentFiles()
+    {
+        if (string.IsNullOrWhiteSpace(GetCurrentDefinitionPath()) && string.IsNullOrWhiteSpace(GetCurrentDataPath()))
+        {
+            SetStatus("再読み込みするファイルがありません。先にファイルを開いてください。");
+            return;
+        }
+        if (MessageBox.Show(this,
+            "現在の編集内容を破棄し、定義とデータをファイルから再読み込みしますか？\r\n読込形式・文字コード・改行条件は引き継ぎます。",
+            "再読み込み", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+        try
+        {
+            ReloadCurrentFilesCore();
+            SetStatus("現在の読込条件でファイルを再読み込みしました。");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "再読み込みエラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ReloadCurrentFilesCore()
+    {
+        var definitionPath = GetCurrentDefinitionPath();
+        var dataPath = GetCurrentDataPath();
+        var fromExcel = definitionPath?.StartsWith("(Excel) ", StringComparison.Ordinal) == true;
+        if (fromExcel && saveDataPath is null)
+        {
+            var previousLayout = layout;
+            LoadExcel(definitionPath![8..]);
+            layout = previousLayout;
+            RefreshGrid();
+            return;
+        }
+
+        // 定義とデータを両方解析できるまでは、編集中のモデル・グリッドに触れない。
+        var definition = !fromExcel && !string.IsNullOrWhiteSpace(definitionPath)
+            ? ReadDefinition(definitionPath, currentXmlLayout?.Id) : null;
+        var loadedFields = (definition?.Fields ?? fields).ToList();
+        if (!IsCsv)
+        {
+            var width = NationalTextEncodingHelper.FixedByteWidth(currentNationalTextEncoding);
+            loadedFields = loadedFields.Select(field => field.Type == FieldDataType.FullWidthText
+                ? field with { NationalByteWidth = width } : field).ToList();
+        }
+        var loadedRecords = string.IsNullOrWhiteSpace(dataPath) ? null
+            : IsCsv ? CsvDataReader.Read(dataPath, loadedFields, currentCsvEncoding)
+            : FixedLengthDataReader.Read(dataPath, loadedFields, currentSeparatorMode,
+                currentDataEncodingProfile, currentNationalTextEncoding);
+
+        grid.CancelEdit();
+        if (definition is not null)
+        {
+            var hidden = fields.SequenceEqual(loadedFields) ? hiddenFieldIndexes.ToArray() : [];
+            ApplyDefinition(definitionPath!, loadedFields, definition.Value.XmlLayout);
+            hiddenFieldIndexes.UnionWith(hidden);
+        }
+        records.Clear();
+        if (loadedRecords is not null) records.AddRange(loadedRecords);
+        NormalizeRecords();
         UpdateSeparatorModeText();
-        return true;
+        RefreshGrid();
     }
 
     private static bool IsCopybookPath(string path)
