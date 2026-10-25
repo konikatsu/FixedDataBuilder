@@ -44,8 +44,8 @@ internal static partial class Program
                         Equal((rowIndex + 1).ToString(), grid[0, rowIndex].Value);
                         Equal(true, grid[0, rowIndex].ReadOnly);
                     }
-                    Equal("識別番号" + Environment.NewLine + "X(22)" + Environment.NewLine + "[1,22]", grid.Columns[1].HeaderText);
-                    Equal("番号" + Environment.NewLine + "X(15)" + Environment.NewLine + "[23,15]", grid.Columns[2].HeaderText);
+                    Equal("識別番号" + Environment.NewLine + "X(22)" + Environment.NewLine + "[1(22)]", grid.Columns[1].HeaderText);
+                    Equal("番号" + Environment.NewLine + "X(15)" + Environment.NewLine + "[23(15)]", grid.Columns[2].HeaderText);
                 }
             }
         });
