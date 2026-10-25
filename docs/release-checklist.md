@@ -2,6 +2,15 @@
 
 FixedDataBuilder の GitHub 公開前に確認すること。
 
+## 配布形式と起動確認
+
+- 2026-10-25のユーザー指示により、今後は.NET非同梱のWindows x64軽量版だけを配布する。
+- `dotnet publish FixedDataBuilder/FixedDataBuilder.csproj -p:PublishProfile=Lightweight -o release` を使う。
+- 実際に公開する製品EXEからメイン画面が開くことを確認し、その5ファイルを再ビルドせずZIP化する。
+- `.NET 8 Windows Desktop Runtime x64` が必要とREADMEとリリースに記載する。SDKは不要。
+- 製品起動、製品UIでの操作確認、自動テストの実行結果をそれぞれ明記する。
+- ダウンロード後の別PC確認はユーザーが担当する。
+
 ## README 画像の反映漏れ対策
 
 v0.1.10 で `Excel出力` ボタンを追加したとき、Excel 出力結果の画像は追加したが、README が参照している既存画像 `docs/screen-image-cobol-sample.png` の撮り直し確認が漏れた。
@@ -23,6 +32,8 @@ v0.1.10 で `Excel出力` ボタンを追加したとき、Excel 出力結果の
 ## GitHub Releases の整理
 
 GitHub Releases は、原則として最新 3 バージョンだけを残します。
+
+現在はSACの比較調査に過去版が必要なため、この整理を停止します。過去リリース・タグ・ローカル配布物は削除せず保持してください。
 
 目的:
 

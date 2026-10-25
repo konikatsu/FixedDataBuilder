@@ -1,15 +1,14 @@
 # README_FOR_CODEX
 
-## v0.1.45 開発中：F5再読み込み
+## v0.1.45：F5再読み込みと軽量版への統一
 
-- 続報：ユーザーが軽量版としての再作成・起動確認を明示依頼。v002の通常のframework-dependent publishで作成し、製品EXEのタイトルv0.1.45・ウィンドウ表示・PC側coreclr8.0.32・SAC Onを確認（PID32472）。製品DLL SHA256=528842AB9A89E97263B250DDBBC2A680E919C35A94EAE49A5657069029FF8225。前回v001も軽量版だったので、「軽量化が原因で解消」とは断定しない。
-- v002で製品DLLを再ビルドせず検証プロジェクトをBuildProjectReferences=falseでビルドし、配布DLLとのハッシュ一致を確認。ただし検証EXE自体が再度拒否され、61件の実行は依然未完了。製品のメイン画面起動とリロード機能の実行検証を区別する。最新状態はreviews/reload-v0.1.45/v002を参照。GitHub公開はまだ行っていない。
-
-- 最新origin/main（v0.1.44）をfetchしてcodex/reload-v0.1.45で実装。ファイル→再読み込み/F5で現在の定義・データを読み直す。読込形式、CSV文字コード、固定長プロファイル、型N文字コード、改行条件を維持する。編集破棄のYes/No確認は既定No。
-- ReadDefinitionを読込と適用に分離し、再読み込みでは両ファイルの解析成功後に置換する。失敗時は編集中のモデルとグリッドを維持。定義のみ、COPY、XML選択ID、Excel取込、名前を付けて保存後のパスに対応。XML表示欄は引き続き非表示。
-- 回帰テスト8件を追加（既存53件と合計61件）。ビルドは警告0・エラー0。ただし検証EXEはSAC拒否で実行できず、製品EXEも通常の起動で拒否。テスト成功や起動確認済みとは表現しない。
-- 起動確認できた版だけ公開するという指示を守り、main/リリースはv0.1.44のまま。README画像は旧版の実写を維持し、v0.1.45撮影済みと偽らない。release/の配布物を上書きしない。ソースはローカル作業ブランチに保存する。
-- 証拠と未公開ビルドはC:/dev/FixedDataBuilder/reviews/reload-v0.1.45/v001。セキュリティ設定変更・別ホスト経由の実行・信頼回避の再ビルドは行わない。ダウンロード後の別PC検証はユーザーが行うという従来指示を維持する。
+- ユーザーの最終指示は「今後、軽量版で、gitにpush」。以後の配布はWindows x64の.NET非同梱版に統一する。Properties/PublishProfiles/Lightweight.pubxmlを使用し、起動確認した成果物を再ビルドせず配布する。
+- v0.1.44を基にファイル→再読み込み/F5を追加。形式、文字コード、型N文字コード、改行条件を維持する。編集破棄の確認は既定No。ReadDefinitionを解析と適用に分離し、両ファイルの解析成功後にモデルを置換する。失敗時は現在の定義とデータを保持する。XML表示欄は引き続き非表示。
+- v001では製品EXE・検証EXEがSAC拒否。ユーザーの明示指示で軽量版を再作成したv002では製品EXEのメイン画面表示、SAC On、PC側coreclr8.0.32利用を確認した。前回も軽量版だったため、軽量化が許可の原因とは断定しない。
+- 確認済み製品DLL SHA256=528842AB9A89E97263B250DDBBC2A680E919C35A94EAE49A5657069029FF8225。製品EXEから架空データを開き、CSV変更反映、確認取消の編集保持、固定長の定義とデータの変更反映、読込エラー時の内容保持の4項目を実画面で確認。通常画面・CSV画面・メニュー・確認ダイアログの実写をREADMEへ反映した。
+- 回帰テスト8件を追加（計61件）、警告0・エラー0でビルド済み。テスト側の製品DLLと配布DLLのハッシュ一致を確認したが、検証EXE自体が拒否されるため61件の実行は未完了。製品UIの4項目確認と自動テストを混同しない。
+- 起動確認済みv002の5ファイルをrelease/とZIPへそのままコピーし公開する。ユーザーの業務データ、reviews、イベントログはコミット・配布しない。過去リリースはSAC比較用に保持し、削除しない。ダウンロード後の別PC確認はユーザーが担当する。
+- 証拠はC:/dev/FixedDataBuilder/reviews/reload-v0.1.45/v002。セキュリティ設定変更や、別ホスト経由の信頼回避は行っていない。
 
 ## v0.1.44 追記：隠し機能の表示欄を常時非表示にする
 
@@ -374,7 +373,7 @@ dotnet build FixedDataBuilder\FixedDataBuilder.csproj -c Release
 ### Release publish
 
 ```powershell
-dotnet publish FixedDataBuilder\FixedDataBuilder.csproj -c Release -o release
+dotnet publish FixedDataBuilder\FixedDataBuilder.csproj -p:PublishProfile=Lightweight -o release
 ```
 
 ### サンプル起動
@@ -433,13 +432,13 @@ UI変更がある場合:
 1. `FixedDataBuilder.csproj` の Version / AssemblyVersion / FileVersion / InformationalVersion を上げる
 2. `dotnet build`
 3. 必要ならスモークテスト
-4. `dotnet publish ... -o release`
+4. `dotnet publish ... -p:PublishProfile=Lightweight -o release` で.NET非同梱版を作成し、製品EXEの起動を確認。確認後は再ビルドしない
 5. zip 作成
 6. README / screenshot 更新
 7. commit / push
 8. `gh release create vX.Y.Z FixedDataBuilder-vX.Y.Z.zip ...`
 9. `gh release view vX.Y.Z --repo konikatsu/FixedDataBuilder --json tagName,url,assets`
-10. `gh release list --repo konikatsu/FixedDataBuilder --limit 20` でRelease一覧を確認し、最新3バージョンだけ残す。4つ前より古いGitHub Releaseは削除する。Gitタグは原則削除しない
+10. Release一覧を確認する。SAC比較中のため、過去リリースとタグは削除せず保持する
 
 ## 既知の失敗・注意点
 
