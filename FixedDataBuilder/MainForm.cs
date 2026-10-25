@@ -2093,7 +2093,7 @@ public sealed class MainForm : Form
             if (IsDisplayableField(field) && !hiddenFieldIndexes.Contains(fieldIndex))
             {
                 occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
-                var ruler = IsCsv ? $"CSV列{fields.Take(fieldIndex + 1).Count(item => !item.IsRedefines)}" : $"[{byteStart}-{byteEnd}]";
+                var ruler = IsCsv ? $"CSV列{fields.Take(fieldIndex + 1).Count(item => !item.IsRedefines)}" : $"[{byteStart}({field.StorageByteLength})]";
                 var header = occursInfo is null
                     ? $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}"
                     : $"{occursInfo.ChildName}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}";

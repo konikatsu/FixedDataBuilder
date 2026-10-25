@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.43 追記：v0.1.41ベースの開始位置・長さ表示
+
+- ユーザーの明示指示により、v0.1.41のコミット `df3c84cfd668e2486d8241293e8715a41ebad8f3` からブランチを作成した。v0.1.42はベースにしない。
+- v0.1.41との製品コード差分は、レコード縦の位置見出しを `[開始-終了]` から `[開始位置(長さ)]` にする1行と、版数プロパティだけ。例は `[1(22)]`、`[23(15)]`。開始位置は1始まり、長さはバイト数。Excel出力も同じ見出しを使う。
+- 固定長・CSVの処理、CSV列番号の見出し、Excelの水色と元ファイル名プレフィクスはv0.1.41どおり。既存の表示テストの期待値2箇所だけを新形式へ更新する。
+- ビルドは成功したが、検証ホストが製品 `FixedDataBuilder.dll` を読み込む段階でSAC拒否（FileLoadException 0x800711C7）。53件の実行と新しい画面の撮影は未完了。別ホストでの実行やポリシー変更は試していない。
+- READMEは実際に撮影したv0.1.39の画像を参考として維持し、新形式と実行確認の制限を明記する。架空のv0.1.43画面を作らない。
+- 10月25日、ユーザーのダウンロード版v0.1.42についても製品EXEの3077をWindows側ツールで取得した（RecordId3877、SAC標準ポリシー、未署名）。通常execのイベントログ表示は古い記録までだったため、最新ログはdev_runnerのrun_powershellから取得する。関連証拠はローカルreviews/smart-app-control-v0.1.42/v001に保存。
+
 ## v0.1.41 追記：Excel出力名の元ファイルプレフィクス
 
 - Excel出力の既定名を `元データファイル名_FixedDataBuilder_項目縦.xlsx` / `元データファイル名_FixedDataBuilder_レコード縦.xlsx` に変更。元ファイルの拡張子は除く。データファイルがなければ定義名、どちらもなければ従来の名前へフォールバックする。
@@ -85,7 +94,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 - 作業場所: `C:\dev\FixedDataBuilder`
 - GitHub: `https://github.com/konikatsu/FixedDataBuilder`
-- 現在の開発バージョン: `v0.1.41`（公開状況はGitHub Releasesで確認）
+- 現在の開発バージョン: `v0.1.43`（公開状況はGitHub Releasesで確認）
 
 ## 現在の成功状態
 
@@ -97,7 +106,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 - `v0.1.35` でファイルのドラッグ＆ドロップ読み込みを追加。定義＋データ同時ドロップ・Excel・キャンセル・読込失敗時の保持を含む31件のテストが成功。
 - `release/` の実行ファイルとサンプル入り `FixedDataBuilder-v0.1.35.zip` を更新。README冒頭画像も v0.1.35 に更新。
 - `v0.1.34` で汎用XML定義の読み込み・レイアウト選択を追加
-- `release/FixedDataBuilder.exe` は v0.1.41 の Release ビルドを使う
+- `release/FixedDataBuilder.exe` は v0.1.43 の Release ビルドを使う
 - `FixedDataBuilder-v0.1.34.zip` を作成済み
 - zip の中身は exe 等と `samples/` が直下に入る形
 - README 冒頭は `docs/screen-image-cell-display-v0.1.39.png` を参照。隠し機能の専用画面画像はREADMEに掲載しない。
