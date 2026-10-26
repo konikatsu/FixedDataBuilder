@@ -20,9 +20,36 @@ internal static partial class Program
         var recentPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "FixedDataBuilder", "recent-files.txt");
         var previousHistory = File.Exists(recentPath) ? File.ReadAllBytes(recentPath) : null;
+        var preferencesPath = DataLoadSettingsStore.DefaultPath;
+        var previousPreferences = File.Exists(preferencesPath) ? File.ReadAllBytes(preferencesPath) : null;
         try
         {
             var repo = Path.GetFullPath(args[0]);
+            if (args.Length >= 4 && args[1] == "--capture-unsaved")
+            {
+                using var form = CreateCellDisplayForm(recordRows: true);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "（架空データ・5行）";
+                var row = (int)Invoke(form, "RecordRowsDataStartIndex")!;
+                Get<DataGridView>(form, "grid")[1, row].Value = "9999999999999999999999";
+                Invoke(form, "UpdateRecordValue", row, 1);
+                Capture(form, args[2], expectedHex: null);
+                WithDialog("未保存の変更", DialogResult.Cancel,
+                    () => Invoke(form, "ConfirmDiscardChanges", "終了"), dialog => Capture(dialog, args[3], expectedHex: null));
+                return 0;
+            }
+            if (args.Length >= 3 && args[1] == "--capture-remembered")
+            {
+                var definition = Path.Combine(repo, "samples", "csv-import-definition.csv");
+                var data = Path.Combine(repo, "samples", "csv-import-data-utf8.csv");
+                var store = new DataLoadSettingsStore(Path.Combine(temporaryDirectory, "capture-load-settings.json"));
+                store.Remember(definition, data, new DataLoadSettings(DataFileFormat.Csv, CsvTextEncoding.Utf8,
+                    RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis));
+                using var form = new MainForm(["--definition", definition], store);
+                WithDialog("データ読込条件", DialogResult.Cancel,
+                    () => Invoke(form, "LoadDataFromPath", data, "読込完了"), dialog => Capture(dialog, args[2], expectedHex: null));
+                return 0;
+            }
             if (args.Length >= 4 && args[1] == "--capture-excel")
             {
                 using var exportForm = new MainForm([
@@ -196,6 +223,7 @@ internal static partial class Program
             RunCsvDataTests(repo);
             RunReloadTests(repo);
             RunHeaderRowsTests(repo);
+            RunUnsavedAndSettingsTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);
@@ -268,6 +296,8 @@ internal static partial class Program
         {
             if (previousHistory is not null) File.WriteAllBytes(recentPath, previousHistory);
             else if (File.Exists(recentPath)) File.Delete(recentPath);
+            if (previousPreferences is not null) File.WriteAllBytes(preferencesPath, previousPreferences);
+            else if (File.Exists(preferencesPath)) File.Delete(preferencesPath);
             // 一意の専用一時ディレクトリのみを削除する。
             Directory.Delete(temporaryDirectory, true);
         }
@@ -280,7 +310,8 @@ internal static partial class Program
     {
         if (form is MainForm mainForm)
         {
-            form.Text = $"FixedDataBuilder v{typeof(MainForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion}";
+            form.Text = $"FixedDataBuilder v{typeof(MainForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion}"
+                + (Get<bool>(mainForm, "hasUnsavedChanges") ? " 【未保存】" : string.Empty);
             var grid = Get<DataGridView>(mainForm, "grid");
             var dataRow = Get<ToolStripMenuItem>(mainForm, "recordRowsButton").Checked
                 ? (int)Invoke(mainForm, "RecordRowsDataStartIndex")! : expectedHex is null ? 0 : 1;

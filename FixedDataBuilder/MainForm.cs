@@ -6,6 +6,7 @@ namespace FixedDataBuilder;
 
 public sealed class MainForm : Form
 {
+    private static readonly string WindowTitle = $"FixedDataBuilder v{typeof(MainForm).Assembly.GetName().Version?.ToString(3)}";
     private static readonly Color DefinitionBackColor = Color.FromArgb(226, 242, 226);
     private static readonly Color DefinitionHeaderBackColor = Color.FromArgb(204, 232, 204);
     private static readonly Color OccursHeaderBackColor = Color.FromArgb(223, 235, 248);
@@ -72,10 +73,13 @@ public sealed class MainForm : Form
     private GridLayout layout = GridLayout.FieldRows;
     private bool isRefreshingGrid;
     private Font? displayFont;
+    private bool hasUnsavedChanges;
+    private readonly DataLoadSettingsStore loadSettingsStore;
 
-    public MainForm(string[]? args = null)
+    public MainForm(string[]? args = null, DataLoadSettingsStore? loadSettingsStore = null)
     {
-        Text = $"FixedDataBuilder v{Application.ProductVersion}";
+        this.loadSettingsStore = loadSettingsStore ?? new DataLoadSettingsStore(DataLoadSettingsStore.DefaultPath);
+        Text = WindowTitle;
         StartPosition = FormStartPosition.CenterScreen;
         Width = 1100;
         Height = 740;
@@ -107,6 +111,39 @@ public sealed class MainForm : Form
         LoadStartupFiles(args ?? []);
     }
 
+    private void SetUnsavedChanges(bool value)
+    {
+        hasUnsavedChanges = value;
+        Text = WindowTitle + (value ? " 【未保存】" : string.Empty);
+    }
+
+    private bool ConfirmDiscardChanges(string action)
+    {
+        if (!grid.EndEdit()) return false;
+        if (!hasUnsavedChanges) return true;
+        using var dialog = new UnsavedChangesForm(action);
+        return dialog.ShowDialog(this) switch
+        {
+            DialogResult.Yes => SaveDataOverwrite(),
+            DialogResult.No => true,
+            _ => false
+        };
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!e.Cancel && !ConfirmDiscardChanges("終了")) e.Cancel = true;
+        base.OnFormClosing(e);
+    }
+
+    private bool RememberCurrentLoadSettings(string path)
+    {
+        var definition = GetCurrentDefinitionPath();
+        return string.IsNullOrWhiteSpace(definition) || loadSettingsStore.Remember(definition, path,
+            new DataLoadSettings(currentDataFileFormat, currentCsvEncoding, currentSeparatorMode, currentNationalTextEncoding),
+            currentXmlLayout?.Id);
+    }
+
     private Control BuildFilePanel()
     {
         var panel = new TableLayoutPanel
@@ -135,13 +172,22 @@ public sealed class MainForm : Form
 
         panel.Controls.Add(CreatePathLabel("定義ファイル"), 0, 0);
         panel.Controls.Add(definitionPathTextBox, 1, 0);
-        panel.SetColumnSpan(definitionPathTextBox, 2);
+        var reloadDefinitionButton = new Button
+        {
+            Name = "ReloadDefinition",
+            Text = "定義を再読み込み",
+            Dock = DockStyle.Fill,
+            Margin = new Padding(6, 0, 0, 0),
+            UseVisualStyleBackColor = true
+        };
+        reloadDefinitionButton.Click += (_, _) => ReloadDefinition();
+        panel.Controls.Add(reloadDefinitionButton, 2, 0);
         panel.Controls.Add(CreatePathLabel("データファイル"), 0, 1);
         panel.Controls.Add(dataPathTextBox, 1, 1);
         var reloadButton = new Button
         {
             Name = "ReloadFiles",
-            Text = "再読み込み (F5)",
+            Text = "全体再読込 (F5)",
             Dock = DockStyle.Fill,
             Margin = new Padding(6, 0, 0, 0),
             UseVisualStyleBackColor = true
@@ -729,6 +775,68 @@ public sealed class MainForm : Form
         xmlLayoutTextBox.Text = xmlLayout is null ? "—" : $"{xmlLayout.Name} [{xmlLayout.Id}] / {xmlLayout.RecordLength} バイト";
     }
 
+    private void ReloadDefinition()
+    {
+        if (string.IsNullOrWhiteSpace(GetCurrentDefinitionPath()))
+        {
+            SetStatus("再読み込みする定義がありません。先に定義ファイルを開いてください。");
+            return;
+        }
+        if (!grid.EndEdit()) return;
+        try
+        {
+            if (ReloadDefinitionCore()) SetStatus("定義だけを再読み込みしました。表示中のデータは保持しています。");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "定義再読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private bool ReloadDefinitionCore()
+    {
+        var path = GetCurrentDefinitionPath();
+        if (string.IsNullOrWhiteSpace(path) || path.StartsWith("(Excel) ", StringComparison.Ordinal))
+            throw new InvalidOperationException("再読み込みできる定義ファイルがありません。Excelから取り込んだ場合は、全体再読込 (F5) を使ってください。");
+        var definition = ReadDefinition(path, currentXmlLayout?.Id);
+        if (definition is null) return false;
+        var hasData = hasUnsavedChanges || !string.IsNullOrWhiteSpace(GetCurrentDataPath());
+        var loadedFields = definition.Value.Fields.Select(field => hasData && field.Type == FieldDataType.FullWidthText
+            ? field with { NationalByteWidth = NationalTextEncodingHelper.FixedByteWidth(currentNationalTextEncoding) } : field).ToList();
+        if (hasData)
+        {
+            var compatible = loadedFields.Count == fields.Count;
+            for (var index = 0; compatible && index < fields.Count; index++)
+            {
+                var previous = fields[index];
+                var next = loadedFields[index];
+                compatible = previous.Type == next.Type && previous.Length == next.Length
+                    && previous.DecimalScale == next.DecimalScale && previous.NationalByteWidth == next.NationalByteWidth
+                    && previous.RedefinesName == next.RedefinesName
+                    && (previous.Name == next.Name || fields.All(field => field.Name != next.Name));
+            }
+            if (!compatible || currentXmlLayout?.EncodingProfile != definition.Value.XmlLayout?.EncodingProfile
+                || currentXmlLayout?.SeparatorMode != definition.Value.XmlLayout?.SeparatorMode)
+                throw new InvalidDataException("項目数・順序・型・桁数などが変わっているため、データを保持したまま定義だけを更新できません。\r\n編集中の場合は保存してから、全体再読込 (F5) で定義とデータを読み直してください。");
+        }
+        else
+        {
+            currentDataFileFormat = DataFileFormat.FixedLength;
+            currentDataEncodingProfile = definition.Value.XmlLayout?.EncodingProfile ?? (IsCopybookPath(path)
+                ? DataEncodingProfile.Utf8WithNationalText : DataEncodingProfile.ShiftJis);
+            currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
+            if (definition.Value.XmlLayout is not null) currentSeparatorMode = definition.Value.XmlLayout.SeparatorMode;
+            records.Clear();
+        }
+        var hidden = hasData ? hiddenFieldIndexes.ToArray() : [];
+        ApplyDefinition(path, loadedFields, definition.Value.XmlLayout);
+        hiddenFieldIndexes.UnionWith(hidden);
+        NormalizeRecords();
+        UpdateSeparatorModeText();
+        RefreshGrid();
+        return true;
+    }
+
     private void ReloadCurrentFiles()
     {
         if (string.IsNullOrWhiteSpace(GetCurrentDefinitionPath()) && string.IsNullOrWhiteSpace(GetCurrentDataPath()))
@@ -736,9 +844,7 @@ public sealed class MainForm : Form
             SetStatus("再読み込みするファイルがありません。先にファイルを開いてください。");
             return;
         }
-        if (MessageBox.Show(this,
-            "現在の編集内容を破棄し、定義とデータをファイルから再読み込みしますか？\r\n読込形式・文字コード・改行条件は引き継ぎます。",
-            "再読み込み", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+        if (!ConfirmDiscardChanges("再読み込み")) return;
         try
         {
             ReloadCurrentFilesCore();
@@ -791,6 +897,7 @@ public sealed class MainForm : Form
         NormalizeRecords();
         UpdateSeparatorModeText();
         RefreshGrid();
+        SetUnsavedChanges(false);
     }
 
     private static bool IsCopybookPath(string path)
@@ -817,6 +924,7 @@ public sealed class MainForm : Form
         SetPathText(dataPathTextBox, path);
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
+        SetUnsavedChanges(false);
     }
 
     private void ApplyNationalTextEncoding(NationalTextEncoding nationalTextEncoding)
@@ -845,6 +953,7 @@ public sealed class MainForm : Form
         SetPathText(dataPathTextBox, path);
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
+        SetUnsavedChanges(false);
     }
 
     private void EnsureKnownSampleSelection(string dataPath, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
@@ -892,6 +1001,7 @@ public sealed class MainForm : Form
 
     private bool LoadDefinitionFromPath(string path, string statusMessage)
     {
+        if (!ConfirmDiscardChanges("定義を開く")) return false;
         try
         {
             if (!LoadDefinition(path)) return false;
@@ -900,6 +1010,7 @@ public sealed class MainForm : Form
             records.Clear();
             records.Add(CreateEmptyRecord());
             RefreshGrid();
+            SetUnsavedChanges(false);
             SetStatus(statusMessage);
             return true;
         }
@@ -918,6 +1029,7 @@ public sealed class MainForm : Form
             return;
         }
 
+        if (!ConfirmDiscardChanges("データを開く")) return;
         try
         {
             var loadOptions = SelectDataLoadOptions(path);
@@ -931,7 +1043,7 @@ public sealed class MainForm : Form
             else
                 LoadData(path, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding);
             RefreshGrid();
-            SetStatus(statusMessage);
+            SetStatus(RememberCurrentLoadSettings(path) ? statusMessage : statusMessage + "（読込条件を記憶できませんでした。）");
         }
         catch (Exception ex)
         {
@@ -1131,14 +1243,15 @@ public sealed class MainForm : Form
 
     private DataLoadOptions? SelectDataLoadOptions(string dataPath)
     {
+        var remembered = loadSettingsStore.Find(GetCurrentDefinitionPath() ?? string.Empty, dataPath, currentXmlLayout?.Id);
         var samplePattern = FindCopybookSamplePattern(dataPath);
         var canUseSampleDefaults = samplePattern?.MatchesDefinition(Path.GetFileName(GetCurrentDefinitionPath())) == true;
-        var defaultSeparatorMode = canUseSampleDefaults
+        var defaultSeparatorMode = remembered?.SeparatorMode ?? (canUseSampleDefaults
             ? samplePattern!.SeparatorMode
-            : currentSeparatorMode;
-        var defaultNationalTextEncoding = canUseSampleDefaults
+            : currentSeparatorMode);
+        var defaultNationalTextEncoding = remembered?.NationalEncoding ?? (canUseSampleDefaults
             ? samplePattern!.NationalTextEncoding
-            : currentNationalTextEncoding;
+            : currentNationalTextEncoding);
 
         using var form = new Form
         {
@@ -1158,7 +1271,8 @@ public sealed class MainForm : Form
             Location = new Point(90, 16), Width = 245
         };
         formatCombo.Items.AddRange(["固定長", "可変長 CSV（ヘッダーなし）"]);
-        formatCombo.SelectedIndex = Path.GetExtension(dataPath).Equals(".csv", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        formatCombo.SelectedIndex = remembered is not null ? (remembered.Format == DataFileFormat.Csv ? 1 : 0)
+            : Path.GetExtension(dataPath).Equals(".csv", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         var csvEncodingLabel = new Label { Text = "CSV文字コード", AutoSize = true, Location = new Point(380, 20) };
         var csvEncodingCombo = new ComboBox
         {
@@ -1166,7 +1280,7 @@ public sealed class MainForm : Form
             Location = new Point(500, 16), Width = 155
         };
         csvEncodingCombo.Items.AddRange(["UTF-8", "Shift_JIS"]);
-        csvEncodingCombo.SelectedIndex = 0;
+        csvEncodingCombo.SelectedIndex = remembered?.CsvEncoding == CsvTextEncoding.ShiftJis ? 1 : 0;
 
         var separatorGroup = new GroupBox
         {
@@ -1316,6 +1430,7 @@ public sealed class MainForm : Form
                     : FixedLengthDataReader.Read(dataPath, previewFields, options.SeparatorMode,
                         currentDataEncodingProfile, options.NationalTextEncoding);
                 ShowDataPreview(previewGrid, previewStatusLabel, previewFields, previewRecords, options.IsCsv);
+                if (remembered is not null) previewStatusLabel.Text += "（前回の読込条件）";
                 okButton.Enabled = true;
             }
             catch (Exception ex)
@@ -1441,6 +1556,7 @@ public sealed class MainForm : Form
             return;
         }
 
+        if (!ConfirmDiscardChanges("定義を編集")) return;
         using var form = new DefinitionEditorForm(editCurrent ? fields : []);
         if (form.ShowDialog(this) != DialogResult.OK || string.IsNullOrWhiteSpace(form.SavedPath))
         {
@@ -1455,6 +1571,7 @@ public sealed class MainForm : Form
             records.Clear();
             records.Add(CreateEmptyRecord());
             RefreshGrid();
+            SetUnsavedChanges(false);
             SetStatus(editCurrent ? "定義ファイルを修正して読み込みました。" : "定義ファイルを作成して読み込みました。");
         }
         catch (Exception ex)
@@ -1505,6 +1622,7 @@ public sealed class MainForm : Form
         }
 
         records.Add(CreateEmptyRecord());
+        SetUnsavedChanges(true);
         RefreshGrid();
         SelectRecord(records.Count - 1);
     }
@@ -1518,6 +1636,7 @@ public sealed class MainForm : Form
         }
 
         records.Insert(index + 1, [.. records[index]]);
+        SetUnsavedChanges(true);
         RefreshGrid();
         SelectRecord(index + 1);
     }
@@ -1531,41 +1650,43 @@ public sealed class MainForm : Form
         }
 
         records.RemoveAt(index);
+        SetUnsavedChanges(true);
         RefreshGrid();
         SelectRecord(Math.Min(index, records.Count - 1));
     }
 
-    private void SaveDataOverwrite()
+    private bool SaveDataOverwrite()
     {
         grid.EndEdit();
         if (string.IsNullOrWhiteSpace(saveDataPath))
         {
-            SaveDataAs();
-            return;
+            return SaveDataAs();
         }
 
         try
         {
             WriteData(saveDataPath, CurrentSaveOptions());
             SetStatus($"上書き保存しました: {Path.GetFileName(saveDataPath)}");
+            return true;
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "保存エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
         }
     }
 
-    private void SaveDataAs()
+    private bool SaveDataAs()
     {
         grid.EndEdit();
         if (fields.Count == 0 || records.Count == 0)
         {
             MessageBox.Show(this, "保存するデータがありません。", "保存", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
+            return false;
         }
 
         using var optionsForm = new DataSaveOptionsForm(CurrentSaveOptions());
-        if (optionsForm.ShowDialog(this) != DialogResult.OK) return;
+        if (optionsForm.ShowDialog(this) != DialogResult.OK) return false;
         var options = optionsForm.Options;
         var isCsv = options.Format == DataFileFormat.Csv;
 
@@ -1581,17 +1702,19 @@ public sealed class MainForm : Form
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
         {
-            return;
+            return false;
         }
 
         try
         {
             WriteData(dialog.FileName, options);
             SetStatus($"保存しました: {Path.GetFileName(dialog.FileName)}");
+            return true;
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "保存エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
         }
     }
 
@@ -1626,6 +1749,8 @@ public sealed class MainForm : Form
         UpdateSeparatorModeText();
         if (refreshNeeded) RefreshGrid();
         else UpdateHexView();
+        SetUnsavedChanges(false);
+        RememberCurrentLoadSettings(path);
     }
 
     private void ExportExcel()
@@ -1689,6 +1814,7 @@ public sealed class MainForm : Form
 
     private void ImportExcelFromPath(string path)
     {
+        if (!ConfirmDiscardChanges("Excelを取り込む")) return;
         try
         {
             LoadExcel(path);
@@ -1724,6 +1850,7 @@ public sealed class MainForm : Form
         NormalizeRecords();
         UpdateSeparatorModeText();
         RefreshGrid();
+        SetUnsavedChanges(false);
     }
 
     private void ValidateImportedDefinition(IReadOnlyList<FieldDefinition> importedFields)
@@ -1982,6 +2109,7 @@ public sealed class MainForm : Form
             }
 
             var formattedValue = FormatValueForDisplay(field, grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty, IsCsv);
+            if (records[recordIndex][fieldRowsFieldIndex] != formattedValue) SetUnsavedChanges(true);
             records[recordIndex][fieldRowsFieldIndex] = formattedValue;
             grid[columnIndex, rowIndex].Value = formattedValue;
             ApplyCellValidationStyle(grid[columnIndex, rowIndex], field, formattedValue);
@@ -2008,6 +2136,7 @@ public sealed class MainForm : Form
         }
 
         var recordRowsFormattedValue = FormatValueForDisplay(recordRowsField, grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty, IsCsv);
+        if (records[recordRowsRecordIndex][fieldIndex] != recordRowsFormattedValue) SetUnsavedChanges(true);
         records[recordRowsRecordIndex][fieldIndex] = recordRowsFormattedValue;
         grid[columnIndex, rowIndex].Value = recordRowsFormattedValue;
         ApplyCellValidationStyle(grid[columnIndex, rowIndex], recordRowsField, recordRowsFormattedValue);
