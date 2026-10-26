@@ -33,7 +33,7 @@ v0.1.10 で `Excel出力` ボタンを追加したとき、Excel 出力結果の
 
 GitHub Releases は、原則として最新 3 バージョンだけを残します。
 
-現在はSACの比較調査に過去版が必要なため、この整理を停止します。過去リリース・タグ・ローカル配布物は削除せず保持してください。
+2026-10-26のユーザー指示により、最新3バージョンを残す整理を再開します。対象はGitHub Releases本体と配布アセットです。Gitタグ・ソース履歴・ローカルの比較用ファイルは残します。削除前に配布アセットのローカル保管とハッシュを確認し、既存ZIPは重複コピーせず再利用します。
 
 目的:
 
@@ -44,7 +44,7 @@ GitHub Releases は、原則として最新 3 バージョンだけを残しま�
 
 1. 新しい Release を作成したあと、`gh release list --repo konikatsu/FixedDataBuilder --limit 20` で一覧を確認する。
 2. 最新 3 バージョンを残す。
-3. 4つ前より古い GitHub Release は削除する。
+3. 削除対象のリリース説明と配布アセットをローカルに保管し、サイズ・SHA256を確認してから、4つ前より古い GitHub Release を削除する。
 4. 削除対象は GitHub Release 本体。Git タグは原則として削除しない。
 5. 削除後、再度 `gh release list --repo konikatsu/FixedDataBuilder --limit 20` で残っている Release を確認する。
 

@@ -4,6 +4,14 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 定義書 CSV・COBOL コピー句を読み込み、項目とレコードを表形式で見比べながら編集できます。COMP-3 / packed decimal 項目は、画面上では通常の数値として表示・入力し、保存時に packed decimal のバイト列へ変換します。
 
+## ダウンロード
+
+[v0.1.49 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.49/FixedDataBuilder-v0.1.49-win-x64-framework-dependent.zip)
+
+軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
+
+[v0.1.49 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.49) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+
 ## 画面イメージ
 
 ![FixedDataBuilder v0.1.49 のスクリーンショット（架空の5行）](docs/screen-image-unsaved-settings-v0.1.49.png)
@@ -104,19 +112,13 @@ Excelへ出力した見出し・行番号・項目名・定義欄は、水色の
 
 変更は新しく出力するExcelに反映されます。以前に出力したファイルは、再度Excel出力してください。
 
-## ダウンロード
+## 配布形式・動作確認
 
 最新版 **v0.1.49** では、未保存の変更表示と読込条件の記憶を追加しました。定義だけを再読み込みする専用ボタンも利用できます。見出し3行、全体再読込 (F5)、元ファイル名を付けるExcel出力、固定長／CSVの入出力を引き継ぎます。
-
-[v0.1.49 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.49/FixedDataBuilder-v0.1.49-win-x64-framework-dependent.zip)
-
-軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
 今後の配布は軽量版に統一します。公開する軽量版は、Smart App ControlがONの環境で製品EXEからメイン画面が開くことを確認したファイルです。ダウンロード後の別PCでの起動確認は、利用者側で行います。
 
 v0.1.49は80件の自動テストに成功しました。未保存時の保存・破棄・キャンセル、アプリを開き直したときの読込条件の復元、定義だけの再読み込みでのデータ保持などを確認しています。テストと同じ製品DLLを使用し、Smart App ControlがONの環境で軽量版の製品EXEからメイン画面が開くことを確認しました。
-
-[v0.1.49 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.49) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 
