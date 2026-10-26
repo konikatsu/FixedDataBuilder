@@ -125,12 +125,12 @@ internal static partial class Program
         {
             using var form = new MainForm(["--definition", definition, "--data", data, "--layout", "record"]);
             var grid = Get<DataGridView>(form, "grid");
-            Equal("12", grid[3, 0].Value);
-            Equal(true, grid.Columns[1].HeaderText.Contains("CSV列1"));
+            Equal("12", grid[3, 2].Value);
+            Equal("CSV列1", grid[1, 1].Value);
             Equal("ab", Invoke(form, "GetVisibleTextValue", fields[1], "ab"));
             Equal("ab･□", Invoke(form, "GetVisibleTextValue", fields[1], "ab 　"));
-            grid[3, 0].Value = "00002";
-            Invoke(form, "UpdateRecordValue", 0, 3);
+            grid[3, 2].Value = "00002";
+            Invoke(form, "UpdateRecordValue", 2, 3);
             Equal("00002", Get<List<List<string>>>(form, "records")[0][2]);
         });
         Test("Save format defaults, format conversion, hidden columns and overwrite respect CSV semantics", () =>
@@ -237,8 +237,11 @@ internal static partial class Program
         WithDialog("データ読込条件", DialogResult.OK,
             () => Invoke(form, "LoadDataFromPath", Path.Combine(repo, "samples", "csv-import-data-utf8.csv"), "CSVの架空データを読み込みました。"),
             dialog => Capture(dialog, optionsImage, expectedHex: null));
+        Get<TextBox>(form, "definitionPathTextBox").Text = "（CSV表示確認用サンプル）";
+        Get<TextBox>(form, "dataPathTextBox").Text = "（架空CSVデータ・5行）";
         Capture(form, mainImage, expectedHex: null);
         using var outputDialog = new DataSaveOptionsForm((DataSaveOptions)Invoke(form, "CurrentSaveOptions")!);
-        Capture(outputDialog, Path.Combine(Path.GetDirectoryName(optionsImage)!, "screen-image-csv-save-options-v0.1.39.png"), expectedHex: null);
+        var version = typeof(MainForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+        Capture(outputDialog, Path.Combine(Path.GetDirectoryName(optionsImage)!, $"screen-image-csv-save-options-v{version}.png"), expectedHex: null);
     }
 }

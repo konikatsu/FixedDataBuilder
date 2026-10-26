@@ -195,6 +195,7 @@ internal static partial class Program
             RunDragDropTests(repo);
             RunCsvDataTests(repo);
             RunReloadTests(repo);
+            RunHeaderRowsTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);
@@ -281,7 +282,9 @@ internal static partial class Program
         {
             form.Text = $"FixedDataBuilder v{typeof(MainForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion}";
             var grid = Get<DataGridView>(mainForm, "grid");
-            grid.CurrentCell = grid[2, expectedHex is null ? 0 : 1];
+            var dataRow = Get<ToolStripMenuItem>(mainForm, "recordRowsButton").Checked
+                ? (int)Invoke(mainForm, "RecordRowsDataStartIndex")! : expectedHex is null ? 0 : 1;
+            grid.CurrentCell = grid[2, dataRow];
         }
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(-30000, -30000);

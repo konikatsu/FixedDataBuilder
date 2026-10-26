@@ -89,8 +89,9 @@ public static class ExcelImporter
 
     private static ExcelImportResult ReadRecordRows(IReadOnlyList<IReadOnlyList<string>> rows)
     {
-        var twoLineHeader = IsTwoLineRecordHeader(rows);
-        var dataStartRow = twoLineHeader ? 2 : 1;
+        var threeLineHeader = Cell(rows, 1, 0) == "型" && Cell(rows, 2, 0) == "位置";
+        var twoLineHeader = threeLineHeader || IsTwoLineRecordHeader(rows);
+        var dataStartRow = threeLineHeader ? 3 : twoLineHeader ? 2 : 1;
         var fields = new List<FieldDefinition>();
         var columnCount = rows.Max(row => row.Count);
 
@@ -116,6 +117,7 @@ public static class ExcelImporter
         var records = new List<List<string>>();
         for (var rowIndex = dataStartRow; rowIndex < rows.Count; rowIndex++)
         {
+            if (Cell(rows, rowIndex, 0) == "OCCURS") continue;
             if (rows[rowIndex].All(string.IsNullOrWhiteSpace))
             {
                 continue;

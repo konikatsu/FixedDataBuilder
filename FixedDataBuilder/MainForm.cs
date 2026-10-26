@@ -113,16 +113,18 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            ColumnCount = 2,
-            RowCount = 5,
+            ColumnCount = 3,
+            RowCount = 6,
             Padding = new Padding(8, 6, 8, 4)
         };
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
 
         ConfigureReadOnlyTextBox(definitionPathTextBox);
@@ -133,14 +135,37 @@ public sealed class MainForm : Form
 
         panel.Controls.Add(CreatePathLabel("定義ファイル"), 0, 0);
         panel.Controls.Add(definitionPathTextBox, 1, 0);
+        panel.SetColumnSpan(definitionPathTextBox, 2);
         panel.Controls.Add(CreatePathLabel("データファイル"), 0, 1);
         panel.Controls.Add(dataPathTextBox, 1, 1);
+        var reloadButton = new Button
+        {
+            Name = "ReloadFiles",
+            Text = "再読み込み (F5)",
+            Dock = DockStyle.Fill,
+            Margin = new Padding(6, 0, 0, 0),
+            UseVisualStyleBackColor = true
+        };
+        reloadButton.Click += (_, _) => ReloadCurrentFiles();
+        panel.Controls.Add(reloadButton, 2, 1);
         panel.Controls.Add(CreatePathLabel("レコード区切り"), 0, 2);
         panel.Controls.Add(separatorModeTextBox, 1, 2);
+        panel.SetColumnSpan(separatorModeTextBox, 2);
         var xmlLayoutLabel = CreatePathLabel("XMLレイアウト");
         xmlLayoutLabel.Visible = false;
         panel.Controls.Add(xmlLayoutLabel, 0, 3);
         panel.Controls.Add(xmlLayoutTextBox, 1, 3);
+        panel.SetColumnSpan(xmlLayoutTextBox, 2);
+        var encodingHelp = new Label
+        {
+            Name = "EncodingHelp",
+            Text = "半角の英字・数字は、UTF-8でもShift_JISでも同じです。日本語・半角カナは異なります。",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true
+        };
+        panel.Controls.Add(encodingHelp, 0, 4);
+        panel.SetColumnSpan(encodingHelp, 3);
         var dropHint = new Label
         {
             Text = "ファイルを画面へドロップして開く（定義＋データの同時ドロップ可／データCSVはデータファイル欄へ）",
@@ -149,8 +174,8 @@ public sealed class MainForm : Form
             ForeColor = SystemColors.GrayText,
             AutoEllipsis = true
         };
-        panel.Controls.Add(dropHint, 0, 4);
-        panel.SetColumnSpan(dropHint, 2);
+        panel.Controls.Add(dropHint, 0, 5);
+        panel.SetColumnSpan(dropHint, 3);
         return panel;
     }
 
@@ -539,9 +564,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        grid.ColumnHeadersHeight = layout == GridLayout.RecordRows
-            ? Math.Max(64, (grid.Font.Height * 3) + 16)
-            : Math.Max(28, grid.Font.Height + 12);
+        grid.ColumnHeadersHeight = Math.Max(28, grid.Font.Height + 12);
         grid.RowTemplate.Height = Math.Max(22, grid.Font.Height + 8);
         foreach (DataGridViewRow row in grid.Rows)
         {
@@ -1227,22 +1250,30 @@ public sealed class MainForm : Form
             Width = 120,
             Anchor = AnchorStyles.Left | AnchorStyles.Bottom
         };
+        var encodingHelp = new Label
+        {
+            Name = "EncodingHelp",
+            Text = "半角の英字・数字は、UTF-8でもShift_JISでも同じです。\r\n日本語・半角カナは異なります。ファイルの文字コードに合わせてください。",
+            Location = new Point(16, 194),
+            Size = new Size(724, 40),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
         var previewLabel = new Label
         {
             Text = "プレビュー（先頭5レコード）",
-            Location = new Point(16, 198),
+            Location = new Point(16, 242),
             AutoSize = true
         };
         var previewStatusLabel = new Label
         {
-            Location = new Point(190, 198),
+            Location = new Point(190, 242),
             Size = new Size(550, 20),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             TextAlign = ContentAlignment.MiddleLeft
         };
         var previewGrid = new DataGridView
         {
-            Location = new Point(16, 220),
+            Location = new Point(16, 264),
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
@@ -1252,7 +1283,7 @@ public sealed class MainForm : Form
             MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
-            Size = new Size(724, 304),
+            Size = new Size(724, 260),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
             Font = displayFont ?? CreateDefaultDisplayFont(),
             BackgroundColor = SystemColors.AppWorkspace
@@ -1309,7 +1340,7 @@ public sealed class MainForm : Form
         }
 
         form.Controls.AddRange([formatLabel, formatCombo, csvEncodingLabel, csvEncodingCombo,
-            separatorGroup, nationalEncodingGroup, previewLabel, previewStatusLabel, previewGrid, previewButton, okButton, cancelButton]);
+            separatorGroup, nationalEncodingGroup, encodingHelp, previewLabel, previewStatusLabel, previewGrid, previewButton, okButton, cancelButton]);
         form.AcceptButton = okButton;
         form.CancelButton = cancelButton;
         UpdatePreview();
@@ -1739,7 +1770,9 @@ public sealed class MainForm : Form
             var row = new List<ExcelCell>();
             for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
             {
-                var kind = IsDefinitionCellForExcel(columnIndex) ? ExcelCellKind.Definition : ExcelCellKind.Normal;
+                var kind = layout == GridLayout.RecordRows && gridRow.Index < 2
+                    ? ExcelCellKind.Header
+                    : IsDefinitionCellForExcel(columnIndex) ? ExcelCellKind.Definition : ExcelCellKind.Normal;
                 row.Add(new ExcelCell(gridRow.Cells[columnIndex].Value?.ToString() ?? string.Empty, kind));
             }
 
@@ -1899,7 +1932,7 @@ public sealed class MainForm : Form
 
     private int RecordRowsDataStartIndex()
     {
-        return occursDisplayInfos.Count > 0 ? 1 : 0;
+        return 2 + (occursDisplayInfos.Count > 0 ? 1 : 0);
     }
 
     private int RecordIndexFromGridRow(int rowIndex)
@@ -2075,6 +2108,7 @@ public sealed class MainForm : Form
             var width = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: false);
             foreach (DataGridViewRow row in grid.Rows)
             {
+                if (layout == GridLayout.RecordRows && RecordIndexFromGridRow(row.Index) < 0) continue;
                 if (!TryGetCellField(row.Index, column.Index, out var field)
                     || (!IsCsv && field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText))) continue;
                 var cell = row.Cells[column.Index];
@@ -2161,11 +2195,13 @@ public sealed class MainForm : Form
     private void RefreshRecordRowsGrid()
     {
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
-        grid.ColumnHeadersHeight = 64;
+        grid.ColumnHeadersHeight = 28;
         grid.Columns.Add(CreateReadOnlyColumn("Record", "行", 50, frozen: true));
         recordGridColumnFieldIndexes.Add(-1);
         ApplyDefinitionColumnStyle(grid.Columns[0]);
 
+        var definitions = new List<string> { "型" };
+        var positions = new List<string> { "位置" };
         var byteStart = 1;
         for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
         {
@@ -2174,10 +2210,10 @@ public sealed class MainForm : Form
             if (IsDisplayableField(field) && !hiddenFieldIndexes.Contains(fieldIndex))
             {
                 occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
-                var ruler = IsCsv ? $"CSV列{fields.Take(fieldIndex + 1).Count(item => !item.IsRedefines)}" : $"[{byteStart}({field.StorageByteLength})]";
-                var header = occursInfo is null
-                    ? $"{field.Name}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}"
-                    : $"{occursInfo.ChildName}{Environment.NewLine}{field.DisplayDefinition}{Environment.NewLine}{ruler}";
+                var ruler = IsCsv ? $"CSV列{fields.Take(fieldIndex + 1).Count(item => !item.IsRedefines)}" : $"[{byteStart}-{byteEnd}]";
+                var header = occursInfo is null ? field.Name : occursInfo.ChildName;
+                definitions.Add(field.DisplayDefinition);
+                positions.Add(ruler);
                 var column = CreateEditableColumn(
                     $"Field{fieldIndex + 1}",
                     header,
@@ -2193,6 +2229,9 @@ public sealed class MainForm : Form
                 byteStart = byteEnd + 1;
             }
         }
+
+        AddRecordDefinitionRow(definitions);
+        AddRecordDefinitionRow(positions);
 
         if (occursDisplayInfos.Count > 0)
         {
@@ -2221,6 +2260,21 @@ public sealed class MainForm : Form
                 row.Cells[columnIndex].ReadOnly = field.IsRedefines;
                 ApplyCellValidationStyle(row.Cells[columnIndex], field, value);
             }
+        }
+    }
+
+    private void AddRecordDefinitionRow(IReadOnlyList<string> values)
+    {
+        var row = grid.Rows[grid.Rows.Add(values.Cast<object>().ToArray())];
+        row.ReadOnly = true;
+        row.Frozen = true;
+        for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
+        {
+            var style = row.Cells[columnIndex].Style;
+            style.BackColor = grid.Columns[columnIndex].HeaderCell.Style.BackColor;
+            style.SelectionBackColor = style.BackColor;
+            style.ForeColor = grid.ForeColor;
+            style.SelectionForeColor = grid.ForeColor;
         }
     }
 
@@ -2355,7 +2409,7 @@ public sealed class MainForm : Form
     {
         if (layout != GridLayout.RecordRows
             || occursDisplayInfos.Count == 0
-            || e.RowIndex != 0
+            || e.RowIndex != 2
             || e.ColumnIndex < 0
             || e.Graphics is null
             || e.CellStyle is null)
@@ -2634,7 +2688,7 @@ public sealed class MainForm : Form
         var encodingText = currentXmlLayout is not null
             ? currentXmlLayout.EncodingName
             : currentDataEncodingProfile == DataEncodingProfile.Utf8WithNationalText ? "UTF-8" : "Shift_JIS";
-        separatorModeTextBox.Text = $"{separatorText} / X・数字: {encodingText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
+        separatorModeTextBox.Text = $"{separatorText} / X項目: {encodingText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
     }
 
     private string? GetCurrentDefinitionPath()

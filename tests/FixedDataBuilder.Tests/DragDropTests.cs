@@ -176,9 +176,12 @@ internal static partial class Program
                 if (layoutName == "レコード縦")
                 {
                     Equal("行", rows[0][0].Text);
-                    Equal("1", rows[1][0].Text);
-                    var legacyRows = rows.Select(row => row.ToArray()).ToArray();
-                    legacyRows[0][0] = new ExcelCell("レコード", ExcelCellKind.Header);
+                    Equal("型", rows[1][0].Text);
+                    Equal("位置", rows[2][0].Text);
+                    Equal("1", rows[3][0].Text);
+                    var legacyHeader = rows[0].Select((cell, index) => new ExcelCell(index == 0 ? "レコード"
+                        : cell.Text + "\n" + rows[1][index].Text + "\n" + rows[2][index].Text, ExcelCellKind.Header)).ToArray();
+                    var legacyRows = new[] { legacyHeader }.Concat(rows.Skip(3).Select(row => row.ToArray())).ToArray();
                     for (var index = 1; index < legacyRows.Length; index++)
                         legacyRows[index][0] = new ExcelCell($"Rec {index}", ExcelCellKind.Definition);
                     var legacyPath = Path.Combine(temporaryDirectory, "legacy-record-rows.xlsx");

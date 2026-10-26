@@ -22,7 +22,7 @@ public sealed class DataSaveOptionsForm : Form
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox = MaximizeBox = false;
-        ClientSize = new Size(510, 300);
+        ClientSize = new Size(510, 350);
         format.Items.AddRange(["固定長", "可変長 CSV（ヘッダーなし）"]);
         csvEncoding.Items.AddRange(["UTF-8", "Shift_JIS"]);
         separator.Items.AddRange(["改行あり (CRLF)", "改行なし"]);
@@ -42,14 +42,20 @@ public sealed class DataSaveOptionsForm : Form
         csvEncoding.SelectedIndex = current.CsvEncoding == CsvTextEncoding.ShiftJis ? 1 : 0;
         separator.SelectedIndex = current.SeparatorMode == RecordSeparatorMode.None ? 1 : 0;
         national.SelectedIndex = current.NationalEncoding switch { NationalTextEncoding.Utf16 => 1, NationalTextEncoding.Utf32 => 2, _ => 0 };
+        var encodingHelp = new Label
+        {
+            Name = "EncodingHelp",
+            Text = "半角の英字・数字は、UTF-8でもShift_JISでも同じです。\r\n日本語・半角カナは、文字コードを合わせてください。",
+            Location = new Point(16, 176), Size = new Size(478, 40)
+        };
         var note = new Label
         {
             Text = "CSV: 空欄・空白・先頭ゼロを保持。桁合わせなし。\r\n全列を引用符で囲み、CRLFで出力します。",
-            Location = new Point(16, 182), Size = new Size(478, 50)
+            Location = new Point(16, 224), Size = new Size(478, 50)
         };
-        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(316, 254), Width = 80 };
-        var cancel = new Button { Text = "キャンセル", DialogResult = DialogResult.Cancel, Location = new Point(410, 254), Width = 80 };
-        Controls.AddRange([note, ok, cancel]);
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(316, 304), Width = 80 };
+        var cancel = new Button { Text = "キャンセル", DialogResult = DialogResult.Cancel, Location = new Point(410, 304), Width = 80 };
+        Controls.AddRange([encodingHelp, note, ok, cancel]);
         AcceptButton = ok;
         CancelButton = cancel;
         void UpdateOptions()
