@@ -6,15 +6,15 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.49 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.49/FixedDataBuilder-v0.1.49-win-x64-framework-dependent.zip)
+[v0.1.50 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.50/FixedDataBuilder-v0.1.50-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.49 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.49) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.50 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.50) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 ## 画面イメージ
 
-![FixedDataBuilder v0.1.49 のスクリーンショット（架空の5行）](docs/screen-image-unsaved-settings-v0.1.49.png)
+![FixedDataBuilder v0.1.50 のスクリーンショット（架空の5行）](docs/screen-image-main-v0.1.50.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
@@ -114,11 +114,11 @@ Excelへ出力した見出し・行番号・項目名・定義欄は、水色の
 
 ## 配布形式・動作確認
 
-最新版 **v0.1.49** では、未保存の変更表示と読込条件の記憶を追加しました。定義だけを再読み込みする専用ボタンも利用できます。見出し3行、全体再読込 (F5)、元ファイル名を付けるExcel出力、固定長／CSVの入出力を引き継ぎます。
+最新版 **v0.1.50** では、定義ファイル選択画面の候補表示を整理しました。CSV・COBOLコピー句の選択、未保存表示、読込条件の記憶、定義だけの再読み込みなどを利用できます。
 
 今後の配布は軽量版に統一します。公開する軽量版は、Smart App ControlがONの環境で製品EXEからメイン画面が開くことを確認したファイルです。ダウンロード後の別PCでの起動確認は、利用者側で行います。
 
-v0.1.49は80件の自動テストに成功しました。未保存時の保存・破棄・キャンセル、アプリを開き直したときの読込条件の復元、定義だけの再読み込みでのデータ保持などを確認しています。テストと同じ製品DLLを使用し、Smart App ControlがONの環境で軽量版の製品EXEからメイン画面が開くことを確認しました。
+v0.1.50は80件の自動テストに成功しました。未保存時の保存・破棄・キャンセル、アプリを開き直したときの読込条件の復元、定義だけの再読み込みでのデータ保持などを確認しています。テストと同じ製品DLLを使用し、Smart App ControlがONの環境で軽量版の製品EXEからメイン画面が開くことを確認しました。
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 

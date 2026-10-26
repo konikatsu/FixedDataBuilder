@@ -6,7 +6,7 @@ public sealed class XmlLayoutSelectionForm : Form
 
     public XmlLayoutSelectionForm(IReadOnlyList<XmlLayoutDefinition> layouts)
     {
-        Text = "汎用XML定義 — レイアウト選択";
+        Text = "レイアウト選択";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(680, 360);
         ClientSize = new Size(900, 400);

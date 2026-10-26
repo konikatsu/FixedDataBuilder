@@ -622,7 +622,7 @@ public sealed class MainForm : Form
     {
         using var dialog = new OpenFileDialog
         {
-            Filter = "定義ファイル (*.csv;*.cbl;*.cpy;*.xml)|*.csv;*.cbl;*.cpy;*.xml|汎用XML定義 (*.xml)|*.xml|CSV ファイル (*.csv)|*.csv|COBOL コピー句 (*.cbl;*.cpy)|*.cbl;*.cpy|すべてのファイル (*.*)|*.*",
+            Filter = "定義ファイル (*.csv;*.cbl;*.cpy)|*.csv;*.cbl;*.cpy|CSV ファイル (*.csv)|*.csv|COBOL コピー句 (*.cbl;*.cpy)|*.cbl;*.cpy|すべてのファイル (*.*)|*.*",
             Title = "定義ファイルを選択"
         };
 

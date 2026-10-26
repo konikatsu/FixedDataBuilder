@@ -144,7 +144,7 @@ internal static partial class Program
         {
             using var form = CreateBasicForm(repo);
             var previous = Get<List<List<string>>>(form, "records").ToArray();
-            WithDialog("汎用XML定義 — レイアウト選択", DialogResult.Cancel, () => Drop(form,
+            WithDialog("レイアウト選択", DialogResult.Cancel, () => Drop(form,
                 Path.Combine(repo, "samples", "generic-xml-definition.xml"),
                 Path.Combine(repo, "samples", "generic-xml-customer-data-utf8-none.dat")));
             Equal(true, previous.SequenceEqual(Get<List<List<string>>>(form, "records")));
