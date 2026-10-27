@@ -15,7 +15,6 @@ public sealed class MainForm : Form
     private static readonly Color OccursGroupAlternateBackColor = Color.FromArgb(247, 244, 255);
     private static readonly Color ErrorBackColor = Color.FromArgb(255, 225, 225);
     private static readonly Color HalfWidthSpaceBackColor = Color.FromArgb(255, 250, 205);
-    private static readonly Encoding ShiftJisEncoding = Encoding.GetEncoding("shift_jis");
     private static readonly string RecentFilesPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "FixedDataBuilder",
@@ -68,8 +67,7 @@ public sealed class MainForm : Form
     private DataEncodingProfile currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
     private NationalTextEncoding currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
     private XmlLayoutDefinition? currentXmlLayout;
-    private Encoding TextDataEncoding => currentDataEncodingProfile == DataEncodingProfile.Utf8WithNationalText
-        ? Encoding.UTF8 : ShiftJisEncoding;
+    private Encoding TextDataEncoding => JapaneseEncodings.ForData(currentDataEncodingProfile);
     private GridLayout layout = GridLayout.FieldRows;
     private bool isRefreshingGrid;
     private Font? displayFont;
@@ -140,7 +138,7 @@ public sealed class MainForm : Form
     {
         var definition = GetCurrentDefinitionPath();
         return string.IsNullOrWhiteSpace(definition) || loadSettingsStore.Remember(definition, path,
-            new DataLoadSettings(currentDataFileFormat, currentCsvEncoding, currentSeparatorMode, currentNationalTextEncoding),
+            new DataLoadSettings(currentDataFileFormat, currentCsvEncoding, currentSeparatorMode, currentNationalTextEncoding, currentDataEncodingProfile),
             currentXmlLayout?.Id);
     }
 
@@ -205,7 +203,7 @@ public sealed class MainForm : Form
         var encodingHelp = new Label
         {
             Name = "EncodingHelp",
-            Text = "半角の英字・数字は、UTF-8でもShift_JISでも同じです。日本語・半角カナは異なります。",
+            Text = "半角の英字・数字はUTF-8・SJIS・MS932で同じです。日本語はファイルの文字コードに合わせてください。",
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true
@@ -684,10 +682,9 @@ public sealed class MainForm : Form
                 var format = GetOptionValue(args, "--format");
                 if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)
                     || (format is null && Path.GetExtension(dataPath).Equals(".csv", StringComparison.OrdinalIgnoreCase)))
-                    LoadCsvData(dataPath, string.Equals(GetOptionValue(args, "--csv-encoding"), "sjis", StringComparison.OrdinalIgnoreCase)
-                        ? CsvTextEncoding.ShiftJis : CsvTextEncoding.Utf8);
+                    LoadCsvData(dataPath, ParseCsvEncoding(GetOptionValue(args, "--csv-encoding")));
                 else
-                    LoadData(dataPath, separatorMode, nationalTextEncoding);
+                    LoadData(dataPath, separatorMode, nationalTextEncoding, ParseTextEncoding(GetOptionValue(args, "--text-encoding")));
             }
 
             var startupLayout = ParseStartupLayout(GetOptionValue(args, "--layout"));
@@ -908,11 +905,12 @@ public sealed class MainForm : Form
             || extension.Equals(".cob", StringComparison.OrdinalIgnoreCase);
     }
 
-    private void LoadData(string path, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding)
+    private void LoadData(string path, RecordSeparatorMode separatorMode, NationalTextEncoding nationalTextEncoding, DataEncodingProfile? textEncoding = null)
     {
         EnsureKnownSampleSelection(path, separatorMode, nationalTextEncoding);
         var loadedFields = BuildFieldsForNationalTextEncoding(nationalTextEncoding);
-        var loadedRecords = FixedLengthDataReader.Read(path, loadedFields, separatorMode, currentDataEncodingProfile, nationalTextEncoding);
+        var loadedRecords = FixedLengthDataReader.Read(path, loadedFields, separatorMode, textEncoding ?? currentDataEncodingProfile, nationalTextEncoding);
+        currentDataEncodingProfile = textEncoding ?? currentDataEncodingProfile;
         ApplyNationalTextEncoding(nationalTextEncoding);
         currentDataFileFormat = DataFileFormat.FixedLength;
 
@@ -1041,7 +1039,7 @@ public sealed class MainForm : Form
             if (loadOptions.IsCsv)
                 LoadCsvData(path, loadOptions.CsvEncoding);
             else
-                LoadData(path, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding);
+                LoadData(path, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding, loadOptions.TextEncoding);
             RefreshGrid();
             SetStatus(RememberCurrentLoadSettings(path) ? statusMessage : statusMessage + "（読込条件を記憶できませんでした。）");
         }
@@ -1225,6 +1223,23 @@ public sealed class MainForm : Form
         };
     }
 
+    private static CsvTextEncoding ParseCsvEncoding(string? value) => NormalizeEncoding(value) switch
+    {
+        null or "utf8" => CsvTextEncoding.Utf8,
+        "sjis" or "shiftjis" => CsvTextEncoding.StrictShiftJis,
+        "ms932" or "cp932" or "windows31j" => CsvTextEncoding.ShiftJis,
+        _ => throw new InvalidDataException("CSV文字コードはUTF-8・SJIS・MS932から指定してください。")
+    };
+
+    private static DataEncodingProfile? ParseTextEncoding(string? value) => NormalizeEncoding(value) switch
+    {
+        null => null, "utf8" => DataEncodingProfile.Utf8WithNationalText,
+        "sjis" or "shiftjis" => DataEncodingProfile.StrictShiftJis,
+        "ms932" or "cp932" or "windows31j" => DataEncodingProfile.ShiftJis,
+        _ => throw new InvalidDataException("X文字コードはUTF-8・SJIS・MS932から指定してください。")
+    };
+    private static string? NormalizeEncoding(string? value) => value?.Trim().ToLowerInvariant().Replace("_", "").Replace("-", "");
+
     private static NationalTextEncoding? ParseNationalTextEncoding(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1234,7 +1249,8 @@ public sealed class MainForm : Form
 
         return value.Trim().ToLowerInvariant().Replace("_", "").Replace("-", "") switch
         {
-            "shiftjis" or "sjis" => NationalTextEncoding.ShiftJis,
+            "ms932" or "cp932" or "windows31j" => NationalTextEncoding.ShiftJis,
+            "shiftjis" or "sjis" => NationalTextEncoding.StrictShiftJis,
             "utf16" or "utf16le" => NationalTextEncoding.Utf16,
             "utf32" or "utf32le" => NationalTextEncoding.Utf32,
             _ => null
@@ -1279,14 +1295,14 @@ public sealed class MainForm : Form
             Name = "CsvEncoding", DropDownStyle = ComboBoxStyle.DropDownList,
             Location = new Point(500, 16), Width = 155
         };
-        csvEncodingCombo.Items.AddRange(["UTF-8", "Shift_JIS"]);
-        csvEncodingCombo.SelectedIndex = remembered?.CsvEncoding == CsvTextEncoding.ShiftJis ? 1 : 0;
+        csvEncodingCombo.Items.AddRange(JapaneseEncodings.CsvNames);
+        csvEncodingCombo.SelectedIndex = (int)(remembered?.CsvEncoding ?? CsvTextEncoding.Utf8);
 
         var separatorGroup = new GroupBox
         {
             Text = "1. レコード区切り",
             Location = new Point(16, 60),
-            Size = new Size(340, 86),
+            Size = new Size(340, 126),
             Anchor = AnchorStyles.Top | AnchorStyles.Left
         };
 
@@ -1305,6 +1321,11 @@ public sealed class MainForm : Form
             AutoSize = true
         };
         separatorGroup.Controls.AddRange([lineBreakRadio, noLineBreakRadio]);
+        var textEncodingLabel = new Label { Text = "X文字コード", AutoSize = true, Location = new Point(14, 88) };
+        var textEncodingCombo = new ComboBox { Name = "TextEncoding", DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(110, 83), Width = 215 };
+        textEncodingCombo.Items.AddRange(JapaneseEncodings.TextNames);
+        textEncodingCombo.SelectedIndex = (int)(remembered?.TextEncoding ?? currentDataEncodingProfile);
+        separatorGroup.Controls.AddRange([textEncodingLabel, textEncodingCombo]);
 
         var nationalEncodingGroup = new GroupBox
         {
@@ -1316,9 +1337,10 @@ public sealed class MainForm : Form
 
         var options = new[]
         {
-            (Encoding: NationalTextEncoding.ShiftJis, Text: "Shift_JIS"),
+            (Encoding: NationalTextEncoding.ShiftJis, Text: "MS932 (CP932)"),
             (Encoding: NationalTextEncoding.Utf16, Text: "UTF-16LE"),
-            (Encoding: NationalTextEncoding.Utf32, Text: "UTF-32LE")
+            (Encoding: NationalTextEncoding.Utf32, Text: "UTF-32LE"),
+            (Encoding: NationalTextEncoding.StrictShiftJis, Text: "SJIS (JIS X 0208)")
         };
         var buttons = new List<RadioButton>();
         for (var index = 0; index < options.Length; index++)
@@ -1367,7 +1389,7 @@ public sealed class MainForm : Form
         var encodingHelp = new Label
         {
             Name = "EncodingHelp",
-            Text = "半角の英字・数字は、UTF-8でもShift_JISでも同じです。\r\n日本語・半角カナは異なります。ファイルの文字コードに合わせてください。",
+            Text = "半角の英字・数字はUTF-8・SJIS・MS932で同じです。\r\nSJISは拡張文字なし。①・髙などを含む場合はMS932。",
             Location = new Point(16, 194),
             Size = new Size(724, 40),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -1412,7 +1434,7 @@ public sealed class MainForm : Form
                 ? encoding
                 : NationalTextEncoding.ShiftJis;
             return new DataLoadOptions(separatorMode, nationalTextEncoding, formatCombo.SelectedIndex == 1,
-                csvEncodingCombo.SelectedIndex == 1 ? CsvTextEncoding.ShiftJis : CsvTextEncoding.Utf8);
+                (CsvTextEncoding)csvEncodingCombo.SelectedIndex, (DataEncodingProfile)textEncodingCombo.SelectedIndex);
         }
 
         void UpdatePreview()
@@ -1428,7 +1450,7 @@ public sealed class MainForm : Form
                 var previewRecords = options.IsCsv
                     ? CsvDataReader.Read(dataPath, previewFields, options.CsvEncoding)
                     : FixedLengthDataReader.Read(dataPath, previewFields, options.SeparatorMode,
-                        currentDataEncodingProfile, options.NationalTextEncoding);
+                        options.TextEncoding ?? currentDataEncodingProfile, options.NationalTextEncoding);
                 ShowDataPreview(previewGrid, previewStatusLabel, previewFields, previewRecords, options.IsCsv);
                 if (remembered is not null) previewStatusLabel.Text += "（前回の読込条件）";
                 okButton.Enabled = true;
@@ -1443,6 +1465,7 @@ public sealed class MainForm : Form
         previewButton.Click += (_, _) => UpdatePreview();
         formatCombo.SelectedIndexChanged += (_, _) => UpdatePreview();
         csvEncodingCombo.SelectedIndexChanged += (_, _) => UpdatePreview();
+        textEncodingCombo.SelectedIndexChanged += (_, _) => UpdatePreview();
         foreach (var radioButton in buttons.Concat([lineBreakRadio, noLineBreakRadio]))
         {
             radioButton.CheckedChanged += (_, _) =>
@@ -1719,12 +1742,13 @@ public sealed class MainForm : Form
     }
 
     private DataSaveOptions CurrentSaveOptions() => new(currentDataFileFormat, currentCsvEncoding,
-        currentSeparatorMode, currentNationalTextEncoding);
+        currentSeparatorMode, currentNationalTextEncoding, currentDataEncodingProfile);
 
     private void WriteData(string path, DataSaveOptions options)
     {
         var refreshNeeded = options.Format != currentDataFileFormat
-            || (options.Format == DataFileFormat.FixedLength && options.NationalEncoding != currentNationalTextEncoding);
+            || (options.Format == DataFileFormat.FixedLength && (options.NationalEncoding != currentNationalTextEncoding
+                || (options.TextEncoding ?? currentDataEncodingProfile) != currentDataEncodingProfile));
         if (options.Format == DataFileFormat.Csv)
         {
             CsvDataWriter.Write(path, fields, records, options.CsvEncoding);
@@ -1732,12 +1756,13 @@ public sealed class MainForm : Form
         else
         {
             var outputFields = BuildFieldsForNationalTextEncoding(options.NationalEncoding);
-            var structuralErrors = ValidateStructureBeforeSave(outputFields, options.NationalEncoding);
+            var structuralErrors = ValidateStructureBeforeSave(outputFields, options.NationalEncoding, options.TextEncoding);
             if (structuralErrors.Count > 0) throw new InvalidDataException(string.Join(Environment.NewLine, structuralErrors.Take(20)));
-            var errors = RecordValidator.Validate(outputFields, records, currentDataEncodingProfile);
+            var errors = RecordValidator.Validate(outputFields, records, options.TextEncoding ?? currentDataEncodingProfile, options.NationalEncoding);
             if (errors.Count > 0) throw new InvalidDataException(string.Join(Environment.NewLine, errors.Take(20)));
             FixedLengthDataWriter.Write(path, outputFields, records, options.SeparatorMode,
-                currentDataEncodingProfile, options.NationalEncoding);
+                options.TextEncoding ?? currentDataEncodingProfile, options.NationalEncoding);
+            currentDataEncodingProfile = options.TextEncoding ?? currentDataEncodingProfile;
             ApplyNationalTextEncoding(options.NationalEncoding);
             currentSeparatorMode = options.SeparatorMode;
         }
@@ -1926,7 +1951,7 @@ public sealed class MainForm : Form
     }
 
     private IReadOnlyList<string> ValidateStructureBeforeSave(IReadOnlyList<FieldDefinition> outputFields,
-        NationalTextEncoding nationalEncoding)
+        NationalTextEncoding nationalEncoding, DataEncodingProfile? textEncoding = null)
     {
         var errors = new List<string>();
         if (outputFields.Count == 0)
@@ -1948,7 +1973,7 @@ public sealed class MainForm : Form
 
             try
             {
-                FixedLengthDataWriter.EncodeRecord(outputFields, records[recordIndex], currentDataEncodingProfile, nationalEncoding);
+                FixedLengthDataWriter.EncodeRecord(outputFields, records[recordIndex], textEncoding ?? currentDataEncodingProfile, nationalEncoding);
             }
             catch (Exception ex)
             {
@@ -1968,7 +1993,7 @@ public sealed class MainForm : Form
             try { CsvDataWriter.Encode(fields, records, currentCsvEncoding); errors = []; }
             catch (Exception ex) { errors = [ex.Message]; }
         }
-        else errors = RecordValidator.Validate(fields, records, currentDataEncodingProfile);
+        else errors = RecordValidator.Validate(fields, records, currentDataEncodingProfile, currentNationalTextEncoding);
         if (errors.Count == 0)
         {
             SetStatus("検証 OK");
@@ -2460,8 +2485,7 @@ public sealed class MainForm : Form
         {
             var field = fields[fieldIndex];
             var bytes = IsCsv
-                ? (currentCsvEncoding == CsvTextEncoding.Utf8 ? new UTF8Encoding(false, true)
-                    : Encoding.GetEncoding(932, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback))
+                ? JapaneseEncodings.ForCsv(currentCsvEncoding)
                     .GetBytes(records[recordIndex][fieldIndex])
                 : FixedLengthDataWriter.EncodeField(field, records[recordIndex][fieldIndex], currentDataEncodingProfile, currentNationalTextEncoding);
             hexTextBox.Text = string.Join(" ", bytes.Select(value => value.ToString("X2")));
@@ -2716,8 +2740,10 @@ public sealed class MainForm : Form
     private string GetVisibleTextValue(FieldDefinition field, string value)
     {
         if (IsCsv) return BuildVisibleTextValue(field, value, 0);
-        var usedLength = field.Type is FieldDataType.FullWidthText or FieldDataType.HalfWidthText
-            ? value.Length : TextDataEncoding.GetByteCount(value);
+        int usedLength;
+        try { usedLength = field.Type is FieldDataType.FullWidthText or FieldDataType.HalfWidthText
+            ? value.Length : TextDataEncoding.GetByteCount(value); }
+        catch (EncoderFallbackException) { return BuildVisibleTextValue(field, value, 0); }
         return BuildVisibleTextValue(field, value, field.Length - usedLength);
     }
 
@@ -2763,6 +2789,9 @@ public sealed class MainForm : Form
     {
         if (IsCsv) return null; // CSVには固定長領域の補完・桁数検証を適用しない。
         value = value.Trim();
+        try { FixedLengthDataWriter.EncodeField(field, value, currentDataEncodingProfile, currentNationalTextEncoding); }
+        catch (EncoderFallbackException ex) { return ex.Message; }
+        catch (InvalidDataException) { /* Existing type/length messages below. */ }
         switch (field.Type)
         {
             case FieldDataType.PlainNumber:
@@ -2808,15 +2837,13 @@ public sealed class MainForm : Form
     {
         if (IsCsv)
         {
-            separatorModeTextBox.Text = $"可変長CSV / {(currentCsvEncoding == CsvTextEncoding.Utf8 ? "UTF-8" : "Shift_JIS")} / ヘッダーなし / 空白を保持";
+            separatorModeTextBox.Text = $"可変長CSV / {JapaneseEncodings.Name(currentCsvEncoding)} / ヘッダーなし / 空白を保持";
             return;
         }
         var separatorText = currentSeparatorMode == RecordSeparatorMode.None
             ? "改行なし"
             : "改行あり (CRLF/LF)";
-        var encodingText = currentXmlLayout is not null
-            ? currentXmlLayout.EncodingName
-            : currentDataEncodingProfile == DataEncodingProfile.Utf8WithNationalText ? "UTF-8" : "Shift_JIS";
+        var encodingText = JapaneseEncodings.Name(currentDataEncodingProfile);
         separatorModeTextBox.Text = $"{separatorText} / X項目: {encodingText} / 型N: {NationalTextEncodingHelper.DisplayName(currentNationalTextEncoding)}";
     }
 
@@ -2952,7 +2979,8 @@ public sealed class MainForm : Form
         RecordSeparatorMode SeparatorMode,
         NationalTextEncoding NationalTextEncoding,
         bool IsCsv = false,
-        CsvTextEncoding CsvEncoding = CsvTextEncoding.Utf8);
+        CsvTextEncoding CsvEncoding = CsvTextEncoding.Utf8,
+        DataEncodingProfile? TextEncoding = null);
 
     private sealed record FieldGridRow(
         int FieldIndex,

@@ -7,11 +7,11 @@ public static class RecordValidator
     public static IReadOnlyList<string> Validate(
         IReadOnlyList<FieldDefinition> fields,
         IReadOnlyList<List<string>> records,
-        DataEncodingProfile encodingProfile = DataEncodingProfile.ShiftJis)
+        DataEncodingProfile encodingProfile = DataEncodingProfile.ShiftJis,
+        NationalTextEncoding nationalEncoding = NationalTextEncoding.ShiftJis)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var textEncoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
-            ? Encoding.UTF8 : Encoding.GetEncoding(932);
+        var textEncoding = JapaneseEncodings.ForData(encodingProfile);
         var errors = new List<string>();
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
@@ -23,6 +23,12 @@ public static class RecordValidator
                 var value = record[fieldIndex].Trim();
                 var location = $"Rec {recordIndex + 1} / {field.Name}";
 
+                try
+                {
+                    if (field.Type is FieldDataType.Text or FieldDataType.HalfWidthText) textEncoding.GetByteCount(value);
+                    if (field.Type == FieldDataType.FullWidthText) NationalTextEncodingHelper.GetEncoding(nationalEncoding).GetByteCount(value);
+                }
+                catch (EncoderFallbackException ex) { errors.Add($"{location}: {ex.Message}"); continue; }
                 switch (field.Type)
                 {
                     case FieldDataType.PlainNumber:

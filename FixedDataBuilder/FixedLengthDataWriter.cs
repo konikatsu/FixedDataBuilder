@@ -17,7 +17,7 @@ public static class FixedLengthDataWriter
         DataEncodingProfile encodingProfile,
         NationalTextEncoding nationalTextEncoding)
     {
-        using var stream = File.Create(path);
+        using var stream = new MemoryStream();
         foreach (var record in records)
         {
             stream.Write(EncodeRecord(fields, record, encodingProfile, nationalTextEncoding));
@@ -28,6 +28,7 @@ public static class FixedLengthDataWriter
                 stream.WriteByte(0x0A);
             }
         }
+        File.WriteAllBytes(path, stream.ToArray());
     }
 
     public static byte[] EncodeRecord(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<string> record)
@@ -68,9 +69,7 @@ public static class FixedLengthDataWriter
         NationalTextEncoding nationalTextEncoding)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
-            ? Encoding.UTF8
-            : Encoding.GetEncoding(932);
+        var encoding = JapaneseEncodings.ForData(encodingProfile);
         value = value.Trim();
 
         return field.Type switch
@@ -166,15 +165,17 @@ public static class FixedLengthDataWriter
 
 public enum DataEncodingProfile
 {
-    ShiftJis,
-    Utf8WithNationalText
+    ShiftJis = 0, // Legacy MS932
+    Utf8WithNationalText = 1,
+    StrictShiftJis = 2
 }
 
 public enum NationalTextEncoding
 {
-    ShiftJis,
-    Utf16,
-    Utf32
+    ShiftJis = 0, // Legacy MS932
+    Utf16 = 1,
+    Utf32 = 2,
+    StrictShiftJis = 3
 }
 
 public static class NationalTextEncodingHelper
@@ -185,6 +186,7 @@ public static class NationalTextEncodingHelper
         return encoding switch
         {
             NationalTextEncoding.ShiftJis => Encoding.GetEncoding(932),
+            NationalTextEncoding.StrictShiftJis => StrictShiftJisEncoding.Instance,
             NationalTextEncoding.Utf16 => Encoding.Unicode,
             NationalTextEncoding.Utf32 => Encoding.UTF32,
             _ => throw new InvalidOperationException($"未対応の型N文字コードです: {encoding}")
@@ -195,7 +197,7 @@ public static class NationalTextEncodingHelper
     {
         return encoding switch
         {
-            NationalTextEncoding.ShiftJis => 2,
+            NationalTextEncoding.ShiftJis or NationalTextEncoding.StrictShiftJis => 2,
             NationalTextEncoding.Utf16 => 2,
             NationalTextEncoding.Utf32 => 4,
             _ => throw new InvalidOperationException($"未対応の型N文字コードです: {encoding}")
@@ -206,7 +208,8 @@ public static class NationalTextEncodingHelper
     {
         return encoding switch
         {
-            NationalTextEncoding.ShiftJis => "Shift_JIS",
+            NationalTextEncoding.ShiftJis => "MS932 (CP932)",
+            NationalTextEncoding.StrictShiftJis => "SJIS (JIS X 0208)",
             NationalTextEncoding.Utf16 => "UTF-16LE",
             NationalTextEncoding.Utf32 => "UTF-32LE",
             _ => encoding.ToString()

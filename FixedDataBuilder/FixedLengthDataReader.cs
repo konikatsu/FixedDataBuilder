@@ -17,9 +17,7 @@ public static class FixedLengthDataReader
         NationalTextEncoding nationalTextEncoding)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = encodingProfile == DataEncodingProfile.Utf8WithNationalText
-            ? Encoding.UTF8
-            : Encoding.GetEncoding(932);
+        var encoding = JapaneseEncodings.ForData(encodingProfile);
         var bytes = File.ReadAllBytes(path);
         var recordLength = fields.Sum(field => field.StorageByteLength);
         if (recordLength <= 0)

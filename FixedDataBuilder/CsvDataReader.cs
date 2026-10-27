@@ -2,7 +2,7 @@ using System.Text;
 
 namespace FixedDataBuilder;
 
-public enum CsvTextEncoding { Utf8, ShiftJis }
+public enum CsvTextEncoding { Utf8 = 0, ShiftJis = 1, StrictShiftJis = 2 }
 
 /// <summary>定義の物理項目順に、CSVの各列を画面の値として取り込む。</summary>
 public static class CsvDataReader
@@ -11,12 +11,7 @@ public static class CsvDataReader
         CsvTextEncoding textEncoding = CsvTextEncoding.Utf8)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = textEncoding switch
-        {
-            CsvTextEncoding.Utf8 => new UTF8Encoding(true, true),
-            CsvTextEncoding.ShiftJis => Encoding.GetEncoding(932, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback),
-            _ => throw new ArgumentOutOfRangeException(nameof(textEncoding))
-        };
+        var encoding = JapaneseEncodings.ForCsv(textEncoding);
         var columnCount = fields.Count(field => !field.IsRedefines);
         if (columnCount == 0) throw new InvalidDataException("定義書に項目がありません。");
 

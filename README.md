@@ -6,15 +6,15 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.50 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.50/FixedDataBuilder-v0.1.50-win-x64-framework-dependent.zip)
+[v0.1.51 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.51/FixedDataBuilder-v0.1.51-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.50 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.50) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.51 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.51) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
 ## 画面イメージ
 
-![FixedDataBuilder v0.1.50 のスクリーンショット（架空の5行）](docs/screen-image-main-v0.1.50.png)
+![FixedDataBuilder v0.1.51 のスクリーンショット（架空の5行）](docs/screen-image-main-v0.1.51.png)
 
 項目縦表示とレコード縦表示を切り替えできます。画面上部には選択中の定義ファイルとデータファイルのパスを表示します。最近使ったファイルは `ファイル` メニューから、定義ファイル・データファイルそれぞれ直近 20 件まで選べます。
 
@@ -26,27 +26,45 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## 文字コードの説明
 
-**半角の英字・数字は、UTF-8でもShift_JISでも同じです。** たとえば `ABC123` は同じバイト列になります。
+**半角の英字・数字は、UTF-8・SJIS・MS932で同じです。** たとえば `ABC123` は同じバイト列になります。
 
-日本語・半角カナは異なるため、ファイルの文字コードに合わせてください。メイン画面と読込・保存条件にも、この説明を表示します。
+文字コードはファイルの作成元に合わせて選んでください。CSVは `UTF-8` / `MS932 (CP932)` / `SJIS (JIS X 0208)`、固定長はX文字コードと型N文字コードをそれぞれ選択できます。
+
+| 選択 | 扱う文字 | 例 |
+| --- | --- | --- |
+| SJIS (JIS X 0208) | ASCII・半角カナ・JIS X 0208。拡張文字はエラー | 東京、ｶﾅ、波ダッシュ `〜` |
+| MS932 (CP932) | Windowsの拡張文字を含む文字コード | `①`・`髙`・`﨑`、全角チルダ `～` |
+| UTF-8 | Unicodeの文字 | 他の文字コードで表現できない文字を含むデータ |
+
+**以前の「Shift_JIS」指定はMS932相当です。** 記憶済みの条件はMS932として引き継ぐため、従来のファイルを開く際は `MS932 (CP932)` を選んでください。新しいSJISは拡張文字・外字や不正なバイトを拒否し、保存時に表現できない文字があれば保存先を変更せずエラーにします。
+
+SJISとMS932では、波ダッシュ `〜` / 全角チルダ `～` など、一部の記号のUnicodeへの対応も異なります。[詳しい変換規則](docs/character-encodings.md)を参照してください。
+
+![SJISで読み込んだ文字コード比較サンプル（架空の3行）](docs/screen-image-encoding-main-v0.1.51.png)
+
+試す場合は `samples/encoding-comparison-definition.csv` を開き、`encoding-sjis.csv` はSJIS、`encoding-ms932.csv` はMS932で読み込んでください。後者をSJISで開くと拡張文字のエラーを確認できます。
+
+![SJIS／MS932を区別する読込条件](docs/screen-image-encoding-load-v0.1.51.png)
+
+![固定長のXと型Nの文字コードを選ぶ保存条件](docs/screen-image-encoding-save-v0.1.51.png)
 
 ## 未保存の変更
 
 セルを編集したり、データ行を追加・複製・削除すると、タイトルに **【未保存】** と表示します。保存が成功すると表示が消えます。保存や再読み込みに失敗した場合は、未保存の状態を保持します。
 
-![編集中の未保存表示](docs/screen-image-unsaved-v0.1.49.png)
+![編集中の未保存表示](docs/screen-image-unsaved-v0.1.51.png)
 
 終了、別ファイルへの切り替え、全体再読込などで未保存の変更がある場合は、「保存して続ける」「保存せずに続ける」「キャンセル」を選べます。保存を取り消したり保存に失敗した場合は、元の編集画面に戻ります。
 
-![未保存の変更の確認](docs/screen-image-unsaved-confirm-v0.1.49.png)
+![未保存の変更の確認](docs/screen-image-unsaved-confirm-v0.1.51.png)
 
 ## 読込条件の記憶
 
-同じ定義とデータを開いたとき、前回正常に読み込めた条件を初期表示します。アプリを開き直しても、固定長／CSVの形式、CSV文字コード、固定長の改行区切り・型N文字コードを引き継ぎます。プレビューに「前回の読込条件」と表示し、必要なら条件を変更できます。
+同じ定義とデータを開いたとき、前回正常に読み込めた条件を初期表示します。アプリを開き直しても、固定長／CSVの形式、CSV文字コード、固定長の改行区切り・X文字コード・型N文字コードを引き継ぎます。プレビューに「前回の読込条件」と表示し、必要なら条件を変更できます。
 
 条件はこのPCに最大100組記憶します。読込をキャンセルした場合や読み込みに失敗した場合は、前回の条件を上書きしません。名前を付けて保存した場合は、その保存先と形式も記憶します。
 
-![前回の読込条件の初期表示](docs/screen-image-remembered-options-v0.1.49.png)
+![前回の読込条件の初期表示](docs/screen-image-encoding-load-v0.1.51.png)
 
 ## 再読み込み
 
@@ -73,10 +91,10 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 1. データの列順に並んだ定義書 CSV または COBOL コピー句を開きます。
 2. `ファイル → データ読込` から CSV データを選びます。ドロップする場合は、画面上部の `データファイル` 欄へ置いてください。
-3. `データ読込条件` の入力形式を `可変長 CSV（ヘッダーなし）` にし、CSV文字コードを `UTF-8` または `Shift_JIS` から選びます。`.csv` を選んだ場合は CSV が初期選択されます。
+3. `データ読込条件` の入力形式を `可変長 CSV（ヘッダーなし）` にし、CSV文字コードを `UTF-8` / `SJIS (JIS X 0208)` / `MS932 (CP932)` から選びます。`.csv` を選んだ場合は CSV が初期選択されます。
 4. プレビューを確認して `OK` を押します。
 
-![CSVデータの読込条件](docs/screen-image-csv-options-v0.1.49.png)
+![CSVデータの読込条件](docs/screen-image-csv-options-v0.1.51.png)
 
 先頭行からデータとして読み、CSVの1列目から定義の項目順に対応させます。カンマ区切り、CRLF / LF、引用符 `"..."`、引用符内のカンマ・改行、`""` で表す引用符、空欄・末尾の空欄、UTF-8のBOMあり・なしに対応します。
 
@@ -86,15 +104,15 @@ CSVで行を追加した場合も、表示項目の初期値は空欄です。�
 
 列数が定義と一致しない行や、閉じていない引用符、不正な文字コードはエラーにします。REDEFINES項目はCSVの列として数えません。ヘッダー行の自動判定や列名による並べ替えは行いません。拡張子が `.csv` の固定長データは、入力形式を `固定長` に切り替えて読み込めます。
 
-![CSVを読み込んだ画面（架空の5件）](docs/screen-image-csv-unsaved-settings-v0.1.49.png)
+![CSVを読み込んだ画面（架空の5件）](docs/screen-image-csv-main-v0.1.51.png)
 
 `ファイル → 名前を付けて保存` の `データ保存条件` で、出力形式を `固定長` / `可変長 CSV（ヘッダーなし）` から選べます。読み込んだ形式が初期選択されます。`上書き保存` は現在の形式・文字コードを維持します。
 
-![CSVデータの保存条件](docs/screen-image-csv-save-options-v0.1.49.png)
+![CSVデータの保存条件](docs/screen-image-csv-save-options-v0.1.51.png)
 
-CSV保存は全列を引用符で囲み、引用符を `""` に変換し、CRLFで改行します。UTF-8はBOMなし、Shift_JISも選べます。CSVの値は保持しますが、引用符や改行の書き方まで入力ファイルと同一になるわけではありません。選択した文字コードで表現できない文字はエラーにし、既存の出力先を変更しません。非表示項目も出力します。
+CSV保存は全列を引用符で囲み、引用符を `""` に変換し、CRLFで改行します。UTF-8はBOMなし、SJIS・MS932も選べます。CSVの値は保持しますが、引用符や改行の書き方まで入力ファイルと同一になるわけではありません。選択した文字コードで表現できない文字はエラーにし、既存の出力先を変更しません。非表示項目も出力します。
 
-固定長を選んだ場合は、従来どおり定義桁数を検証し、空白・ゼロで補完して保存します。CSVモードでは固定長の桁数検証を適用しません。CSVと固定長の相互変換も保存時に選べます。固定長出力の通常の文字コードは従来の定義に従い、CSVの文字コードとは独立しています。
+固定長を選んだ場合は、従来どおり定義桁数を検証し、空白・ゼロで補完して保存します。CSVモードでは固定長の桁数検証を適用しません。CSVと固定長の相互変換も保存時に選べます。固定長出力のX文字コードは定義ごとの従来値を初期表示し、保存条件でSJIS・MS932・UTF-8に切り替えられます。CSV文字コードと型N文字コードは独立しています。
 
 同梱の `samples/csv-import-definition.csv` と `samples/csv-import-data-utf8.csv` で試せます。
 
@@ -114,11 +132,11 @@ Excelへ出力した見出し・行番号・項目名・定義欄は、水色の
 
 ## 配布形式・動作確認
 
-最新版 **v0.1.50** では、定義ファイル選択画面の候補表示を整理しました。CSV・COBOLコピー句の選択、未保存表示、読込条件の記憶、定義だけの再読み込みなどを利用できます。
+最新版 **v0.1.51** では、SJISとMS932を別々に選べるようにしました。CSV・固定長のX項目・型Nに対応し、読込条件の記憶・再読込・保存・HEX表示にも選択を反映します。
 
 今後の配布は軽量版に統一します。公開する軽量版は、Smart App ControlがONの環境で製品EXEからメイン画面が開くことを確認したファイルです。ダウンロード後の別PCでの起動確認は、利用者側で行います。
 
-v0.1.50は80件の自動テストに成功しました。未保存時の保存・破棄・キャンセル、アプリを開き直したときの読込条件の復元、定義だけの再読み込みでのデータ保持などを確認しています。テストと同じ製品DLLを使用し、Smart App ControlがONの環境で軽量版の製品EXEからメイン画面が開くことを確認しました。
+v0.1.51は92件の自動テストに成功しました。既存80件に加え、SJIS全7,070文字コードの独立した変換結果との一致、拡張文字・記号の違い、読込条件の復元、保存失敗時のファイル保持などを確認しています。テストと同じ製品DLLを使用し、Smart App ControlがONの環境で軽量版の製品EXEからメイン画面が開くことを確認しました。
 
 zip を展開して `FixedDataBuilder.exe` を実行してください。zip には `samples/` 配下のサンプル定義・サンプルデータも同梱しています。
 
@@ -161,7 +179,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - `REDEFINES` は物理レコード長には加算せず、保存時は重複領域として書き出しません。画面の表示対象からは除外します
 - 66 レベル、88 レベルは固定長データ項目ではないため読み飛ばします
 - 英字の COBOL 項目名は内蔵辞書で可能な範囲だけ日本語表示名に変換します
-- コピー句由来のデータ読み込みでは、X/9/S9/COMP-3 は UTF-8、N 項目はデータ読み込み時に選択した文字コードで読み込みます
+- コピー句由来のデータ読み込みでは、X/9/S9は既定UTF-8で、読込条件のX文字コードで変更できます。N項目は別に選択した文字コード、COMP-3はバイナリとして読み込みます
 
 対応している COBOL 表記:
 
@@ -169,7 +187,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - `S9(n)`: 符号付き数字
 - `9(nVm)`: 小数桁付き符号なし数字
 - `S9(nVm)`: 小数桁付き符号付き数字
-- `X(n)`: 半角文字、Shift_JIS の n バイト領域
+- `X(n)`: 文字項目、選択した文字コードの n バイト領域
 - `N(n)`: 全角文字、全角 n 文字領域
 - `9(n) COMP-3`: 符号なし packed decimal
 - `S9(n) COMP-3`: 符号付き packed decimal
@@ -182,12 +200,12 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - 定義書 CSV 作成時、文字型の小数桁は入力不可
 - `定義作成` は空の新規作成、`定義修正` は読み込み済み定義の編集
 - 固定長データ読み込み
-- 可変長 CSV データの読み込み・保存（定義の項目順、ヘッダーなし、UTF-8 / Shift_JIS、空白を保持）
+- 可変長 CSV データの読み込み・保存（定義の項目順、ヘッダーなし、UTF-8 / SJIS / MS932、空白を保持）
 - 定義・データ・Excel のドラッグ＆ドロップ読み込みと、定義＋データの同時ドロップ
-- 読み込み時の改行あり / 改行なしと型N文字コード選択。`データ読込条件` 画面で、`Shift_JIS` / `UTF-16LE` / `UTF-32LE` を選べます。既定値は `Shift_JIS` です
+- 読み込み時の改行あり / 改行なしと型N文字コード選択。`データ読込条件` 画面で、`MS932 (CP932)` / `SJIS (JIS X 0208)` / `UTF-16LE` / `UTF-32LE` を選べます。型Nの既定値は従来と同じMS932です
 - `データ読込条件` 画面で、選択中の条件によるデータプレビューを確認できます
 
-![データ読込条件画面](docs/screen-image-data-load-options-v0.1.31.png)
+![データ読込条件画面](docs/screen-image-encoding-load-v0.1.51.png)
 - 保存時に読み込み時の改行形式を継承
 - 上書き保存 / 名前を付けて保存
 - 項目縦表示 / レコード縦表示の切り替え
@@ -207,7 +225,7 @@ COBOL コピー句（`.cbl` / `.cpy`）も定義ファイルとして読み込�
 - 画面表示形式の Excel 出力
 - Excel 出力後に作成したブックを開く
 - FixedDataBuilder が出力した Excel の取り込み
-- 定義に応じた Shift_JIS / UTF-8 の固定長データ保存
+- SJIS / MS932 / UTF-8 を選べる固定長データ保存
 - `N(n)` の未入力値は全角スペースで保存
 - `S9(n)` / `S9(nVm)` の表示数値は末尾桁の ASCII ゾーン符号で保存
 - COMP-3 / packed decimal の暫定エンコード・デコード
@@ -234,7 +252,7 @@ S9(3) COMP-3  -123 -> 12 3D
 
 ### CSV 定義サンプル
 
-まずは `samples/basic-definition.csv` と `samples/basic-data-sjis-crlf.dat` を読み込んでください。Shift_JIS 前提、改行ありの固定長データです。
+まずは `samples/basic-definition.csv` と `samples/basic-data-sjis-crlf.dat` を読み込んでください。MS932（以前のShift_JIS指定）前提、改行ありの固定長データです。
 
 ```csv
 ジナン,JINAN,7,6.7,100
@@ -250,14 +268,14 @@ S9(3) COMP-3  -123 -> 12 3D
 
 - コピー句ファイルは UTF-8 です
 - データファイル名の `crlf` は `改行あり (CRLF/LF)`、`none` は `改行なし` を表します
-- データファイル名の `n-utf16le` / `n-utf32le` / `n-sjis` は、型N文字コードの選択値を表します
+- データファイル名の `n-utf16le` / `n-utf32le` / `n-sjis` は、型N文字コードの選択値を表します（既存の `n-sjis` サンプルはMS932を選択）
 - 型Nは固定長領域として扱うため、可変長のUTF-8は選択肢から外しています
 - 以下の表にない組み合わせは、エラーまたは文字化けになります
 
 | 用途 | 定義ファイル | データファイル | 改行区切り | 型N文字コード |
 | --- | --- | --- | --- | --- |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |
-| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-sjis-n-sjis.dat` | 改行なし | Shift_JIS |
+| 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-sjis-n-sjis.dat` | 改行なし | MS932 (CP932) |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf16le.dat` | 改行なし | UTF-16LE |
 | 基本コピー句 | `copybook-basic-definition.cbl` | `copybook-basic-data-none-utf8-n-utf32le.dat` | 改行なし | UTF-32LE |
 | 基本項目OCCURS | `copybook-occurs-definition.cbl` | `copybook-occurs-data-crlf-utf8-n-utf16le.dat` | 改行あり (CRLF/LF) | UTF-16LE |

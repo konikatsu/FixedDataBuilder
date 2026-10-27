@@ -69,6 +69,25 @@ internal static partial class Program
                 Capture(displayForm, args[4], expectedHex: null);
                 return 0;
             }
+            if (args.Length >= 5 && args[1] == "--capture-encodings")
+            {
+                var definition = Path.Combine(repo, "samples", "encoding-comparison-definition.csv");
+                var data = Path.Combine(repo, "samples", "encoding-sjis.csv");
+                var store = new DataLoadSettingsStore(Path.Combine(temporaryDirectory, "capture-encoding-settings.json"));
+                store.Remember(definition, data, new DataLoadSettings(DataFileFormat.Csv, CsvTextEncoding.StrictShiftJis,
+                    RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.StrictShiftJis, DataEncodingProfile.StrictShiftJis));
+                using var form = new MainForm(["--definition", definition, "--data", data, "--format", "csv", "--csv-encoding", "sjis", "--layout", "record"], store);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（文字コード比較用サンプル定義）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "encoding-sjis.csv（架空データ3行）";
+                Capture(form, args[2], expectedHex: null);
+                using var load = new MainForm(["--definition", definition], store);
+                WithDialog("データ読込条件", DialogResult.Cancel, () => Invoke(load, "LoadDataFromPath", data, "読込完了"),
+                    dialog => Capture(dialog, args[3], expectedHex: null));
+                using var save = new DataSaveOptionsForm(new DataSaveOptions(DataFileFormat.FixedLength, CsvTextEncoding.StrictShiftJis,
+                    RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.StrictShiftJis, DataEncodingProfile.StrictShiftJis));
+                Capture(save, args[4], expectedHex: null);
+                return 0;
+            }
             var sample = Path.Combine(repo, "samples", "generic-xml-definition.xml");
             var layouts = XmlDefinitionReader.Read(sample);
             var customer = layouts.Single(layout => layout.Id == "customer-fixed");
@@ -224,6 +243,7 @@ internal static partial class Program
             RunReloadTests(repo);
             RunHeaderRowsTests(repo);
             RunUnsavedAndSettingsTests(repo);
+            RunJapaneseEncodingTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

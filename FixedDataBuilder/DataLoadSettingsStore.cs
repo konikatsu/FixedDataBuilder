@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace FixedDataBuilder;
 
 public sealed record DataLoadSettings(DataFileFormat Format, CsvTextEncoding CsvEncoding,
-    RecordSeparatorMode SeparatorMode, NationalTextEncoding NationalEncoding);
+    RecordSeparatorMode SeparatorMode, NationalTextEncoding NationalEncoding, DataEncodingProfile? TextEncoding = null);
 
 public sealed class DataLoadSettingsStore(string path)
 {
@@ -60,7 +60,8 @@ public sealed class DataLoadSettingsStore(string path)
                 .Where(entry => entry is not null && entry.DefinitionPath is not null && entry.DataPath is not null
                     && entry.Settings is not null && Enum.IsDefined(entry.Settings.Format)
                     && Enum.IsDefined(entry.Settings.CsvEncoding) && Enum.IsDefined(entry.Settings.SeparatorMode)
-                    && Enum.IsDefined(entry.Settings.NationalEncoding)).Take(100).ToList();
+                    && Enum.IsDefined(entry.Settings.NationalEncoding)
+                    && (entry.Settings.TextEncoding is null || Enum.IsDefined(entry.Settings.TextEncoding.Value))).Take(100).ToList();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {

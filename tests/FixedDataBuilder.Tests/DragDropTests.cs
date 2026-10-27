@@ -158,7 +158,7 @@ internal static partial class Program
             var previousFields = Get<List<FieldDefinition>>(form, "fields").ToArray();
             var bad = Path.Combine(temporaryDirectory, "bad.dat");
             File.WriteAllBytes(bad, [0x41]);
-            Throws<TargetInvocationException>(() => Invoke(form, "LoadData", bad, RecordSeparatorMode.None, NationalTextEncoding.Utf32));
+            Throws<TargetInvocationException>(() => Invoke(form, "LoadData", bad, RecordSeparatorMode.None, NationalTextEncoding.Utf32, null));
             Equal(true, previousRecords.SequenceEqual(Get<List<List<string>>>(form, "records")));
             Equal(true, previousFields.SequenceEqual(Get<List<FieldDefinition>>(form, "fields")));
             Equal(NationalTextEncoding.ShiftJis, Get<NationalTextEncoding>(form, "currentNationalTextEncoding"));

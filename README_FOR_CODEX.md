@@ -1,5 +1,13 @@
 # README_FOR_CODEX
 
+## v0.1.51：SJISとMS932を明示的に分離
+
+- ユーザーの指示でCSV・固定長X・型Nに厳密なSJISを追加。既存のenum ShiftJisと保存設定の数値はMS932として維持し、StrictShiftJisを末尾へ追加。新しいSJISではベストフィット・代替文字を使わず、拡張文字・外字・未定義・不正な末尾バイトを拒否。ASCII/JIS0201カナ/JIS0208の全7070コード、Unicode記号差分を処理する。元のUnicode表ファイル自体は配布しない。規則と出典はdocs/character-encodings.md。
+- 固定長Xの選択も読込・保存画面へ追加。DataLoadSettingsに省略可能なTextEncodingを追加し、古い設定は従来の初期値へ。SJIS選択はHEX・検証・F5・再起動でも保持。CLIのsjisは厳密SJIS、既存MS932用途はms932/cp932を使う。固定長出力は全レコードを変換してから保存し、SJIS変換失敗で既存ファイルを壊さない。編集途中の変換不能値は描画でき、エラーとして修正可能。
+- 既存80件＋新規12件で92件成功。7070コードを独立したCPython shift_jisのSHA256期待値と照合し往復確認。拡張文字・記号差分・StreamReaderバッファ境界・EOF・保存失敗時保持・旧設定互換・GUIプレビュー切替・SJISからMS932への保存変換・F5を確認。テスト用のDataSaveOptionsの期待値とLoadData呼出し引数を新規プロパティに合わせた。
+- 最終製品DLLをpublish --no-build。テスト側とSHA256一致。Smart App Control Onで製品EXEからv0.1.51のメイン画面が開き、PC側.NET8.0.32を使用。EXE=8AD5E3CE7C8CEA0AC01A96DBA913E64E02FF604BD4154872043C02A3A2DF458C、DLL=BBF3DC8450737322E114ABF099B6EF5CDE0D4533D973850EAD6FF19633E378FA。証拠はreviews/sjis-ms932-v0.1.51/v001。起動後は再ビルドしない。
+- README冒頭は従来の架空5行構成を保持して撮り直し、SJIS比較3行と読込・固定長保存・CSV保存画面を追加。公開用3サンプル追加。実データ・reviewsは公開しない。隠し機能の説明を公開READMEへ再掲載しない。軽量版だけ公開、利用者が別PCのダウンロード後起動を確認。公開Releaseは51/50/49の3つを残し、48だけを保管検証後に削除、タグ履歴ローカルは保持。
+
 ## v0.1.50：通常の定義ファイル選択から隠し機能の表記を除く
 
 - ユーザーが定義取込時の「汎用XML」を見せたくないと指示し、隠し機能であると再確認。OpenDefinitionのフィルターからXML専用候補と*.xmlを削除した。通常はCSV・COBOLコピー句・すべてのファイルだけを案内する。

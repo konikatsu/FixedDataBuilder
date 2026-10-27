@@ -139,7 +139,7 @@ internal static partial class Program
             Get<HashSet<int>>(form, "hiddenFieldIndexes").Add(3);
             var csvOptions = new DataSaveOptions(DataFileFormat.Csv, CsvTextEncoding.Utf8, RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis);
             using var dialog = new DataSaveOptionsForm(csvOptions);
-            Equal(csvOptions, dialog.Options);
+            Equal(csvOptions with { TextEncoding = DataEncodingProfile.ShiftJis }, dialog.Options);
             var combos = Descendants(dialog).OfType<ComboBox>().ToDictionary(control => control.Name);
             Equal(true, combos["CsvEncoding"].Enabled);
             Equal(false, combos["NationalEncoding"].Enabled);

@@ -14,12 +14,7 @@ public static class CsvDataWriter
         IReadOnlyList<List<string>> records, CsvTextEncoding textEncoding = CsvTextEncoding.Utf8)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = textEncoding switch
-        {
-            CsvTextEncoding.Utf8 => new UTF8Encoding(false, true),
-            CsvTextEncoding.ShiftJis => Encoding.GetEncoding(932, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback),
-            _ => throw new ArgumentOutOfRangeException(nameof(textEncoding))
-        };
+        var encoding = JapaneseEncodings.ForCsv(textEncoding);
         var indexes = fields.Select((field, index) => (field, index))
             .Where(item => !item.field.IsRedefines).Select(item => item.index).ToArray();
         if (indexes.Length == 0) throw new InvalidDataException("定義書に項目がありません。");
