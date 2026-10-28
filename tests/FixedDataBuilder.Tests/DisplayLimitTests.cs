@@ -52,6 +52,34 @@ internal static partial class Program
             Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(false, 100, 20, true, 8));
             Equal(null, Invoke(form, "WrappedDisplayLines", row, 1));
         });
+        Test("Fixed-length display truncation preserves saved bytes, Excel and HEX in both grid layouts", () =>
+        {
+            foreach (var recordRows in new[] { false, true })
+            {
+                using var form = CreateCellDisplayForm(recordRows);
+                var grid = Get<DataGridView>(form, "grid");
+                var row = recordRows ? (int)Invoke(form, "RecordRowsDataStartIndex")! : 0;
+                var column = recordRows ? 1 : 2;
+                grid.CurrentCell = grid[column, row];
+                Invoke(form, "UpdateHexView");
+                var originalValue = grid[column, row].Value;
+                var hex = Get<TextBox>(form, "hexTextBox").Text;
+                var excel = (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(form, "BuildExcelRows")!;
+                var before = Path.Combine(temporaryDirectory, $"limit-fixed-before-{recordRows}.dat");
+                var after = Path.Combine(temporaryDirectory, $"limit-fixed-after-{recordRows}.dat");
+                var saveOptions = Invoke(form, "CurrentSaveOptions");
+                Invoke(form, "WriteData", before, saveOptions);
+                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 1, 10, true, 12));
+                Equal("1234567890|12…", string.Join("|", (IReadOnlyList<string>)Invoke(form, "WrappedDisplayLines", row, column)!));
+                Equal(originalValue, grid[column, row].Value);
+                Equal(hex, Get<TextBox>(form, "hexTextBox").Text);
+                var afterExcel = (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(form, "BuildExcelRows")!;
+                Equal(true, excel.SelectMany(r => r).SequenceEqual(afterExcel.SelectMany(r => r)));
+                Invoke(form, "WriteData", after, saveOptions);
+                Equal(true, File.ReadAllBytes(before).SequenceEqual(File.ReadAllBytes(after)));
+                Equal(false, Get<bool>(form, "hasUnsavedChanges"));
+            }
+        });
         Test("Display limit form keeps character and byte limits separate and honors enable toggles", () =>
         {
             using var dialog = new DisplayWrapOptionsForm(new DisplayWrapOptions(false, 20, 10, true, 12));

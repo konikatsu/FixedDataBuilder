@@ -31,7 +31,7 @@ public sealed class DisplayWrapOptionsForm : Form
         var line = new Label { Text = "1行の長さ（バイト）", AutoSize = true, Location = new Point(20, 104) };
         var help = new Label
         {
-            Text = "例：20バイト以上を20バイトごとに折り返す。\r\n文字数の上限を超えた部分は画面だけ省略し、末尾に…を表示。\r\n日本語・絵文字などの文字の途中では分割しません。\r\n行高は自動調整します（手動指定行を除く）。保存・HEXは元の値です。",
+            Text = "例：20バイト以上を20バイトごとに折り返す。\r\n文字数の上限を超えた部分は画面だけ省略し、末尾に…を表示。\r\n日本語・絵文字などの文字の途中では分割しません。\r\n行高は自動調整します。保存・Excel出力・HEXは元の値です。",
             Location = new Point(20, 228), Size = new Size(510, 76)
         };
         var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(350, 333), Width = 80 };

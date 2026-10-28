@@ -90,7 +90,7 @@ internal static partial class Program
                 Capture(save, args[4], expectedHex: null);
                 return 0;
             }
-            if (args.Length >= 7 && args[1] == "--capture-resize")
+            if (args.Length >= 6 && args[1] == "--capture-hex-pane")
             {
                 using var form = CreateCellDisplayForm(recordRows: true);
                 Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
@@ -99,12 +99,22 @@ internal static partial class Program
                 var split = Get<SplitContainer>(form, "dataHexSplit");
                 split.SplitterDistance = split.Height - split.SplitterWidth - 200;
                 Capture(form, args[3], expectedHex: null);
-                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 20, 20, true, 12));
+                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 20, 10, true, 12));
                 Capture(form, args[4], expectedHex: null);
-                using var wrap = new DisplayWrapOptionsForm(new DisplayWrapOptions(true, 20, 20, true, 12));
-                Capture(wrap, args[5], expectedHex: null);
-                WithDialog("選択行の高さ", DialogResult.Cancel, () => Invoke(form, "ChooseSelectedRowHeight"),
-                    dialog => Capture(dialog, args[6], expectedHex: null));
+                using var dialog = new DisplayWrapOptionsForm(new DisplayWrapOptions(true, 20, 10, true, 12));
+                Capture(dialog, args[5], expectedHex: null);
+                return 0;
+            }
+            if (args.Length >= 5 && args[1] == "--capture-display-limit")
+            {
+                using var form = CreateCellDisplayForm(recordRows: true);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "（架空データ・5行）";
+                Capture(form, args[2], expectedHex: null);
+                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 20, 10, true, 12));
+                Capture(form, args[3], expectedHex: null);
+                using var dialog = new DisplayWrapOptionsForm(new DisplayWrapOptions(true, 20, 10, true, 12));
+                Capture(dialog, args[4], expectedHex: null);
                 return 0;
             }
             var sample = Path.Combine(repo, "samples", "generic-xml-definition.xml");
@@ -266,8 +276,8 @@ internal static partial class Program
             RunCsvHeaderTests(repo);
             RunDisplayWrapTests(repo);
             RunSpaceAndZoomTests(repo);
-            RunPaneAndRowHeightTests(repo);
             RunDisplayLimitTests(repo);
+            RunHexPaneResizeTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

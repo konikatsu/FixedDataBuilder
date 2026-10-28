@@ -53,7 +53,6 @@ public sealed class MainForm : Form
         SplitterWidth = 6, SplitterDistance = 362, Panel1MinSize = 100, Panel2MinSize = 64,
         FixedPanel = FixedPanel.Panel2, Dock = DockStyle.Fill, BackColor = SystemColors.ControlDark
     };
-    private readonly HashSet<int> manualHeightRows = [];
     private readonly MenuStrip menuStrip = new();
     private readonly ToolStripMenuItem recentDefinitionFilesMenu = new("最近使った定義ファイル");
     private readonly ToolStripMenuItem recentDataFilesMenu = new("最近使ったデータファイル");
@@ -421,10 +420,7 @@ public sealed class MainForm : Form
             CreateMenuItem("縮小", (_, _) => ChangeZoomFromWheel(-120)),
             new ToolStripSeparator(),
             wrapDisplayButton,
-            CreateMenuItem("折り返し表示設定...", (_, _) => ChooseDisplayWrapOptions()),
-            new ToolStripSeparator(),
-            CreateMenuItem("選択行の高さ...", (_, _) => ChooseSelectedRowHeight()),
-            CreateMenuItem("選択行の高さを自動調整", (_, _) => ResetSelectedRowHeights())));
+            CreateMenuItem("折り返し表示設定...", (_, _) => ChooseDisplayWrapOptions())));
         menuStrip.Items.Add(CreateMenu("ツール",
             CreateMenuItem("検証", (_, _) => ValidateRecords(showSuccess: true))));
         RefreshRecentFileItems();
@@ -451,7 +447,7 @@ public sealed class MainForm : Form
         grid.AllowUserToDeleteRows = false;
         grid.RowHeadersVisible = false;
         grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
-        grid.MultiSelect = true;
+        grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
         grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
@@ -542,7 +538,6 @@ public sealed class MainForm : Form
         if (!displayWrapOptions.Enabled) return;
         foreach (DataGridViewRow row in grid.Rows)
         {
-            if (manualHeightRows.Contains(row.Index)) continue;
             var height = grid.RowTemplate.Height;
             foreach (DataGridViewCell cell in row.Cells)
             {
@@ -603,48 +598,6 @@ public sealed class MainForm : Form
         }
         e.Handled = true;
         return true;
-    }
-
-    private bool IsDataGridRow(int row) => row >= 0 && row < grid.Rows.Count
-        && (layout == GridLayout.RecordRows ? RecordIndexFromGridRow(row) >= 0 : FieldIndexFromFieldRow(row) >= 0);
-
-    private List<int> SelectedDataRows()
-    {
-        var rows = grid.SelectedCells.Cast<DataGridViewCell>().Select(cell => cell.RowIndex)
-            .Where(IsDataGridRow).Distinct().Order().ToList();
-        if (rows.Count == 0 && grid.SelectedCells.Count == 0 && grid.CurrentCell is not null && IsDataGridRow(grid.CurrentCell.RowIndex))
-            rows.Add(grid.CurrentCell.RowIndex);
-        return rows;
-    }
-
-    private void ChooseSelectedRowHeight()
-    {
-        if (!grid.EndEdit()) return;
-        var rows = SelectedDataRows();
-        if (rows.Count == 0) { SetStatus("高さを変更するデータ行を選択してください。"); return; }
-        using var form = new RowHeightOptionsForm(rows.Count, grid.Rows[rows[0]].Height);
-        if (form.ShowDialog(this) == DialogResult.OK) SetSelectedRowHeight(form.RowHeight);
-    }
-
-    private void SetSelectedRowHeight(int height)
-    {
-        foreach (var row in SelectedDataRows())
-        {
-            manualHeightRows.Add(row);
-            grid.Rows[row].Height = Math.Clamp(height, grid.Rows[row].MinimumHeight, 65536);
-        }
-        grid.Invalidate();
-    }
-
-    private void ResetSelectedRowHeights()
-    {
-        foreach (var row in SelectedDataRows())
-        {
-            manualHeightRows.Remove(row);
-            grid.Rows[row].Height = grid.RowTemplate.Height;
-        }
-        AdjustWrappedRowHeights();
-        grid.Invalidate();
     }
 
     private void ChooseVisibleFields()
@@ -828,7 +781,7 @@ public sealed class MainForm : Form
         grid.RowTemplate.Height = Math.Max(22, grid.Font.Height + 8);
         foreach (DataGridViewRow row in grid.Rows)
         {
-            if (!manualHeightRows.Contains(row.Index)) row.Height = grid.RowTemplate.Height;
+            row.Height = grid.RowTemplate.Height;
         }
         AdjustWrappedRowHeights();
     }
@@ -2459,7 +2412,6 @@ public sealed class MainForm : Form
         try
         {
             NormalizeRecords();
-            manualHeightRows.Clear();
             grid.Columns.Clear();
             grid.Rows.Clear();
             fieldGridRows.Clear();

@@ -1,21 +1,22 @@
 # README_FOR_CODEX
 
-## v0.1.54：PC再起動後の利用者起動確認と公開
+## v0.1.56：v0.1.55に選択項目HEXエリアの高さ調整を追加
 
-- 利用者がPC再起動後に起動できたと直接報告し、GitHub公開を依頼。詳しいREADME確認とテストは後回しでよいとの指示。直前に開始済みの同一ネイティブ検証EXEは全129件成功・終了0・stderr空で完了した。
-- 製品EXE/DLLは初回拒否時からハッシュ不変、再ビルドせず軽量版を公開。EXE SHA256=8D6656B1938DDBF85A063FA7D6BDDC023C38CD9B5B1EF5C98AB4825C0773CD03、DLL SHA256=0A960BCE9528DD580583EC8569D287B665DFB522C331E7D6E0D4C11A2E4F4BE3。原因を再起動だけに断定しない。
-- READMEは配布リンクと公開状況のみ更新。画像・詳細確認は利用者指示で後日。公開Releaseは54/53/52の3版を保持し、51のReleaseを保管検証後に削除、タグ・履歴・ローカルは維持。証拠reviews/resizable-hex-pane-v0.1.54/v001。
+- 利用者がv55の起動OKを報告し、v55へ選択項目エリア高さ調整だけを追加したv56の作成とpushを依頼。基点c8df26eb1b6999113a70d28812ecda503631abd8。製品差分はMainFormとcsproj版数の2ファイル。v54の複数行選択・一括行高・manualHeightRows・RowHeightOptionsFormは含めない。
+- gridとHEXを水平SplitContainer（DataHexSplit）へ配置。境界6px、上最小100/下最小64、初期下82px、FixedPanel.Panel2、メイン最小720x420。ウィンドウ拡大時に調整後の下部高さを維持。選択・データ・HEX・dirty・文字数上限を保持する。高さは起動中の表示設定。
+- 全128件成功（既存126＋サイズ変更/最小サイズ等2件）、終了0・stderr空。警告0・エラー0でビルドしpublish --no-build、テストと配布DLL一致。SAC Onで通常の製品EXEからv56主画面表示、PC側.NET8.0.32使用。EXE SHA256=B00F1D8B00BDF511BFBADE562BFA11375012B8442EC2586ED21BB23632F48844、DLL SHA256=F1D6A1C7FF683596997F00E01C62F76A959D10C6A1D0231C32777EA4B8B97CA2。起動後は再ビルドしない。別PC起動は未確認と明記。
+- 同じテストEXEで実フォームの従来架空5行を撮影。通常・HEX拡大・表示上限・設定の4枚をREADMEへ反映。生業務データ・SACログ・レビューはコミットしない。証拠reviews/hex-pane-v0.1.56/v001。
+- 確認済み5ファイルと公開サンプル35を軽量版ZIPへ。GitHubの公開版は56/54/53を保持、52のReleaseだけローカル保管検証後に削除、タグ・履歴は維持。v55は未公開であるため新規に公開しない。mainにv54履歴を残しつつ、最終ツリーはv55基点の本ブランチと完全一致させる。
+- v54のClaude Code Opus5.5 highレビューはv004に完了。先行v55メモの進行中・起動未確認は当時の記録であり、最新状態は本節を参照。
 
 
-## v0.1.54：HEX高さ変更・選択行の一括高さ・表示文字数上限（確認中）
+## v0.1.55：v0.1.53をベースに表示文字数上限だけ追加
 
-- ユーザーが下部の選択項目表示エリアの高さ変更を依頼し、続けて複数行の高さの一括変更、折り返し時の表示文字数による切捨てを追加依頼。54にまとめる。
-- MainFormのgridとHEXエリアを水平SplitContainer（DataHexSplit）へ移動。Panel1にgrid、Panel2にHEX。SplitterWidth6、上最小100px・下最小64px、FixedPanel.Panel2で調整後の下の高さをウィンドウ拡大時に維持。初期下82px、メイン最小720x420。データ・描画・HEX・空白数の処理は継承。
-- MultiSelect=true、CellSelectを維持。Ctrl/Shiftで選択したセルの行番号を重複除外し、「表示→選択行の高さ...」で一括指定。「選択行の高さを自動調整」で指定を解除。manualHeightRowsで明示的な高さを保持し、通常のフォント・折り返し再計算は手動行を上書きしない。RefreshGridによる再読込・方向切替・行追加削除などの再構築では指定を解除し、行番号ずれを防ぐ。見出し/OCCURS帯は対象外。行削除などの既存コマンドを複数行処理に拡張しない。
-- DisplayWrapOptionsへ省略可能なLimitDisplay=false・MaxCharacters=100を追加。設定フォームで別の文字数上限を指定。表示だけに適用し、StringInfoによるUnicodeテキスト要素を分割しない。元値から先頭N文字を使い、末尾に…を付ける（記号はN文字に含めない）。バイト閾値未満でも文字数上限は適用し、折り返しOFFでは適用しない。省略済み表示へ固定長の補完空白を足さず、元のセル値・HEX・Excel・保存・空白数には影響させない。
-- 121件＋新規8件=129件を用意。SplitContainerの高さ・最小サイズ、選択維持、複数行高さ・取消・自動復帰、再構築時リセット、文字数上限・Unicode・CSV/Excel/HEX/空白数の原値保持を確認するテストを追加。既存の折り返し設定試験はチェックボックスをWrapEnabled名で特定するよう更新。--capture-resizeは既存の5行構成で通常・HEX拡大・省略・設定・行高の実フォーム画像を取得する。
-- 警告0・エラー0でビルドしたが、初回の検証EXE・製品EXEともSAC Onで拒否。129件未実行、起動未確認。EXE SHA256=8D6656B1938DDBF85A063FA7D6BDDC023C38CD9B5B1EF5C98AB4825C0773CD03、DLL SHA256=0A960BCE9528DD580583EC8569D287B665DFB522C331E7D6E0D4C11A2E4F4BE3。ローカルreviews/resizable-hex-pane-v0.1.54/v001/publish/framework-dependent/。publish --no-buildでテスト側DLLと一致を確認。startup-v001.jsonとCodeIntegrity記録を保存。
-- 前回53では同一ファイルを利用者が開いた後、こちらの通常実行でも通ったため、今回も同じファイルの利用者側起動結果をasyncで確認したが、利用者も「ブロックされた」と回答。54は公開保留とし、追加の実行や回避用ビルドは行わない。再ビルドや実行ホストの変更で回避はしない。確認前はmain・release/・公開版53と最新3版53/52/51を維持し、未確認EXEを公開しない。業務データ・reviewsはコミットしない。READMEには現状と使い方を記載し、撮影前の54の画像を捏造しない。公開文書へ隠し機能を記載しない。
+- 利用者がv53をベースに、表示文字数の上限と省略記号だけを追加したv55を依頼。v54のSplitContainer、最小画面サイズ、MultiSelect、一括行高、manualHeightRows、RowHeightOptionsFormは含めない。基点f39af9ba3d918ede25719f36018f21f09f603566。製品差分はMainFormのWrappedDisplayLines、DisplayWrapOptionsForm、csproj版数の3ファイルだけ。
+- 表示上限は折り返しON中だけ有効。Unicodeテキスト要素単位、末尾…は文字数外、切り捨て済みの値に固定長補完空白を足さない。元値・編集・固定長/CSV保存・Excel・HEX・空白数を維持。手動行高の機能はなく従来の自動行高を使う。
+- 警告0・エラー0でビルド、全126件成功・終了0・stderr空。新規5件でCSV原値・Unicode・条件/UI、固定長の両方向で保存バイト/Excel/HEX維持を確認。publish --no-buildでテストDLL一致。SAC Onで通常の製品EXEからv55主画面表示、PC側.NET8.0.32を使用。Hidden起動は主画面確認できず、同じファイルをNormal起動して確認した。再ビルドなし。
+- EXE SHA256=E11590F042877646D0CFE3BDE17B1DF3C91F6D7E3C579B322AB1B4DB3B814F42、DLL SHA256=7A03B0A9346114E7AF4DC2E2BC75E8DA7290600281640232037B95A79A66FCE9。証拠reviews/display-limit-v0.1.55/v001。確認用フォルダーとZIPをC:/dev/FixedDataBuilder直下へ作成。別PC確認は未了。GitHub Releaseとmainの配布物はまだ変更しない。ソースブランチだけpushする。
+- README画像は同じテストEXEから従来の架空5行を実フォーム撮影し、通常・文字数上限・設定の3枚を更新。隠し機能を公開文書へ追加しない。v54のSACレビューはClaude Code Opus5.5 highで別途進行中、reviews/resizable-hex-pane-v0.1.54/v004。
 
 
 ## v0.1.53：利用者の起動確認後、同一ファイルで121件成功・公開
