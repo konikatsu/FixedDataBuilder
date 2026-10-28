@@ -6,15 +6,15 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.53 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.53/FixedDataBuilder-v0.1.53-win-x64-framework-dependent.zip)
+[v0.1.54 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.54/FixedDataBuilder-v0.1.54-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.53 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.53) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.54 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.54) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
-## 開発中のv0.1.54（起動確認待ち）
+## v0.1.54：HEXエリアと行高の調整・表示文字数の上限
 
-この作業ブランチには、次の表示機能を追加しています。公開版のダウンロードは、起動確認済みのv0.1.53です。
+v0.1.54では、次の表示機能を追加しました。
 
 - **下のHEXエリアの高さ変更**：表と「選択項目 HEX」の間の境界を上下にドラッグして調整します。初期の高さは従来に合わせ、ウィンドウを大きくしたときも調整後の高さを維持します。表とHEXエリアの最小の高さを確保します。
 - **複数行の高さを一括変更**：Ctrl／Shiftで複数行のセルを選び、`表示 → 選択行の高さ...` からピクセル数を指定します。項目縦・レコード縦の両方に対応し、型・位置・OCCURS帯などの見出し行は対象外です。
@@ -23,7 +23,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 文字数上限は「折り返し表示」を有効にしている間だけ適用します。省略した値には補完空白を追加しません。元データ・編集欄・保存内容・Excel出力・HEX・空白数の集計は省略せず、元の値を維持します。表示の変更だけでは未保存状態になりません。
 
-v0.1.54は警告0・エラー0でビルド済みですが、こちらでは製品・検証EXEがWindowsのアプリ制御で拒否され、起動と全129件のテスト実行を確認できていません。利用者からもブロックされたとの報告があり、公開を保留しています。起動できた版だけを配布する方針に従い、公開版・`release/`・配布リンクはv0.1.53を維持しています。以下の画像もv0.1.53以前の参考です。
+v0.1.54は、利用者がPC再起動後の起動を確認しました。同じファイルを再ビルドせず配布しています。全129件の自動テストにも成功しました。README画像の撮り直しと詳細確認は後日対応のため、以下の画像はv0.1.53以前の参考です。
 
 ## 選択セルの空白数と拡大・縮小
 
