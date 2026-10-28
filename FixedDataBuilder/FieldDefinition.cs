@@ -7,7 +7,8 @@ public sealed record FieldDefinition(
     string DefinitionText = "",
     int DecimalScale = 0,
     int NationalByteWidth = 2,
-    string? RedefinesName = null)
+    string? RedefinesName = null,
+    string Comment = "")
 {
     public string DisplayDefinition => string.IsNullOrWhiteSpace(DefinitionText)
         ? $"{Type}({Length})"

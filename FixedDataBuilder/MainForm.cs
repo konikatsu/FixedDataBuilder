@@ -1135,7 +1135,8 @@ public sealed partial class MainForm : Form
         grid.CancelEdit();
         if (definition is not null)
         {
-            var hidden = fields.SequenceEqual(loadedFields) ? hiddenFieldIndexes.ToArray() : [];
+            var hidden = fields.Select(field => field with { Comment = "" })
+                .SequenceEqual(loadedFields.Select(field => field with { Comment = "" })) ? hiddenFieldIndexes.ToArray() : [];
             ApplyDefinition(definitionPath!, loadedFields, definition.Value.XmlLayout);
             hiddenFieldIndexes.UnionWith(hidden);
         }
@@ -2582,6 +2583,12 @@ public sealed partial class MainForm : Form
             grid.Columns.Add(CreateReadOnlyColumn("FieldHex", "HEX", 300, frozen: false));
             grid.Columns[SingleRecordHexColumnIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             grid.Columns.Add(CreateReadOnlyColumn("FieldSpaces", "空白 半角 / 全角", 140, frozen: false));
+            if (fields.Any(field => !string.IsNullOrEmpty(field.Comment)))
+            {
+                var commentColumn = CreateReadOnlyColumn("FieldComment", "期待値・コメント", 240, frozen: false);
+                commentColumn.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+                grid.Columns.Add(commentColumn);
+            }
         }
         else for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
         {
@@ -2609,9 +2616,14 @@ public sealed partial class MainForm : Form
             row.HeaderCell.Value = (fieldIndex + 1).ToString(CultureInfo.InvariantCulture);
             row.HeaderCell.ToolTipText = $"定義順の項目番号: {fieldIndex + 1}";
             row.Cells[0].Value = occursInfo is null ? field.Name : $"  {occursInfo.ChildName}";
-            row.Cells[0].ToolTipText = isSingleRecordView ? $"{field.Name} / {field.DisplayDefinition}" : field.Name;
+            row.Cells[0].ToolTipText = FieldDefinitionToolTip(field);
             row.Cells[1].Value = field.DisplayDefinition;
             if (isSingleRecordView) row.Cells[2].Value = IsCsv ? "" : FieldStartPosition(fieldIndex);
+            if (isSingleRecordView && grid.Columns.Contains("FieldComment"))
+            {
+                row.Cells["FieldComment"].Value = field.Comment;
+                row.Cells["FieldComment"].ToolTipText = field.Comment;
+            }
             if (occursInfo is not null)
             {
                 row.DefaultCellStyle.BackColor = OccursBackColor(occursInfo);
@@ -2679,6 +2691,7 @@ public sealed partial class MainForm : Form
                     header,
                     170);
                 column.HeaderCell.Style.BackColor = occursInfo is null ? DefinitionHeaderBackColor : OccursHeaderBackColor;
+                column.HeaderCell.ToolTipText = FieldDefinitionToolTip(field);
 
                 grid.Columns.Add(column);
                 recordGridColumnFieldIndexes.Add(fieldIndex);

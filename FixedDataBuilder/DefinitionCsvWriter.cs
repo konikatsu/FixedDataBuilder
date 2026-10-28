@@ -2,7 +2,7 @@ using System.Text;
 
 namespace FixedDataBuilder;
 
-public sealed record DefinitionCsvRow(string Name, string Definition);
+public sealed record DefinitionCsvRow(string Name, string Definition, string Comment = "");
 
 public static class DefinitionCsvWriter
 {
@@ -14,12 +14,18 @@ public static class DefinitionCsvWriter
     public static string BuildCsv(IReadOnlyList<DefinitionCsvRow> rows)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("項目名,定義");
+        var hasComments = rows.Any(row => !string.IsNullOrEmpty(row.Comment));
+        builder.AppendLine(hasComments ? "項目名,定義,コメント" : "項目名,定義");
         foreach (var row in rows)
         {
             builder.Append(Escape(row.Name));
             builder.Append(',');
             builder.Append(Escape(row.Definition));
+            if (hasComments)
+            {
+                builder.Append(',');
+                builder.Append(Escape(row.Comment));
+            }
             builder.AppendLine();
         }
 
@@ -35,7 +41,7 @@ public static class DefinitionCsvWriter
             rowNumber++;
             var name = row.Name.Trim();
             var definition = row.Definition.Trim();
-            if (string.IsNullOrEmpty(name) && string.IsNullOrEmpty(definition))
+            if (string.IsNullOrEmpty(name) && string.IsNullOrEmpty(definition) && string.IsNullOrEmpty(row.Comment))
             {
                 continue;
             }
@@ -45,7 +51,7 @@ public static class DefinitionCsvWriter
                 throw new InvalidDataException($"{rowNumber} 行目: 項目名と定義を両方入力してください。");
             }
 
-            normalizedRows.Add(new DefinitionCsvRow(name, definition));
+            normalizedRows.Add(new DefinitionCsvRow(name, definition, row.Comment));
         }
 
         if (normalizedRows.Count == 0)

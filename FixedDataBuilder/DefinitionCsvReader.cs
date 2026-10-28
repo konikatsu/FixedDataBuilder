@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.VisualBasic.FileIO;
 
 namespace FixedDataBuilder;
 
@@ -8,24 +9,30 @@ public static partial class DefinitionCsvReader
 {
     public static IReadOnlyList<FieldDefinition> Read(string path)
     {
-        using var reader = new StreamReader(path, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-        var fields = new List<FieldDefinition>();
-        var lineNumber = 0;
-
-        while (reader.ReadLine() is { } line)
+        using var reader = new TextFieldParser(path, Encoding.UTF8, true)
         {
-            lineNumber++;
-            if (string.IsNullOrWhiteSpace(line))
+            TextFieldType = FieldType.Delimited,
+            HasFieldsEnclosedInQuotes = true,
+            TrimWhiteSpace = false
+        };
+        reader.SetDelimiters(",");
+        var fields = new List<FieldDefinition>();
+        var firstRecord = true;
+        while (!reader.EndOfData)
+        {
+            var lineNumber = checked((int)reader.LineNumber);
+            string[] cells;
+            try { cells = reader.ReadFields() ?? []; }
+            catch (MalformedLineException ex)
             {
+                throw new InvalidDataException($"{reader.ErrorLineNumber} 行目: 定義CSVの引用符や区切りが不正です。", ex);
+            }
+            if (firstRecord && IsHeader(1, cells))
+            {
+                firstRecord = false;
                 continue;
             }
-
-            var cells = ParseCsvLine(line);
-            if (IsHeader(lineNumber, cells))
-            {
-                continue;
-            }
-
+            firstRecord = false;
             fields.Add(ParseField(cells, lineNumber));
         }
 
@@ -65,18 +72,21 @@ public static partial class DefinitionCsvReader
             throw new InvalidDataException($"{lineNumber} 行目: 項目名が空です。");
         }
 
-        if (cells.Count >= 3 && int.TryParse(cells[2].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var legacyLength))
+        var legacyType = cells[1].Trim();
+        var isLegacyType = legacyType is "平数字" or "PAC_符号なし" or "PAC/packed decimal 符号なし"
+            or "PAC_符号あり" or "PAC/packed decimal 符号あり" or "文字" or "文字_半角" or "文字_全角";
+        if (isLegacyType && cells.Count >= 3 && int.TryParse(cells[2].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var legacyLength))
         {
             if (legacyLength <= 0)
             {
                 throw new InvalidDataException($"{lineNumber} 行目: 桁数は正の整数で指定してください。");
             }
 
-            var legacyType = cells[1].Trim();
-            return new FieldDefinition(name, ParseLegacyType(legacyType), legacyLength, $"{legacyType} {legacyLength}");
+            return new FieldDefinition(name, ParseLegacyType(legacyType), legacyLength, $"{legacyType} {legacyLength}",
+                Comment: cells.Count >= 4 ? cells[3] : "");
         }
 
-        return ParseFieldDefinition(name, cells[1], lineNumber);
+        return ParseFieldDefinition(name, cells[1], lineNumber) with { Comment = cells.Count >= 3 ? cells[2] : "" };
     }
 
     private static FieldDefinition ParseCobolPicture(string name, string picture, int lineNumber)
@@ -148,42 +158,6 @@ public static partial class DefinitionCsvReader
         "文字_全角" => FieldDataType.FullWidthText,
         _ => throw new InvalidDataException($"未対応の型です: {value}")
     };
-
-    private static List<string> ParseCsvLine(string line)
-    {
-        var cells = new List<string>();
-        var cell = new StringBuilder();
-        var inQuote = false;
-
-        for (var i = 0; i < line.Length; i++)
-        {
-            var ch = line[i];
-            if (ch == '"')
-            {
-                if (inQuote && i + 1 < line.Length && line[i + 1] == '"')
-                {
-                    cell.Append('"');
-                    i++;
-                    continue;
-                }
-
-                inQuote = !inQuote;
-                continue;
-            }
-
-            if (ch == ',' && !inQuote)
-            {
-                cells.Add(cell.ToString());
-                cell.Clear();
-                continue;
-            }
-
-            cell.Append(ch);
-        }
-
-        cells.Add(cell.ToString());
-        return cells;
-    }
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex SpaceRegex();

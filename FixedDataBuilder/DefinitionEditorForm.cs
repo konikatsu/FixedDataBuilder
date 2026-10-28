@@ -133,6 +133,13 @@ public sealed class DefinitionEditorForm : Form
             ReadOnly = true,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
+        grid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Comment", HeaderText = "期待値・コメント", FillWeight = 50, MinimumWidth = 180,
+            DefaultCellStyle = new DataGridViewCellStyle { WrapMode = DataGridViewTriState.True },
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
     }
 
     private void LoadInitialRows()
@@ -158,11 +165,11 @@ public sealed class DefinitionEditorForm : Form
                 type,
                 field.IntegerDigitLength.ToString(),
                 field.DecimalScale == 0 ? string.Empty : field.DecimalScale.ToString(),
-                comp3);
+                comp3, field.Comment);
         }
     }
 
-    private void AddDefinitionRow(string name, string type, string integerDigits, string decimalDigits, bool comp3)
+    private void AddDefinitionRow(string name, string type, string integerDigits, string decimalDigits, bool comp3, string comment = "")
     {
         var rowIndex = grid.Rows.Add();
         var row = grid.Rows[rowIndex];
@@ -171,6 +178,7 @@ public sealed class DefinitionEditorForm : Form
         row.Cells["IntegerDigits"].Value = integerDigits;
         row.Cells["DecimalDigits"].Value = decimalDigits;
         row.Cells["Comp3"].Value = comp3;
+        row.Cells["Comment"].Value = comment;
         UpdateRowEditability(rowIndex);
         UpdatePreviewCell(rowIndex);
     }
@@ -199,7 +207,8 @@ public sealed class DefinitionEditorForm : Form
             row.Cells["Type"].Value?.ToString() ?? TypeHalfWidthText,
             row.Cells["IntegerDigits"].Value?.ToString() ?? "1",
             row.Cells["DecimalDigits"].Value?.ToString() ?? string.Empty,
-            Convert.ToBoolean(row.Cells["Comp3"].Value ?? false));
+            Convert.ToBoolean(row.Cells["Comp3"].Value ?? false),
+            row.Cells["Comment"].Value?.ToString() ?? string.Empty);
     }
 
     private void DeleteCurrentRow()
@@ -263,7 +272,8 @@ public sealed class DefinitionEditorForm : Form
 
             yield return new DefinitionCsvRow(
                 row.Cells["Name"].Value?.ToString() ?? string.Empty,
-                BuildDefinition(row));
+                BuildDefinition(row),
+                row.Cells["Comment"].Value?.ToString() ?? string.Empty);
         }
     }
 

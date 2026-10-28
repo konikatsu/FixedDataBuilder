@@ -120,6 +120,10 @@ public sealed partial class MainForm
     private string FieldStartPosition(int fieldIndex) =>
         (1L + fields.Take(fieldIndex).Sum(field => (long)field.StorageByteLength)).ToString(CultureInfo.InvariantCulture);
 
+    private static string FieldDefinitionToolTip(FieldDefinition field) =>
+        string.IsNullOrEmpty(field.Comment) ? $"{field.Name} / {field.DisplayDefinition}"
+            : $"{field.Name} / {field.DisplayDefinition}{Environment.NewLine}期待値・コメント: {field.Comment}";
+
     private string FieldHexText(int recordIndex, int fieldIndex)
     {
         try
@@ -154,6 +158,7 @@ public sealed partial class MainForm
         grid.Columns[SingleRecordValueColumnIndex].Width = Math.Clamp(valueWidth, 140, 340);
         var spaces = grid.Columns[SingleRecordSpacesColumnIndex];
         spaces.Width = Math.Max(140, TextRenderer.MeasureText(spaces.HeaderText, grid.Font).Width + 22);
+        if (grid.Columns.Contains("FieldComment")) grid.Columns["FieldComment"].Width = 240;
         var usedWidth = grid.Columns.Cast<DataGridViewColumn>()
             .Where(column => column.Visible && column.Index != SingleRecordHexColumnIndex).Sum(column => column.Width);
         grid.Columns[SingleRecordHexColumnIndex].Width = Math.Max(200, grid.ClientSize.Width - grid.RowHeadersWidth - usedWidth - 22);
