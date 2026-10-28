@@ -501,15 +501,21 @@ public sealed class MainForm : Form
             : TextDataEncoding;
         try
         {
-            if (encoding.GetByteCount(value) < displayWrapOptions.ThresholdBytes
-                && !value.Contains('\r') && !value.Contains('\n')) return null;
-            // Preserve the existing fixed-length padding markers; measure spaces
-            // before converting them to the visible marker glyphs.
-            var padding = !IsCsv && field.Type is FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText
+            var shouldWrap = encoding.GetByteCount(value) >= displayWrapOptions.ThresholdBytes
+                || value.Contains('\r') || value.Contains('\n');
+            var truncated = false;
+            var displayed = displayWrapOptions.LimitDisplay
+                ? DisplayTextLimiter.Limit(value, displayWrapOptions.MaxCharacters, out truncated) : value;
+            if (!shouldWrap && !truncated) return null;
+            // Padding belongs to the full fixed-length display. A truncated value
+            // ends at its omission marker rather than adding hidden padding.
+            var padding = !truncated && !IsCsv && field.Type is FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText
                 ? Math.Max(0, GetVisibleTextValue(field, value).Length - value.Length) : 0;
-            var padded = value + new string(field.Type == FieldDataType.FullWidthText ? '\u3000' : ' ', padding);
-            return ByteTextWrapper.Lines(padded, encoding, displayWrapOptions.LineBytes)
+            var padded = displayed + new string(field.Type == FieldDataType.FullWidthText ? '\u3000' : ' ', padding);
+            var lines = (shouldWrap ? ByteTextWrapper.Lines(padded, encoding, displayWrapOptions.LineBytes) : [padded])
                 .Select(part => BuildVisibleTextValue(field, part, 0)).ToArray();
+            if (truncated) lines[^1] += "…";
+            return lines;
         }
         catch (EncoderFallbackException)
         {

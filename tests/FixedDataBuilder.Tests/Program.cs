@@ -90,6 +90,18 @@ internal static partial class Program
                 Capture(save, args[4], expectedHex: null);
                 return 0;
             }
+            if (args.Length >= 5 && args[1] == "--capture-display-limit")
+            {
+                using var form = CreateCellDisplayForm(recordRows: true);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "（架空データ・5行）";
+                Capture(form, args[2], expectedHex: null);
+                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 20, 10, true, 12));
+                Capture(form, args[3], expectedHex: null);
+                using var dialog = new DisplayWrapOptionsForm(new DisplayWrapOptions(true, 20, 10, true, 12));
+                Capture(dialog, args[4], expectedHex: null);
+                return 0;
+            }
             var sample = Path.Combine(repo, "samples", "generic-xml-definition.xml");
             var layouts = XmlDefinitionReader.Read(sample);
             var customer = layouts.Single(layout => layout.Id == "customer-fixed");
@@ -249,6 +261,7 @@ internal static partial class Program
             RunCsvHeaderTests(repo);
             RunDisplayWrapTests(repo);
             RunSpaceAndZoomTests(repo);
+            RunDisplayLimitTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

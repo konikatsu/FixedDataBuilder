@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.55：v0.1.53をベースに表示文字数上限だけ追加
+
+- 利用者がv53をベースに、表示文字数の上限と省略記号だけを追加したv55を依頼。v54のSplitContainer、最小画面サイズ、MultiSelect、一括行高、manualHeightRows、RowHeightOptionsFormは含めない。基点f39af9ba3d918ede25719f36018f21f09f603566。製品差分はMainFormのWrappedDisplayLines、DisplayWrapOptionsForm、csproj版数の3ファイルだけ。
+- 表示上限は折り返しON中だけ有効。Unicodeテキスト要素単位、末尾…は文字数外、切り捨て済みの値に固定長補完空白を足さない。元値・編集・固定長/CSV保存・Excel・HEX・空白数を維持。手動行高の機能はなく従来の自動行高を使う。
+- 警告0・エラー0でビルド、全126件成功・終了0・stderr空。新規5件でCSV原値・Unicode・条件/UI、固定長の両方向で保存バイト/Excel/HEX維持を確認。publish --no-buildでテストDLL一致。SAC Onで通常の製品EXEからv55主画面表示、PC側.NET8.0.32を使用。Hidden起動は主画面確認できず、同じファイルをNormal起動して確認した。再ビルドなし。
+- EXE SHA256=E11590F042877646D0CFE3BDE17B1DF3C91F6D7E3C579B322AB1B4DB3B814F42、DLL SHA256=7A03B0A9346114E7AF4DC2E2BC75E8DA7290600281640232037B95A79A66FCE9。証拠reviews/display-limit-v0.1.55/v001。確認用フォルダーとZIPをC:/dev/FixedDataBuilder直下へ作成。別PC確認は未了。GitHub Releaseとmainの配布物はまだ変更しない。ソースブランチだけpushする。
+- README画像は同じテストEXEから従来の架空5行を実フォーム撮影し、通常・文字数上限・設定の3枚を更新。隠し機能を公開文書へ追加しない。v54のSACレビューはClaude Code Opus5.5 highで別途進行中、reviews/resizable-hex-pane-v0.1.54/v004。
+
+
 ## v0.1.53：利用者の起動確認後、同一ファイルで121件成功・公開
 
 - 利用者が製品EXE、自動テストEXEともブロックされず、PowerShellから実行できたと直接報告。その後「公開してほしい」と明示。初回拒否時のstartup-v001.jsonと記録は保持し、user-startup-confirmation-v001.jsonへ利用者報告・ハッシュ不変を保存。

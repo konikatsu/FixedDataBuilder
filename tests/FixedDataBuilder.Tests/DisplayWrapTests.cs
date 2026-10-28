@@ -115,7 +115,7 @@ internal static partial class Program
         Test("Wrap settings expose enable, threshold and line bytes; cancel preserves the current display", () =>
         {
             using var dialog = new DisplayWrapOptionsForm(new DisplayWrapOptions());
-            var enabled = dialog.Controls.OfType<CheckBox>().Single();
+            var enabled = dialog.Controls.OfType<CheckBox>().Single(c => c.Name == "WrapEnabled");
             var numbers = dialog.Controls.OfType<NumericUpDown>().ToDictionary(c => c.Name);
             Equal(false, numbers["WrapLineBytes"].Enabled);
             enabled.Checked = true;
@@ -124,7 +124,7 @@ internal static partial class Program
             Equal(new DisplayWrapOptions(true, 30, 15), dialog.Options);
             using var form = CreateCellDisplayForm(recordRows: true);
             WithDialog("折り返し表示設定", DialogResult.Cancel, () => Invoke(form, "ChooseDisplayWrapOptions"), settings =>
-                settings.Controls.OfType<CheckBox>().Single().Checked = true);
+                settings.Controls.OfType<CheckBox>().Single(c => c.Name == "WrapEnabled").Checked = true);
             Equal(false, Get<DisplayWrapOptions>(form, "displayWrapOptions").Enabled);
         });
     }
