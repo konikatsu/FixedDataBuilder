@@ -4,7 +4,7 @@ using System.Diagnostics;
 
 namespace FixedDataBuilder;
 
-public sealed class MainForm : Form
+public sealed partial class MainForm : Form
 {
     private static readonly string WindowTitle = $"FixedDataBuilder v{typeof(MainForm).Assembly.GetName().Version?.ToString(3)}";
     private static readonly Color DefinitionBackColor = Color.FromArgb(226, 242, 226);
@@ -109,6 +109,7 @@ public sealed class MainForm : Form
         Controls.Add(grid);
         Controls.Add(BuildHexPanel());
         Controls.Add(statusStrip);
+        Controls.Add(BuildViewPanel());
         Controls.Add(BuildFilePanel());
         Controls.Add(menuStrip);
 
@@ -305,7 +306,7 @@ public sealed class MainForm : Form
 
     private void SetHexAreaHeight(int requestedHeight)
     {
-        if (isResizingHexArea || hexArea.Parent != this || WindowState == FormWindowState.Minimized) return;
+        if (isResizingHexArea || isSingleRecordView || hexArea.Parent != this || WindowState == FormWindowState.Minimized) return;
         var minimumHexHeight = Math.Max(64, (int)Math.Round(64 * DeviceDpi / 96f));
         var minimumGridHeight = Math.Max(100, (int)Math.Round(100 * DeviceDpi / 96f));
         // Use the client area and docked bars rather than grid.Height, which can
@@ -472,6 +473,7 @@ public sealed class MainForm : Form
         menuStrip.Items.Add(CreateMenu("表示",
             fieldRowsButton,
             recordRowsButton,
+            singleRecordViewButton,
             new ToolStripSeparator(),
             CreateMenuItem("表示項目...", (_, _) => ChooseVisibleFields()),
             CreateMenuItem("フォント設定...", (_, _) => ChooseDisplayFont()),
@@ -544,6 +546,10 @@ public sealed class MainForm : Form
         grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
         grid.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
         hexTextBox.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
+        grid.ColumnWidthChanged += (_, _) =>
+        {
+            if (isSingleRecordView && !isRefreshingGrid) AdjustSingleRecordRowHeights();
+        };
     }
 
     private void ChooseDisplayWrapOptions()
@@ -598,7 +604,7 @@ public sealed class MainForm : Form
 
     private void AdjustWrappedRowHeights()
     {
-        if (!displayWrapOptions.Enabled) return;
+        if (!displayWrapOptions.Enabled) { AdjustSingleRecordRowHeights(); return; }
         foreach (DataGridViewRow row in grid.Rows)
         {
             var height = grid.RowTemplate.Height;
@@ -610,6 +616,7 @@ public sealed class MainForm : Form
             }
             row.Height = Math.Clamp(height, row.MinimumHeight, 65536);
         }
+        AdjustSingleRecordRowHeights();
     }
 
     private void SizeWrappedColumns()
@@ -1098,9 +1105,15 @@ public sealed class MainForm : Form
         if (fromExcel && saveDataPath is null)
         {
             var previousLayout = layout;
+            var previousSingleRecordView = isSingleRecordView;
+            var previousRecord = singleRecordIndex;
+            var previousField = CurrentFieldIndex();
             LoadExcel(definitionPath![8..]);
             layout = previousLayout;
+            isSingleRecordView = previousSingleRecordView;
+            singleRecordIndex = previousRecord;
             RefreshGrid();
+            if (isSingleRecordView) RestoreRecordFieldSelection(singleRecordIndex, previousField);
             return;
         }
 
@@ -1994,6 +2007,7 @@ public sealed class MainForm : Form
     private void WriteData(string path, DataSaveOptions options)
     {
         var refreshNeeded = options.Format != currentDataFileFormat
+            || (isSingleRecordView && options.Format == DataFileFormat.Csv && options.CsvEncoding != currentCsvEncoding)
             || (options.Format == DataFileFormat.FixedLength && (options.NationalEncoding != currentNationalTextEncoding
                 || (options.TextEncoding ?? currentDataEncodingProfile) != currentDataEncodingProfile));
         if (options.Format == DataFileFormat.Csv)
@@ -2121,6 +2135,7 @@ public sealed class MainForm : Form
         SetPathText(definitionPathTextBox, $"(Excel) {path}");
         SetPathText(dataPathTextBox, path);
         layout = imported.LayoutName == "レコード縦" ? GridLayout.RecordRows : GridLayout.FieldRows;
+        isSingleRecordView = false;
         NormalizeRecords();
         UpdateSeparatorModeText();
         RefreshGrid();
@@ -2155,6 +2170,7 @@ public sealed class MainForm : Form
 
     private IReadOnlyList<IReadOnlyList<ExcelCell>> BuildExcelRows()
     {
+        if (isSingleRecordView) return BuildSingleRecordExcelRows();
         var rows = new List<IReadOnlyList<ExcelCell>>();
         rows.Add(grid.Columns
             .Cast<DataGridViewColumn>()
@@ -2343,14 +2359,19 @@ public sealed class MainForm : Form
 
     private void ChangeLayout(GridLayout nextLayout)
     {
-        if (layout == nextLayout)
+        if (layout == nextLayout && !isSingleRecordView)
         {
             return;
         }
 
         grid.EndEdit();
+        var record = CurrentRecordIndex();
+        var field = CurrentFieldIndex();
+        var wasSingleRecordView = isSingleRecordView;
+        isSingleRecordView = false;
         layout = nextLayout;
         RefreshGrid();
+        if (wasSingleRecordView) RestoreRecordFieldSelection(record, field);
     }
 
     private void UpdateRecordValue(int rowIndex, int columnIndex)
@@ -2365,12 +2386,12 @@ public sealed class MainForm : Form
         if (layout == GridLayout.FieldRows)
         {
             var fieldRowsFieldIndex = FieldIndexFromFieldRow(rowIndex);
-            if (columnIndex < 2 || fieldRowsFieldIndex < 0)
+            if (columnIndex < 2 || (isSingleRecordView && columnIndex != 2) || fieldRowsFieldIndex < 0)
             {
                 return;
             }
 
-            var recordIndex = columnIndex - 2;
+            var recordIndex = isSingleRecordView ? singleRecordIndex : columnIndex - 2;
             if (recordIndex < 0 || recordIndex >= records.Count)
             {
                 return;
@@ -2387,6 +2408,7 @@ public sealed class MainForm : Form
             records[recordIndex][fieldRowsFieldIndex] = formattedValue;
             grid[columnIndex, rowIndex].Value = formattedValue;
             ApplyCellValidationStyle(grid[columnIndex, rowIndex], field, formattedValue);
+            UpdateSingleRecordDetails(rowIndex);
             UpdateHexView();
             return;
         }
@@ -2419,6 +2441,7 @@ public sealed class MainForm : Form
 
     private int CurrentRecordIndex()
     {
+        if (isSingleRecordView) return records.Count == 0 ? -1 : singleRecordIndex;
         if (grid.CurrentCell is null)
         {
             return records.Count - 1;
@@ -2443,6 +2466,13 @@ public sealed class MainForm : Form
 
     private void SelectRecord(int recordIndex)
     {
+        if (isSingleRecordView)
+        {
+            ChangeSingleRecord(recordIndex);
+            var firstRow = fieldGridRows.FindIndex(row => !row.IsOccursHeader && row.FieldIndex >= 0);
+            if (firstRow >= 0 && records.Count > 0) grid.CurrentCell = grid[2, firstRow];
+            return;
+        }
         if (recordIndex < 0 || fields.Count == 0 || records.Count == 0 || VisibleFieldIndexes().Count == 0)
         {
             return;
@@ -2477,6 +2507,7 @@ public sealed class MainForm : Form
         try
         {
             NormalizeRecords();
+            UpdateSingleRecordControls();
             grid.Columns.Clear();
             grid.Rows.Clear();
             fieldGridRows.Clear();
@@ -2508,6 +2539,7 @@ public sealed class MainForm : Form
 
     private void SizeColumnsToFitData()
     {
+        if (isSingleRecordView) { SizeSingleRecordColumns(); return; }
         if (displayWrapOptions.Enabled) { SizeWrappedColumns(); return; }
         foreach (DataGridViewColumn column in grid.Columns)
         {
@@ -2535,11 +2567,20 @@ public sealed class MainForm : Form
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
         grid.ColumnHeadersHeight = 28;
         grid.Columns.Add(CreateReadOnlyColumn("Name", "項目名", 180, frozen: true));
-        grid.Columns.Add(CreateReadOnlyColumn("Definition", "定義", 150, frozen: true));
+        grid.Columns.Add(CreateReadOnlyColumn("Definition", isSingleRecordView ? "開始位置" : "定義", 150, frozen: true));
         ApplyDefinitionColumnStyle(grid.Columns[0]);
         ApplyDefinitionColumnStyle(grid.Columns[1]);
 
-        for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
+        if (isSingleRecordView)
+        {
+            grid.Columns.Add(CreateEditableColumn("SingleRecordValue", "内容", 200));
+            grid.Columns[2].ReadOnly = records.Count == 0;
+            grid.Columns.Add(CreateReadOnlyColumn("FieldHex", "HEX", 300, frozen: false));
+            grid.Columns[3].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            grid.Columns.Add(CreateReadOnlyColumn("FieldSpaces", "空白 半角 / 全角", 140, frozen: false));
+            grid.Columns[1].HeaderCell.ToolTipText = IsCsv ? "CSVの列番号（開始バイト位置は値の長さで変わります）" : "レコード先頭を1とする開始バイト位置";
+        }
+        else for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
         {
             grid.Columns.Add(CreateEditableColumn($"Record{recordIndex + 1}", $"Rec {recordIndex + 1}", 140));
         }
@@ -2565,20 +2606,25 @@ public sealed class MainForm : Form
             row.HeaderCell.Value = (fieldIndex + 1).ToString(CultureInfo.InvariantCulture);
             row.HeaderCell.ToolTipText = $"定義順の項目番号: {fieldIndex + 1}";
             row.Cells[0].Value = occursInfo is null ? field.Name : $"  {occursInfo.ChildName}";
-            row.Cells[0].ToolTipText = field.Name;
-            row.Cells[1].Value = field.DisplayDefinition;
+            row.Cells[0].ToolTipText = isSingleRecordView ? $"{field.Name} / {field.DisplayDefinition}" : field.Name;
+            row.Cells[1].Value = isSingleRecordView ? FieldStartPosition(fieldIndex) : field.DisplayDefinition;
             if (occursInfo is not null)
             {
                 row.DefaultCellStyle.BackColor = OccursBackColor(occursInfo);
             }
 
-            for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
+            var displayedRecords = isSingleRecordView
+                ? records.Count > 0 ? new[] { singleRecordIndex } : Array.Empty<int>()
+                : Enumerable.Range(0, records.Count);
+            foreach (var recordIndex in displayedRecords)
             {
                 var value = FormatValueForDisplay(field, records[recordIndex][fieldIndex], IsCsv);
-                row.Cells[recordIndex + 2].Value = value;
-                row.Cells[recordIndex + 2].ReadOnly = field.IsRedefines;
-                ApplyCellValidationStyle(row.Cells[recordIndex + 2], field, value, occursInfo is null ? null : OccursBackColor(occursInfo));
+                var columnIndex = isSingleRecordView ? 2 : recordIndex + 2;
+                row.Cells[columnIndex].Value = value;
+                row.Cells[columnIndex].ReadOnly = field.IsRedefines;
+                ApplyCellValidationStyle(row.Cells[columnIndex], field, value, occursInfo is null ? null : OccursBackColor(occursInfo));
             }
+            UpdateSingleRecordDetails(rowIndex);
         }
     }
 
@@ -2738,19 +2784,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        try
-        {
-            var field = fields[fieldIndex];
-            var bytes = IsCsv
-                ? JapaneseEncodings.ForCsv(currentCsvEncoding)
-                    .GetBytes(records[recordIndex][fieldIndex])
-                : FixedLengthDataWriter.EncodeField(field, records[recordIndex][fieldIndex], currentDataEncodingProfile, currentNationalTextEncoding);
-            hexTextBox.Text = string.Join(" ", bytes.Select(value => value.ToString("X2")));
-        }
-        catch (Exception ex)
-        {
-            hexTextBox.Text = $"HEX 表示エラー: {ex.Message}";
-        }
+        hexTextBox.Text = FieldHexText(recordIndex, fieldIndex);
     }
 
     private void UpdateSelectionSpaceCount()
@@ -3037,7 +3071,7 @@ public sealed class MainForm : Form
         if (layout == GridLayout.FieldRows)
         {
             var fieldIndex = FieldIndexFromFieldRow(rowIndex);
-            if (columnIndex >= 2 && fieldIndex >= 0)
+            if (columnIndex >= 2 && (!isSingleRecordView || columnIndex == 2) && fieldIndex >= 0)
             {
                 field = fields[fieldIndex];
                 return true;
@@ -3101,8 +3135,8 @@ public sealed class MainForm : Form
 
     private void UpdateLayoutButtons()
     {
-        fieldRowsButton.Checked = layout == GridLayout.FieldRows;
-        recordRowsButton.Checked = layout == GridLayout.RecordRows;
+        fieldRowsButton.Checked = !isSingleRecordView && layout == GridLayout.FieldRows;
+        recordRowsButton.Checked = !isSingleRecordView && layout == GridLayout.RecordRows;
     }
 
     private void UpdateSeparatorModeText()

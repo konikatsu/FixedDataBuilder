@@ -1,5 +1,16 @@
 # README_FOR_CODEX
 
+## v0.1.61：項目ごとに開始位置・内容・HEX・空白数を並べる1件表示（2026-10-28）
+
+- 利用者がテキストアートを承認し作成を依頼、続けて開始位置も追加と指示。基点v60=996101b9bac52aeed42c724cd1d90a246a502321、ブランチcodex/single-record-view-v0.1.61。Panel方式の高さ調整を維持。SplitContainer/Splitterは追加していない。
+- 上部に一覧/1件表示、前へ/次へ、1始まりの行番号指定。項目縦の行を再利用し、No.・項目名・開始位置・内容・HEX・空白数（半角/全角）。1件表示中だけ共通下部HEXを隠す。内容列だけ編集・既存検証・空白表示・文字数上限の対象とし、HEXは省略しない。HEX列は折り返して行高も調整する。固定長は物理格納バイトで開始位置（非表示・N・COMP-3も計算）、CSVはCSV列番号。型定義は項目名のツールチップで参照できる。
+- MainForm.SingleRecordView.csに表示モード/ナビゲーション/診断列/全件Excel生成を分離。通常の項目縦/レコード縦に戻せる。保存・Excelは全レコードを保持し、Excelに診断列を追加しない。編集中に移動しても元レコードへ確定し、選択項目を保持。CSV文字コード変更保存で全項目HEX更新、Excel由来F5でも表示モードを維持。追加/複製/削除、非表示の元No.、OCCURS帯の診断空欄、補完空白もテスト。
+- 初回テストは通常のChangeLayoutへ選択復元を広げたことでHeaderRowsTestsが失敗。復元を1件表示から退出するときに限定して修正。v002で139件成功。レビューで挙がったCSV文字コード変更保存とExcel F5の2件も追加し、最終build-v003.txtは警告0・エラー0、test-result-v003.txtは全141件成功・終了0・stderr空。通常モードの選択動作をテストに合わせて不当に変更したものではなく既存動作を復元した。
+- publish --no-buildでテストと製品DLL一致。2026-10-28 15:19 JST、SAC Onで製品EXEの通常起動を試みたが拒否。CodeIntegrity3077 Record5268、Status0xc0e90002、PolicyNameVerifiedAndReputableDesktop、GUID{0283ac0f-fff1-49ae-ada1-8a933130cad6}、3089署名0。対象は製品EXE（FlatHash一致）。製品主画面の確認は未了。同じDLLを使う自動テストと実フォーム画像の成功とは区別する。拒否後に別ホストでの実行や再ビルド、SAC設定変更はしていない。
+- EXE SHA256=40A88883245638FA3FA63D76280B3102DA4D53FE3A76CDA02019D3DF4D9F2BA3、DLL SHA256=F292E712418385374F94D95E8FDB3C08BC1F8EB27EE1FDADEB400B187B2075B7。C:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.61-win-x64-framework-dependentと同名ZIPを確認用に作成。ZIP215501バイト・40ファイル・SHA256=C62FF05711C636F6ED6A6C35D1964ACB4B01A030257A10C607AEB3D755AE51CA。公開sample35ファイルのみ、テスト/配布DLL・publish/フォルダー/ZIP一致。証拠reviews/single-record-view-v0.1.61/v001。
+- README通常/1件表示の画像を同じテストEXEから架空5行で撮影。ソースブランチのみpushし、main/Release/タグ/release配布物は変更しない。別PC未確認。v60起動OK/v61拒否の双方にSplitContainerがなく、有無だけで拒否原因とは断定できないことを利用者へ説明済み。
+- 利用者へ製品EXEのパスと、自動テストEXEのパス・必要引数C:/dev/FixedDataBuilderを案内した。自動テストEXEはreviews/single-record-view-v0.1.61/v001/build/bin/FixedDataBuilder.Tests/release_win-x64/FixedDataBuilder.Tests.exe。同フォルダーの依存ファイルが必要。
+
 ## v0.1.60：SplitContainerを使わないHEX高さ調整（2026-10-28）
 
 - 利用者の明示依頼「SplitContainerを使わない版を作成してみて」。起動OKのv58（729ab1b385e55a770dccc2239f88bc5ba58407ed）からcodex/manual-hex-resize-v0.1.60を作成。v59からの継承ではない。通常のPanelのHeightを上端6pxのグリップのMouseDown/Move/Upで変更する。SplitContainer・Splitterはコントロール階層に存在しない。

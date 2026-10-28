@@ -90,6 +90,16 @@ internal static partial class Program
                 Capture(save, args[4], expectedHex: null);
                 return 0;
             }
+            if (args.Length >= 4 && args[1] == "--capture-single-record")
+            {
+                using var form = CreateCellDisplayForm(recordRows: false);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "（架空データ・5行）";
+                Capture(form, args[2], expectedHex: null);
+                Invoke(form, "SetSingleRecordView", true);
+                Capture(form, args[3], expectedHex: null);
+                return 0;
+            }
             if (args.Length >= 6 && args[1] == "--capture-manual-hex")
             {
                 using var form = CreateCellDisplayForm(recordRows: false);
@@ -292,6 +302,7 @@ internal static partial class Program
             RunDisplayLimitTests(repo);
             RunFieldNumberTests(repo);
             RunManualHexResizeTests(repo);
+            RunSingleRecordViewTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);
