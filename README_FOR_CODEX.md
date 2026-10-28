@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.58：v55ベースに項目番号だけを追加
+
+- 利用者がv55 OK/v56・v57 SAC拒否を報告し、v55基点にNo.表示だけを追加したv58を依頼。基点c8df26eb1b6999113a70d28812ecda503631abd8。v56/v57からの継承ではない。製品差分はMainFormの番号欄12行とcsproj版数だけ。SplitContainer/dataHexSplit/MinimumSize/手動行高/複数選択の追加なし。
+- 項目縦のRowHeadersへ定義順のfieldIndex+1、左上No.を表示。非表示でも元番号維持、OCCURS帯無番号。データの列を増やさない。レコード縦の行見出しは隠し既存の行番号を維持。v55の表示文字数上限をそのまま保持。
+- 警告0・エラー0でビルド、全130件成功（既存126＋番号4件）、終了0・stderr空。publish --no-build、テストと配布DLL一致。SAC Onで通常製品EXEからv58主画面、PC側.NET8.0.32使用を確認。EXE SHA256=3C3A34E981744F44D930383B7C08FC5CEA264A47D66D88107572496E0DA5365B、DLL SHA256=4273358EC894F37A2CE51DDB6B6409AB08E94616E12EC92C3C340010FB52C398。起動後再ビルドなし。
+- 同じ検証EXEから架空5行の項目縦/レコード縦を撮影しREADMEへ。C:/dev/FixedDataBuilder直下に確認用フォルダー/ZIP。別PC起動は未確認。ソースブランチだけpushし、main/Releaseはv56を維持。証拠reviews/field-numbers-v0.1.58/v001。
+- 利用者の「通れば高さ調整が犯人」について、通った構成を絞る材料にはなるが、版ごとのハッシュとSAC評判も変わるため因果確定とは扱わない。SAC設定・証明書・拡張属性を変更しない。v56公開説明へ別PC拒否報告を追記する。
+
+
 ## v0.1.55：v0.1.53をベースに表示文字数上限だけ追加
 
 - 利用者がv53をベースに、表示文字数の上限と省略記号だけを追加したv55を依頼。v54のSplitContainer、最小画面サイズ、MultiSelect、一括行高、manualHeightRows、RowHeightOptionsFormは含めない。基点f39af9ba3d918ede25719f36018f21f09f603566。製品差分はMainFormのWrappedDisplayLines、DisplayWrapOptionsForm、csproj版数の3ファイルだけ。

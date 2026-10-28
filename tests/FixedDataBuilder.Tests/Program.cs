@@ -90,6 +90,20 @@ internal static partial class Program
                 Capture(save, args[4], expectedHex: null);
                 return 0;
             }
+            if (args.Length >= 5 && args[1] == "--capture-field-numbers")
+            {
+                using var form = CreateCellDisplayForm(recordRows: false);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "（架空データ・5行）";
+                Capture(form, args[2], expectedHex: null);
+                Get<HashSet<int>>(form, "hiddenFieldIndexes").Add(1);
+                Invoke(form, "RefreshGrid");
+                Capture(form, args[3], expectedHex: null);
+                Get<HashSet<int>>(form, "hiddenFieldIndexes").Clear();
+                Get<ToolStripMenuItem>(form, "recordRowsButton").PerformClick();
+                Capture(form, args[4], expectedHex: null);
+                return 0;
+            }
             if (args.Length >= 5 && args[1] == "--capture-display-limit")
             {
                 using var form = CreateCellDisplayForm(recordRows: true);
@@ -262,6 +276,7 @@ internal static partial class Program
             RunDisplayWrapTests(repo);
             RunSpaceAndZoomTests(repo);
             RunDisplayLimitTests(repo);
+            RunFieldNumberTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);
