@@ -1,5 +1,16 @@
 # README_FOR_CODEX
 
+## v0.1.54：HEX高さ変更・選択行の一括高さ・表示文字数上限（確認中）
+
+- ユーザーが下部の選択項目表示エリアの高さ変更を依頼し、続けて複数行の高さの一括変更、折り返し時の表示文字数による切捨てを追加依頼。54にまとめる。
+- MainFormのgridとHEXエリアを水平SplitContainer（DataHexSplit）へ移動。Panel1にgrid、Panel2にHEX。SplitterWidth6、上最小100px・下最小64px、FixedPanel.Panel2で調整後の下の高さをウィンドウ拡大時に維持。初期下82px、メイン最小720x420。データ・描画・HEX・空白数の処理は継承。
+- MultiSelect=true、CellSelectを維持。Ctrl/Shiftで選択したセルの行番号を重複除外し、「表示→選択行の高さ...」で一括指定。「選択行の高さを自動調整」で指定を解除。manualHeightRowsで明示的な高さを保持し、通常のフォント・折り返し再計算は手動行を上書きしない。RefreshGridによる再読込・方向切替・行追加削除などの再構築では指定を解除し、行番号ずれを防ぐ。見出し/OCCURS帯は対象外。行削除などの既存コマンドを複数行処理に拡張しない。
+- DisplayWrapOptionsへ省略可能なLimitDisplay=false・MaxCharacters=100を追加。設定フォームで別の文字数上限を指定。表示だけに適用し、StringInfoによるUnicodeテキスト要素を分割しない。元値から先頭N文字を使い、末尾に…を付ける（記号はN文字に含めない）。バイト閾値未満でも文字数上限は適用し、折り返しOFFでは適用しない。省略済み表示へ固定長の補完空白を足さず、元のセル値・HEX・Excel・保存・空白数には影響させない。
+- 121件＋新規8件=129件を用意。SplitContainerの高さ・最小サイズ、選択維持、複数行高さ・取消・自動復帰、再構築時リセット、文字数上限・Unicode・CSV/Excel/HEX/空白数の原値保持を確認するテストを追加。既存の折り返し設定試験はチェックボックスをWrapEnabled名で特定するよう更新。--capture-resizeは既存の5行構成で通常・HEX拡大・省略・設定・行高の実フォーム画像を取得する。
+- 警告0・エラー0でビルドしたが、初回の検証EXE・製品EXEともSAC Onで拒否。129件未実行、起動未確認。EXE SHA256=8D6656B1938DDBF85A063FA7D6BDDC023C38CD9B5B1EF5C98AB4825C0773CD03、DLL SHA256=0A960BCE9528DD580583EC8569D287B665DFB522C331E7D6E0D4C11A2E4F4BE3。ローカルreviews/resizable-hex-pane-v0.1.54/v001/publish/framework-dependent/。publish --no-buildでテスト側DLLと一致を確認。startup-v001.jsonとCodeIntegrity記録を保存。
+- 前回53では同一ファイルを利用者が開いた後、こちらの通常実行でも通ったため、今回も同じファイルの利用者側起動結果をasyncで確認中。再ビルドや実行ホストの変更で回避はしない。確認前はmain・release/・公開版53と最新3版53/52/51を維持し、未確認EXEを公開しない。業務データ・reviewsはコミットしない。READMEには現状と使い方を記載し、撮影前の54の画像を捏造しない。公開文書へ隠し機能を記載しない。
+
+
 ## v0.1.53：利用者の起動確認後、同一ファイルで121件成功・公開
 
 - 利用者が製品EXE、自動テストEXEともブロックされず、PowerShellから実行できたと直接報告。その後「公開してほしい」と明示。初回拒否時のstartup-v001.jsonと記録は保持し、user-startup-confirmation-v001.jsonへ利用者報告・ハッシュ不変を保存。
