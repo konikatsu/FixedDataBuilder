@@ -1,12 +1,27 @@
 # README_FOR_CODEX
 
-## v0.1.61：MSI作成とSAC独立レビュー（2026-10-28、進行中）
+## v0.1.62：1件表示の属性列とCSV位置列の非表示（2026-10-28）
+
+- 利用者がv61の再ビルド・起動確認・pushを依頼。その後、1件表示では属性が常時見えないと指摘し、CSV列表示は不要、修正版はv0.1.62として作成するよう指示した。基点a41d548c6bc7efe5b67f72842aca5cf675533fb1、ブランチcodex/single-record-attributes-v0.1.62。mainはv56由来の別履歴であり、今回main/Releaseを更新せず作業ブランチへソース・確認済みreleaseの5ファイルをpushする。
+- 型・桁数を属性列へ常時表示。固定長はNo./項目名/属性/開始位置/内容/HEX/空白数、CSVは開始位置列を非表示。内容列の移動に合わせて選択・編集・折り返し・HEX更新・行高の参照を定数へ統一し、表示列だけで利用可能幅を計算する。Excelは従来の全件表を保持する。
+- 初回試験は架空サンプル最終項目の期待値をX(2)として失敗したため、元の定義9(2)へ期待値を訂正した。撮影ヘルパーも隠れた位置列でなく内容列を選ぶよう修正。build-v002は警告0・エラー0、test-result-v002は全141件成功・終了0・stderr空。固定長X/N/COMP-3属性、CSV位置列非表示、編集/移動/Excel/保存の回帰を確認した。
+- publish --no-build、テストと製品DLLのSHA256一致。2026-10-28 16:32 JST、SAC Onのまま製品EXEの通常起動でv0.1.62の主画面表示（PID3408/Handle6686882/Responding）と正常終了0を確認。PC側.NET8.0.32を使用。製品単独GUIで個別機能を操作した試験とは区別する。
+- EXE SHA256=EF79204530987C05AF632DB0D6718EBAAB0F168572A131150D1FFEE26A15BC29、DLL SHA256=05965AEA61D1364C40C11FEB77DA48839F79F84BC4B5A85D5E9B62D493F04899。確認後再ビルドせずrelease/とC:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.62-win-x64-framework-dependentフォルダー・同名ZIPへコピー。ZIP215705バイト、40ファイル、SHA256=74F54C0E28FC59063B33964628A1EC17297E3B05DADFD22F15C29D4EA5733ADC。公開samples35ファイルのみ。全コピー/ZIPの内容とハッシュ一致。別PC起動は未確認。
+- 通常表示、固定長1件表示、CSV1件表示を同じ製品DLLのテスト実フォームから公開/架空データで撮影しREADMEへ反映。CSV画像をpush前に利用者へ提示。証拠reviews/single-record-attributes-v0.1.62/v001。古い比較用ファイル、未追跡画像、利用者の業務データやログを削除・コミットしない。MSI再作成やセキュリティ設定変更は行っていない。
+
+## v0.1.61：再起動後の利用者報告と依頼による再ビルド（2026-10-28）
+
+- 利用者が再起動後に起動できたと報告。16:22の読取りではSAC On、元の配布EXE40A888…/DLL F292…はハッシュ不変、実行プロセスなし。従って利用者報告と、同一ファイルである補助確認を区別する。証拠reviews/sac-product-v0.1.61/v002/POST-REBOOT-OBSERVATION-v005.json。
+- 続けて利用者が再ビルド・起動確認・pushを明示依頼。v61を新しいbuildフォルダーでRebuildし、警告0・エラー0、全141件成功、publish --no-build。EXEは40A888…で同一、DLLは0D5DA927DFF52C84117A7BAC1162CA21B7AD89E8247BCAA84782FF0A986F4AD5へ変化した。16:25の通常起動はSAC Onで主画面表示と正常終了0、PC側.NET8.0.32、製品DLL実ロードパスも確認。証拠reviews/single-record-view-v0.1.61/v002。利用者の当初再起動後成功と、この再ビルド後実測は別事象である。
+- push前に利用者の新しい表示修正依頼を受け、成果物更新はv0.1.62へ切り替えた。v61の既存配布フォルダー/ZIP/MSIは上書きしない。特定APIが原因、再起動すれば常に直る等の断定はしない。
+
+## v0.1.61：MSI作成とSAC独立レビュー（2026-10-28）
 
 - 利用者が製品EXEの拒否原因調査を依頼。最新ログをreviews/sac-product-v0.1.61/v001へ採取し、v60/v61のEXE差は版情報5バイトのみ・処理セクション一致、両者未署名・MOTWなし、SAC Onを再確認。CiTool一覧はアクセス拒否。最新ログはEXE拒否だけでなく最終DLL F292…のRecord5264も含み、141件成功と時間帯が重なる。成功をSAC全面許可の証拠にしない。
-- 利用者指定のAntigravity CLI Gemini3.8Flash high、Claude Code Opus5.5 max、GPT-6 Astra ultraへ同じREQUEST-v002.mdと封印したソース/証拠68項目を渡す。依頼・結果はreviews/sac-product-v0.1.61/v002。AstraとGeminiは結果保存済み、Claudeは実行中。Geminiの「unknownへリセットと確定」「EAを許可キャッシュと確定」「署名で完全保証」は証拠過剰なので採用しない。補正を総合結果へ残す必要あり。
+- 利用者指定のAntigravity CLI Gemini3.8Flash high、Claude Code Opus5.5 max、GPT-6 Astra ultraへ同じREQUEST-v002.mdと封印したソース/証拠68項目を渡す。依頼・結果はreviews/sac-product-v0.1.61/v002。Astra・Gemini・Claudeの3件すべて結果保存済み（Claudeは16:06:40 JSTに終了）。Geminiの「unknownへリセットと確定」「EAを許可キャッシュと確定」「署名で完全保証」は証拠過剰なので採用しない。補正を総合結果へ残す必要あり。
 - 利用者がレビュー待ちにMSI作成を明示依頼。既存v61製品5ファイル＋公開samples35を再ビルドせず格納。WiX5.0.2をreviews/msi-v0.1.61/v001/toolsへ局所導入、installer/Package.wxsとBuild-Msi.ps1を作成。ユーザー単位、LocalAppData/Programs/FixedDataBuilder、スタートメニュー・アンインストール登録、.NET8非同梱。SAC/証明書設定や製品の自動起動は行わない。
 - MSIのdecompile/展開で40ファイルすべて元ハッシュと一致し、Scope=perUser/Version=0.1.61を確認。製品EXE/DLLハッシュは前節のまま。C:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.61-win-x64-framework-dependent.msi、229376バイト、SHA256=EA190A7BB9C7F453C1CF75CE32EA4C706A051384A48A9BE774007F2BB868870B、未署名。証拠reviews/msi-v0.1.61/v001。通常インストールは実施せず、利用者が担当。
-- 利用者が「MSIにしても、起動できない」と報告。追加読み取りでMSIの15:47:41インストール成功（MsiInstaller1033/11707、status0）、15:47:55に導入先EXEがSAC拒否（3077 Record5304、元と同じFlatHash）、15:48:48アンインストール成功（1034/11724、status0）を確認。実際の導入・削除は利用者操作であり親はしていない。現在導入先ファイルが存在しないことは削除成功と整合。MSI自体の拒否ではなく導入後EXE拒否と分離できた。ログはreviews/msi-v0.1.61/v001。利用者はPC再起動を希望し、作成物は保存済み、Claudeがまだ実行中で再起動により中断するため可能なら完了待ちと説明した。再起動操作はしていない。
+- 利用者が「MSIにしても、起動できない」と報告。追加読み取りでMSIの15:47:41インストール成功（MsiInstaller1033/11707、status0）、15:47:55に導入先EXEがSAC拒否（3077 Record5304、元と同じFlatHash）、15:48:48アンインストール成功（1034/11724、status0）を確認。実際の導入・削除は利用者操作であり親はしていない。現在導入先ファイルが存在しないことは削除成功と整合。MSI自体の拒否ではなく導入後EXE拒否と分離できた。ログはreviews/msi-v0.1.61/v001。利用者はPC再起動を希望し、作成物は保存済み、当初はClaude完了待ちと説明したが、16:06:40に完了し保存された。後に利用者が再起動を実施した。こちらから再起動操作はしていない。
 
 ## v0.1.61：項目ごとに開始位置・内容・HEX・空白数を並べる1件表示（2026-10-28）
 

@@ -98,6 +98,15 @@ internal static partial class Program
                 Capture(form, args[2], expectedHex: null);
                 Invoke(form, "SetSingleRecordView", true);
                 Capture(form, args[3], expectedHex: null);
+                if (args.Length >= 5)
+                {
+                    using var csvForm = new MainForm(["--definition", Path.Combine(repo, "samples", "csv-header-wrap-definition.csv"),
+                        "--data", Path.Combine(repo, "samples", "space-count-data-utf8.csv"), "--csv-header", "present", "--layout", "field"]);
+                    Get<TextBox>(csvForm, "definitionPathTextBox").Text = "（表示確認用CSV定義）";
+                    Get<TextBox>(csvForm, "dataPathTextBox").Text = "（公開サンプルCSV）";
+                    Invoke(csvForm, "SetSingleRecordView", true);
+                    Capture(csvForm, args[4], expectedHex: null);
+                }
                 return 0;
             }
             if (args.Length >= 6 && args[1] == "--capture-manual-hex")
@@ -396,7 +405,7 @@ internal static partial class Program
             var grid = Get<DataGridView>(mainForm, "grid");
             var dataRow = Get<ToolStripMenuItem>(mainForm, "recordRowsButton").Checked
                 ? (int)Invoke(mainForm, "RecordRowsDataStartIndex")! : expectedHex is null ? 0 : 1;
-            grid.CurrentCell = grid[2, dataRow];
+            grid.CurrentCell = grid[Get<bool>(mainForm, "isSingleRecordView") ? grid.Columns["SingleRecordValue"].Index : 2, dataRow];
         }
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(-30000, -30000);

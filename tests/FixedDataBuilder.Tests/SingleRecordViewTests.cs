@@ -4,27 +4,30 @@ internal static partial class Program
 {
     private static void RunSingleRecordViewTests(string repo)
     {
-        Test("Single record view places position, full HEX and space counts beside each field", () =>
+        Test("Single record view shows attributes, position, full HEX and space counts beside each field", () =>
         {
             using var form = CreateCellDisplayForm(recordRows: false);
             Invoke(form, "SetSingleRecordView", true);
             var grid = Get<DataGridView>(form, "grid");
             Equal(true, Get<bool>(form, "isSingleRecordView"));
-            Equal(5, grid.Columns.Count);
+            Equal(6, grid.Columns.Count);
             Equal("No.", grid.TopLeftHeaderCell.Value);
             Equal("項目名", grid.Columns[0].HeaderText);
+            Equal("属性", grid.Columns[1].HeaderText);
+            Equal(true, grid.Columns["FieldStartPosition"].Visible);
+            Equal("X(22)|X(15)|X(10)|9(2)", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(row => row.Cells[1].Value)));
             Equal("1|2|3|4", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.HeaderCell.Value)));
-            Equal("1|23|38|48", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells[1].Value)));
-            Equal("1234567890123456789012", grid[2, 0].Value);
-            Equal("31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32", grid[3, 0].Value);
-            Equal("0 / 0", grid[4, 0].Value);
+            Equal("1|23|38|48", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells[2].Value)));
+            Equal("1234567890123456789012", grid[3, 0].Value);
+            Equal("31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32", grid[4, 0].Value);
+            Equal("0 / 0", grid[5, 0].Value);
             Equal(false, Get<Panel>(form, "hexArea").Visible);
-            Equal(false, grid[2, 0].ReadOnly);
-            foreach (var column in new[] { 0, 1, 3, 4 }) Equal(true, grid[column, 0].ReadOnly);
+            Equal(false, grid[3, 0].ReadOnly);
+            foreach (var column in new[] { 0, 1, 2, 4, 5 }) Equal(true, grid[column, 0].ReadOnly);
             Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 1, 10, true, 12));
-            Equal("1234567890|12…", string.Join("|", (IReadOnlyList<string>)Invoke(form, "WrappedDisplayLines", 0, 2)!));
-            Equal(null, Invoke(form, "WrappedDisplayLines", 0, 3));
+            Equal("1234567890|12…", string.Join("|", (IReadOnlyList<string>)Invoke(form, "WrappedDisplayLines", 0, 3)!));
             Equal(null, Invoke(form, "WrappedDisplayLines", 0, 4));
+            Equal(null, Invoke(form, "WrappedDisplayLines", 0, 5));
             using var bitmap = RenderGrid(form);
             Equal(false, Get<bool>(form, "hasUnsavedChanges"));
         });
@@ -45,11 +48,16 @@ internal static partial class Program
             Invoke(form, "WriteData", before, saveOptions);
             Invoke(form, "SetSingleRecordView", true);
             var grid = Get<DataGridView>(form, "grid");
-            Equal("CSV列1", grid[1, 0].Value);
-            Equal("CSV列2", grid[1, 1].Value);
-            Equal(value, grid[2, 1].Value);
-            Equal("41 20 20 42 E3 80 80 F0 9F 98 80 2C 22 51 22 0A 20", grid[3, 1].Value);
-            Equal("3 / 1", grid[4, 1].Value);
+            Equal(false, grid.Columns["FieldStartPosition"].Visible);
+            Equal("項目名|属性|内容|HEX|空白 半角 / 全角", string.Join("|", grid.Columns.Cast<DataGridViewColumn>()
+                .Where(column => column.Visible).Select(column => column.HeaderText)));
+            var fields = Get<List<FieldDefinition>>(form, "fields");
+            Equal(fields[0].DisplayDefinition, grid[1, 0].Value);
+            Equal(fields[1].DisplayDefinition, grid[1, 1].Value);
+            Equal("1|2", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(row => row.HeaderCell.Value)));
+            Equal(value, grid[3, 1].Value);
+            Equal("41 20 20 42 E3 80 80 F0 9F 98 80 2C 22 51 22 0A 20", grid[4, 1].Value);
+            Equal("3 / 1", grid[5, 1].Value);
             Invoke(form, "ChangeSingleRecord", 2);
             var excelAfter = (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(form, "BuildExcelRows")!;
             Equal(true, excelBefore.SelectMany(r => r).SequenceEqual(excelAfter.SelectMany(r => r)));
@@ -73,17 +81,18 @@ internal static partial class Program
             Invoke(form, "RefreshGrid");
             Invoke(form, "SetSingleRecordView", true);
             var grid = Get<DataGridView>(form, "grid");
-            Equal("1|5|9|12", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells[1].Value)));
-            Equal("41 20 20 20", grid[3, 0].Value);
-            Equal("3 / 0", grid[4, 0].Value);
-            Equal("8E 52 81 40", grid[3, 1].Value);
-            Equal("0 / 1", grid[4, 1].Value);
-            Equal("12 34 5D", grid[3, 2].Value);
-            grid[2, 0].Value = "ABCDE";
-            Invoke(form, "UpdateRecordValue", 0, 2);
+            Equal("X(4)|N(2)|S9(5) COMP-3|X(2)", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(row => row.Cells[1].Value)));
+            Equal("1|5|9|12", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells[2].Value)));
+            Equal("41 20 20 20", grid[4, 0].Value);
+            Equal("3 / 0", grid[5, 0].Value);
+            Equal("8E 52 81 40", grid[4, 1].Value);
+            Equal("0 / 1", grid[5, 1].Value);
+            Equal("12 34 5D", grid[4, 2].Value);
+            grid[3, 0].Value = "ABCDE";
+            Invoke(form, "UpdateRecordValue", 0, 3);
             Equal("ABCDE", Get<List<List<string>>>(form, "records")[0][0]);
-            Equal(Color.FromArgb(255, 225, 225), grid[2, 0].Style.BackColor);
-            Equal(true, (grid[3, 0].Value?.ToString() ?? "").Contains("エラー"));
+            Equal(Color.FromArgb(255, 225, 225), grid[3, 0].Style.BackColor);
+            Equal(true, (grid[4, 0].Value?.ToString() ?? "").Contains("エラー"));
             Equal(true, Get<bool>(form, "hasUnsavedChanges"));
         });
 
@@ -94,12 +103,12 @@ internal static partial class Program
             Invoke(form, "SetSingleRecordView", true);
             var grid = Get<DataGridView>(form, "grid");
             var records = Get<List<List<string>>>(form, "records");
-            grid.CurrentCell = grid[2, 1];
+            grid.CurrentCell = grid[3, 1];
             Equal(true, grid.BeginEdit(false));
             ((TextBox)grid.EditingControl!).Text = "987";
             Get<Button>(form, "nextRecordButton").PerformClick();
             Equal("987", records[0][1]);
-            Equal("223456789012345", grid[2, 1].Value);
+            Equal("223456789012345", grid[3, 1].Value);
             Equal(1, (int)Invoke(form, "CurrentFieldIndex")!);
             Equal(1, Get<int>(form, "singleRecordIndex"));
             Equal(2m, Get<NumericUpDown>(form, "singleRecordNumber").Value);
@@ -111,7 +120,7 @@ internal static partial class Program
             Invoke(form, "ChangeSingleRecord", int.MinValue);
             Equal(0, Get<int>(form, "singleRecordIndex"));
             Equal(false, Get<Button>(form, "previousRecordButton").Enabled);
-            Equal("987", grid[2, 1].Value);
+            Equal("987", grid[3, 1].Value);
             Equal(true, Get<bool>(form, "hasUnsavedChanges"));
         });
 
@@ -123,7 +132,7 @@ internal static partial class Program
             Invoke(form, "SetSingleRecordView", true);
             var grid = Get<DataGridView>(form, "grid");
             Equal("1|3|4", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.HeaderCell.Value)));
-            Equal("1|38|48", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells[1].Value)));
+            Equal("1|38|48", string.Join("|", grid.Rows.Cast<DataGridViewRow>().Select(r => r.Cells[2].Value)));
             Invoke(form, "ChangeSingleRecord", 2);
             var selected = Get<List<List<string>>>(form, "records")[2].ToArray();
             Invoke(form, "DuplicateRecord");
@@ -152,8 +161,8 @@ internal static partial class Program
                 {
                     bands++;
                     Equal(null, row.HeaderCell.Value);
-                    Equal("", row.Cells[3].Value);
                     Equal("", row.Cells[4].Value);
+                    Equal("", row.Cells[5].Value);
                 }
             }
             Equal(true, bands > 0);
@@ -170,14 +179,14 @@ internal static partial class Program
             Invoke(form, "SelectRecord", 0);
             Invoke(form, "SetSingleRecordView", true);
             var grid = Get<DataGridView>(form, "grid");
-            grid.CurrentCell = grid[2, 0];
-            Equal("E6 9D B1 E4 BA AC", grid[3, 0].Value);
-            Equal("E5 A4 A7 E9 98 AA", grid[3, 1].Value);
+            grid.CurrentCell = grid[3, 0];
+            Equal("E6 9D B1 E4 BA AC", grid[4, 0].Value);
+            Equal("E5 A4 A7 E9 98 AA", grid[4, 1].Value);
             var ms932Path = Path.Combine(temporaryDirectory, "single-encoding-ms932.csv");
             Invoke(form, "WriteData", ms932Path, new DataSaveOptions(DataFileFormat.Csv, CsvTextEncoding.ShiftJis,
                 RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis, CsvHasHeader: true));
-            Equal("93 8C 8B 9E", grid[3, 0].Value);
-            Equal("91 E5 8D E3", grid[3, 1].Value);
+            Equal("93 8C 8B 9E", grid[4, 0].Value);
+            Equal("91 E5 8D E3", grid[4, 1].Value);
             Equal(0, Get<int>(form, "singleRecordIndex"));
             Equal("東京", records[0][0]);
             Equal("大阪", records[0][1]);
@@ -185,10 +194,10 @@ internal static partial class Program
             var utf8Path = Path.Combine(temporaryDirectory, "single-encoding-utf8.csv");
             Invoke(form, "WriteData", utf8Path, new DataSaveOptions(DataFileFormat.Csv, CsvTextEncoding.Utf8,
                 RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis, CsvHasHeader: true));
-            Equal("E6 9D B1 E4 BA AC", grid[3, 0].Value);
-            Equal("E5 A4 A7 E9 98 AA", grid[3, 1].Value);
-            Equal("0 / 0", grid[4, 0].Value);
-            Equal("0 / 0", grid[4, 1].Value);
+            Equal("E6 9D B1 E4 BA AC", grid[4, 0].Value);
+            Equal("E5 A4 A7 E9 98 AA", grid[4, 1].Value);
+            Equal("0 / 0", grid[5, 0].Value);
+            Equal("0 / 0", grid[5, 1].Value);
             Equal(false, Get<bool>(form, "hasUnsavedChanges"));
         });
 
@@ -209,9 +218,9 @@ internal static partial class Program
             Equal(2m, Get<NumericUpDown>(form, "singleRecordNumber").Value);
             Equal(5, Get<List<List<string>>>(form, "records").Count);
             var grid = Get<DataGridView>(form, "grid");
-            Equal(5, grid.Columns.Count);
-            Equal("2234567890123456789012", grid[2, 0].Value);
-            Equal("32 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32", grid[3, 0].Value);
+            Equal(6, grid.Columns.Count);
+            Equal("2234567890123456789012", grid[3, 0].Value);
+            Equal("32 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32", grid[4, 0].Value);
             Equal("2234567890123456789012", Get<List<List<string>>>(form, "records")[1][0]);
             Equal(false, Get<bool>(form, "hasUnsavedChanges"));
         });

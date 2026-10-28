@@ -4,6 +4,9 @@ namespace FixedDataBuilder;
 
 public sealed partial class MainForm
 {
+    private const int SingleRecordValueColumnIndex = 3;
+    private const int SingleRecordHexColumnIndex = 4;
+    private const int SingleRecordSpacesColumnIndex = 5;
     private bool isSingleRecordView;
     private int singleRecordIndex;
     private bool isUpdatingRecordNavigator;
@@ -105,7 +108,7 @@ public sealed partial class MainForm
         if (layout == GridLayout.FieldRows)
         {
             var row = fieldGridRows.FindIndex(item => item.FieldIndex == field && !item.IsOccursHeader);
-            if (row >= 0) grid.CurrentCell = grid[isSingleRecordView ? 2 : record + 2, row];
+            if (row >= 0) grid.CurrentCell = grid[isSingleRecordView ? SingleRecordValueColumnIndex : record + 2, row];
         }
         else
         {
@@ -114,9 +117,8 @@ public sealed partial class MainForm
         }
     }
 
-    private string FieldStartPosition(int fieldIndex) => IsCsv
-        ? $"CSV列{fields.Take(fieldIndex + 1).Count(field => !field.IsRedefines)}"
-        : (1L + fields.Take(fieldIndex).Sum(field => (long)field.StorageByteLength)).ToString(CultureInfo.InvariantCulture);
+    private string FieldStartPosition(int fieldIndex) =>
+        (1L + fields.Take(fieldIndex).Sum(field => (long)field.StorageByteLength)).ToString(CultureInfo.InvariantCulture);
 
     private string FieldHexText(int recordIndex, int fieldIndex)
     {
@@ -136,22 +138,25 @@ public sealed partial class MainForm
         var fieldIndex = FieldIndexFromFieldRow(rowIndex);
         if (fieldIndex < 0) return;
         var row = grid.Rows[rowIndex];
-        row.Cells[3].Value = FieldHexText(singleRecordIndex, fieldIndex);
+        row.Cells[SingleRecordHexColumnIndex].Value = FieldHexText(singleRecordIndex, fieldIndex);
         var summary = SelectionSpaceSummary.Count(records[singleRecordIndex][fieldIndex], fields[fieldIndex], IsCsv, TextDataEncoding);
-        row.Cells[4].Value = $"{summary.HalfWidth} / {summary.FullWidth}";
-        row.Cells[4].ToolTipText = summary.DisplayText;
+        row.Cells[SingleRecordSpacesColumnIndex].Value = $"{summary.HalfWidth} / {summary.FullWidth}";
+        row.Cells[SingleRecordSpacesColumnIndex].ToolTipText = summary.DisplayText;
     }
 
     private void SizeSingleRecordColumns()
     {
-        if (grid.Columns.Count < 5) return;
+        if (grid.Columns.Count <= SingleRecordSpacesColumnIndex) return;
         grid.Columns[0].Width = Math.Clamp(grid.Columns[0].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false), 100, 320);
-        grid.Columns[1].Width = Math.Clamp(grid.Columns[1].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false), 100, 160);
-        var valueWidth = grid.Columns[2].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false);
-        grid.Columns[2].Width = Math.Clamp(valueWidth, 140, 340);
-        grid.Columns[4].Width = Math.Max(140, TextRenderer.MeasureText(grid.Columns[4].HeaderText, grid.Font).Width + 22);
-        grid.Columns[3].Width = Math.Max(200, grid.ClientSize.Width - grid.RowHeadersWidth
-            - grid.Columns[0].Width - grid.Columns[1].Width - grid.Columns[2].Width - grid.Columns[4].Width - 22);
+        grid.Columns[1].Width = Math.Max(100, grid.Columns[1].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false));
+        grid.Columns[2].Width = Math.Clamp(grid.Columns[2].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false), 100, 160);
+        var valueWidth = grid.Columns[SingleRecordValueColumnIndex].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false);
+        grid.Columns[SingleRecordValueColumnIndex].Width = Math.Clamp(valueWidth, 140, 340);
+        var spaces = grid.Columns[SingleRecordSpacesColumnIndex];
+        spaces.Width = Math.Max(140, TextRenderer.MeasureText(spaces.HeaderText, grid.Font).Width + 22);
+        var usedWidth = grid.Columns.Cast<DataGridViewColumn>()
+            .Where(column => column.Visible && column.Index != SingleRecordHexColumnIndex).Sum(column => column.Width);
+        grid.Columns[SingleRecordHexColumnIndex].Width = Math.Max(200, grid.ClientSize.Width - grid.RowHeadersWidth - usedWidth - 22);
         AdjustSingleRecordRowHeights();
     }
 
@@ -160,7 +165,7 @@ public sealed partial class MainForm
         if (!isSingleRecordView) return;
         foreach (DataGridViewRow row in grid.Rows)
         {
-            var wrapped = WrappedDisplayLines(row.Index, 2);
+            var wrapped = WrappedDisplayLines(row.Index, SingleRecordValueColumnIndex);
             var height = Math.Max(grid.RowTemplate.Height,
                 row.GetPreferredHeight(row.Index, DataGridViewAutoSizeRowMode.AllCells, true));
             if (wrapped is not null) height = Math.Max(height, wrapped.Count * (grid.Font.Height + 2) + 6);

@@ -2386,7 +2386,7 @@ public sealed partial class MainForm : Form
         if (layout == GridLayout.FieldRows)
         {
             var fieldRowsFieldIndex = FieldIndexFromFieldRow(rowIndex);
-            if (columnIndex < 2 || (isSingleRecordView && columnIndex != 2) || fieldRowsFieldIndex < 0)
+            if (columnIndex < 2 || (isSingleRecordView && columnIndex != SingleRecordValueColumnIndex) || fieldRowsFieldIndex < 0)
             {
                 return;
             }
@@ -2470,7 +2470,7 @@ public sealed partial class MainForm : Form
         {
             ChangeSingleRecord(recordIndex);
             var firstRow = fieldGridRows.FindIndex(row => !row.IsOccursHeader && row.FieldIndex >= 0);
-            if (firstRow >= 0 && records.Count > 0) grid.CurrentCell = grid[2, firstRow];
+            if (firstRow >= 0 && records.Count > 0) grid.CurrentCell = grid[SingleRecordValueColumnIndex, firstRow];
             return;
         }
         if (recordIndex < 0 || fields.Count == 0 || records.Count == 0 || VisibleFieldIndexes().Count == 0)
@@ -2567,18 +2567,21 @@ public sealed partial class MainForm : Form
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
         grid.ColumnHeadersHeight = 28;
         grid.Columns.Add(CreateReadOnlyColumn("Name", "項目名", 180, frozen: true));
-        grid.Columns.Add(CreateReadOnlyColumn("Definition", isSingleRecordView ? "開始位置" : "定義", 150, frozen: true));
+        grid.Columns.Add(CreateReadOnlyColumn("Definition", isSingleRecordView ? "属性" : "定義", 150, frozen: true));
         ApplyDefinitionColumnStyle(grid.Columns[0]);
         ApplyDefinitionColumnStyle(grid.Columns[1]);
 
         if (isSingleRecordView)
         {
+            grid.Columns.Add(CreateReadOnlyColumn("FieldStartPosition", "開始位置", 100, frozen: true));
+            ApplyDefinitionColumnStyle(grid.Columns[2]);
+            grid.Columns[2].Visible = !IsCsv;
+            grid.Columns[2].HeaderCell.ToolTipText = "レコード先頭を1とする開始バイト位置";
             grid.Columns.Add(CreateEditableColumn("SingleRecordValue", "内容", 200));
-            grid.Columns[2].ReadOnly = records.Count == 0;
+            grid.Columns[SingleRecordValueColumnIndex].ReadOnly = records.Count == 0;
             grid.Columns.Add(CreateReadOnlyColumn("FieldHex", "HEX", 300, frozen: false));
-            grid.Columns[3].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            grid.Columns[SingleRecordHexColumnIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             grid.Columns.Add(CreateReadOnlyColumn("FieldSpaces", "空白 半角 / 全角", 140, frozen: false));
-            grid.Columns[1].HeaderCell.ToolTipText = IsCsv ? "CSVの列番号（開始バイト位置は値の長さで変わります）" : "レコード先頭を1とする開始バイト位置";
         }
         else for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
         {
@@ -2607,7 +2610,8 @@ public sealed partial class MainForm : Form
             row.HeaderCell.ToolTipText = $"定義順の項目番号: {fieldIndex + 1}";
             row.Cells[0].Value = occursInfo is null ? field.Name : $"  {occursInfo.ChildName}";
             row.Cells[0].ToolTipText = isSingleRecordView ? $"{field.Name} / {field.DisplayDefinition}" : field.Name;
-            row.Cells[1].Value = isSingleRecordView ? FieldStartPosition(fieldIndex) : field.DisplayDefinition;
+            row.Cells[1].Value = field.DisplayDefinition;
+            if (isSingleRecordView) row.Cells[2].Value = IsCsv ? "" : FieldStartPosition(fieldIndex);
             if (occursInfo is not null)
             {
                 row.DefaultCellStyle.BackColor = OccursBackColor(occursInfo);
@@ -2619,7 +2623,7 @@ public sealed partial class MainForm : Form
             foreach (var recordIndex in displayedRecords)
             {
                 var value = FormatValueForDisplay(field, records[recordIndex][fieldIndex], IsCsv);
-                var columnIndex = isSingleRecordView ? 2 : recordIndex + 2;
+                var columnIndex = isSingleRecordView ? SingleRecordValueColumnIndex : recordIndex + 2;
                 row.Cells[columnIndex].Value = value;
                 row.Cells[columnIndex].ReadOnly = field.IsRedefines;
                 ApplyCellValidationStyle(row.Cells[columnIndex], field, value, occursInfo is null ? null : OccursBackColor(occursInfo));
@@ -3071,7 +3075,7 @@ public sealed partial class MainForm : Form
         if (layout == GridLayout.FieldRows)
         {
             var fieldIndex = FieldIndexFromFieldRow(rowIndex);
-            if (columnIndex >= 2 && (!isSingleRecordView || columnIndex == 2) && fieldIndex >= 0)
+            if (columnIndex >= 2 && (!isSingleRecordView || columnIndex == SingleRecordValueColumnIndex) && fieldIndex >= 0)
             {
                 field = fields[fieldIndex];
                 return true;
