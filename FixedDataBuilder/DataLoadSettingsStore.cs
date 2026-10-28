@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace FixedDataBuilder;
 
 public sealed record DataLoadSettings(DataFileFormat Format, CsvTextEncoding CsvEncoding,
-    RecordSeparatorMode SeparatorMode, NationalTextEncoding NationalEncoding, DataEncodingProfile? TextEncoding = null);
+    RecordSeparatorMode SeparatorMode, NationalTextEncoding NationalEncoding, DataEncodingProfile? TextEncoding = null, bool CsvHasHeader = false);
 
 public sealed class DataLoadSettingsStore(string path)
 {

@@ -244,6 +244,8 @@ internal static partial class Program
             RunHeaderRowsTests(repo);
             RunUnsavedAndSettingsTests(repo);
             RunJapaneseEncodingTests(repo);
+            RunCsvHeaderTests(repo);
+            RunDisplayWrapTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

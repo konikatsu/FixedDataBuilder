@@ -8,7 +8,7 @@ public enum CsvTextEncoding { Utf8 = 0, ShiftJis = 1, StrictShiftJis = 2 }
 public static class CsvDataReader
 {
     public static IReadOnlyList<List<string>> Read(string path, IReadOnlyList<FieldDefinition> fields,
-        CsvTextEncoding textEncoding = CsvTextEncoding.Utf8)
+        CsvTextEncoding textEncoding = CsvTextEncoding.Utf8, bool hasHeader = false)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var encoding = JapaneseEncodings.ForCsv(textEncoding);
@@ -23,22 +23,28 @@ public static class CsvDataReader
         var started = false;
         var line = 1;
         var recordStartLine = 1;
+        var headerRead = false;
+        string RowLabel() => hasHeader && !headerRead ? "CSV ヘッダー" : $"CSV {records.Count + 1} 行目";
 
         InvalidDataException Error(string message) =>
-            new($"CSV {records.Count + 1} 行目（ファイル {line} 行目）: {message}");
+            new($"{RowLabel()}（ファイル {line} 行目）: {message}");
 
         void FinishRecord()
         {
             cells.Add(cell.ToString());
             if (cells.Count != columnCount)
-                throw new InvalidDataException($"CSV {records.Count + 1} 行目（ファイル {recordStartLine} 行目）: "
+                throw new InvalidDataException($"{RowLabel()}（ファイル {recordStartLine} 行目）: "
                     + $"列数が定義と一致しません。必要 {columnCount} 列 / 実際 {cells.Count} 列。");
-            var column = 0;
-            // CSV列を持たない数値REDEFINESには、従来の固定長検証で有効な内部初期値を置く。
-            records.Add(fields.Select(field => field.IsRedefines
-                ? field.Type is FieldDataType.PlainNumber or FieldDataType.SignedNumber
-                    or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned ? "0" : string.Empty
-                : cells[column++]).ToList());
+            if (hasHeader && !headerRead) headerRead = true;
+            else
+            {
+                var column = 0;
+                // CSV列を持たない数値REDEFINESには、従来の固定長検証で有効な内部初期値を置く。
+                records.Add(fields.Select(field => field.IsRedefines
+                    ? field.Type is FieldDataType.PlainNumber or FieldDataType.SignedNumber
+                        or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned ? "0" : string.Empty
+                    : cells[column++]).ToList());
+            }
             cells.Clear();
             cell.Clear();
             state = State.Start;
@@ -92,7 +98,8 @@ public static class CsvDataReader
         }
         if (state == State.Quoted) throw Error("引用符が閉じられていません。");
         if (started || cells.Count > 0) FinishRecord();
-        if (records.Count == 0) throw new InvalidDataException("CSVデータに行がありません。");
+        if (records.Count == 0) throw new InvalidDataException(hasHeader && headerRead
+            ? "CSVヘッダーの後にデータ行がありません。" : "CSVデータに行がありません。");
         return records;
     }
 

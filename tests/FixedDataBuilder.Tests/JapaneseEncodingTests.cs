@@ -193,7 +193,7 @@ internal static partial class Program
             });
             Equal("①髙", Get<List<List<string>>>(form, "records")[0][0]);
             Equal(CsvTextEncoding.ShiftJis, Get<CsvTextEncoding>(form, "currentCsvEncoding"));
-            Throws<TargetInvocationException>(() => Invoke(form, "LoadCsvData", data, CsvTextEncoding.StrictShiftJis));
+            Throws<TargetInvocationException>(() => Invoke(form, "LoadCsvData", data, CsvTextEncoding.StrictShiftJis, false));
             Equal("①髙", Get<List<List<string>>>(form, "records")[0][0]);
             Equal(CsvTextEncoding.ShiftJis, store.Find(definition, data)!.CsvEncoding);
         });

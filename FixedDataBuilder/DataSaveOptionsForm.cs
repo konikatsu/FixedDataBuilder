@@ -1,7 +1,7 @@
 namespace FixedDataBuilder;
 
 public sealed record DataSaveOptions(DataFileFormat Format, CsvTextEncoding CsvEncoding,
-    RecordSeparatorMode SeparatorMode, NationalTextEncoding NationalEncoding, DataEncodingProfile? TextEncoding = null);
+    RecordSeparatorMode SeparatorMode, NationalTextEncoding NationalEncoding, DataEncodingProfile? TextEncoding = null, bool CsvHasHeader = false);
 
 public sealed class DataSaveOptionsForm : Form
 {
@@ -13,10 +13,10 @@ public sealed class DataSaveOptionsForm : Form
     private readonly ComboBox textEncoding = new() { Name = "TextEncoding", DropDownStyle = ComboBoxStyle.DropDownList };
 
     public DataSaveOptions Options => new(
-        format.SelectedIndex == 1 ? DataFileFormat.Csv : DataFileFormat.FixedLength,
+        format.SelectedIndex > 0 ? DataFileFormat.Csv : DataFileFormat.FixedLength,
         (CsvTextEncoding)csvEncoding.SelectedIndex,
         separator.SelectedIndex == 1 ? RecordSeparatorMode.None : RecordSeparatorMode.CrLfOrLf,
-        (NationalTextEncoding)national.SelectedIndex, (DataEncodingProfile)textEncoding.SelectedIndex);
+        (NationalTextEncoding)national.SelectedIndex, (DataEncodingProfile)textEncoding.SelectedIndex, format.SelectedIndex == 2);
 
     public DataSaveOptionsForm(DataSaveOptions current)
     {
@@ -25,7 +25,7 @@ public sealed class DataSaveOptionsForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox = MaximizeBox = false;
         ClientSize = new Size(550, 410);
-        format.Items.AddRange(["固定長", "可変長 CSV（ヘッダーなし）"]);
+        format.Items.AddRange(["固定長", "可変長 CSV（ヘッダーなし）", "可変長 CSV（ヘッダーあり）"]);
         csvEncoding.Items.AddRange(JapaneseEncodings.CsvNames);
         textEncoding.Items.AddRange(JapaneseEncodings.TextNames);
         separator.Items.AddRange(["改行あり (CRLF)", "改行なし"]);
@@ -41,7 +41,7 @@ public sealed class DataSaveOptionsForm : Form
             Controls.Add(label);
             Controls.Add(controls[index]);
         }
-        format.SelectedIndex = current.Format == DataFileFormat.Csv ? 1 : 0;
+        format.SelectedIndex = current.Format == DataFileFormat.Csv ? (current.CsvHasHeader ? 2 : 1) : 0;
         csvEncoding.SelectedIndex = (int)current.CsvEncoding;
         textEncoding.SelectedIndex = (int)(current.TextEncoding ?? DataEncodingProfile.ShiftJis);
         separator.SelectedIndex = current.SeparatorMode == RecordSeparatorMode.None ? 1 : 0;
@@ -64,9 +64,12 @@ public sealed class DataSaveOptionsForm : Form
         CancelButton = cancel;
         void UpdateOptions()
         {
-            var isCsv = format.SelectedIndex == 1;
+            var isCsv = format.SelectedIndex > 0;
             csvEncoding.Enabled = labels[1].Enabled = isCsv;
             separator.Enabled = national.Enabled = textEncoding.Enabled = labels[2].Enabled = labels[3].Enabled = labels[4].Enabled = !isCsv;
+            note.Text = format.SelectedIndex == 2
+                ? "CSV: 先頭行に定義の項目名を出力します。\r\nデータの空欄・空白・先頭ゼロを保持。全列引用符・CRLF。"
+                : "CSV: 空欄・空白・先頭ゼロを保持。桁合わせなし。\r\n全列を引用符で囲み、CRLFで出力します。";
             note.Visible = isCsv;
         }
         format.SelectedIndexChanged += (_, _) => UpdateOptions();

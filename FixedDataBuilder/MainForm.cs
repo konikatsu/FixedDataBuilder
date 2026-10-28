@@ -51,6 +51,8 @@ public sealed class MainForm : Form
     private readonly ToolStripStatusLabel statusLabel = new();
     private readonly ToolStripMenuItem fieldRowsButton;
     private readonly ToolStripMenuItem recordRowsButton;
+    private readonly ToolStripMenuItem wrapDisplayButton = new("折り返し表示") { Name = "WrapDisplay", CheckOnClick = true };
+    private DisplayWrapOptions displayWrapOptions = new();
     private readonly List<string> recentDefinitionFiles = [];
     private readonly List<string> recentDataFiles = [];
     private readonly List<FieldDefinition> fields = [];
@@ -62,6 +64,7 @@ public sealed class MainForm : Form
     private string? saveDataPath;
     private DataFileFormat currentDataFileFormat = DataFileFormat.FixedLength;
     private CsvTextEncoding currentCsvEncoding = CsvTextEncoding.Utf8;
+    private bool currentCsvHasHeader;
     private bool IsCsv => currentDataFileFormat == DataFileFormat.Csv;
     private RecordSeparatorMode currentSeparatorMode = RecordSeparatorMode.CrLfOrLf;
     private DataEncodingProfile currentDataEncodingProfile = DataEncodingProfile.ShiftJis;
@@ -138,7 +141,7 @@ public sealed class MainForm : Form
     {
         var definition = GetCurrentDefinitionPath();
         return string.IsNullOrWhiteSpace(definition) || loadSettingsStore.Remember(definition, path,
-            new DataLoadSettings(currentDataFileFormat, currentCsvEncoding, currentSeparatorMode, currentNationalTextEncoding, currentDataEncodingProfile),
+            new DataLoadSettings(currentDataFileFormat, currentCsvEncoding, currentSeparatorMode, currentNationalTextEncoding, currentDataEncodingProfile, currentCsvHasHeader),
             currentXmlLayout?.Id);
     }
 
@@ -388,12 +391,20 @@ public sealed class MainForm : Form
         menuStrip.Items.Add(CreateMenu("定義",
             CreateMenuItem("定義作成...", (_, _) => CreateDefinition(editCurrent: false)),
             CreateMenuItem("定義修正...", (_, _) => CreateDefinition(editCurrent: true))));
+        wrapDisplayButton.CheckedChanged += (_, _) =>
+        {
+            if (displayWrapOptions.Enabled != wrapDisplayButton.Checked)
+                ApplyDisplayWrapOptions(displayWrapOptions with { Enabled = wrapDisplayButton.Checked });
+        };
         menuStrip.Items.Add(CreateMenu("表示",
             fieldRowsButton,
             recordRowsButton,
             new ToolStripSeparator(),
             CreateMenuItem("表示項目...", (_, _) => ChooseVisibleFields()),
-            CreateMenuItem("フォント設定...", (_, _) => ChooseDisplayFont())));
+            CreateMenuItem("フォント設定...", (_, _) => ChooseDisplayFont()),
+            new ToolStripSeparator(),
+            wrapDisplayButton,
+            CreateMenuItem("折り返し表示設定...", (_, _) => ChooseDisplayWrapOptions())));
         menuStrip.Items.Add(CreateMenu("ツール",
             CreateMenuItem("検証", (_, _) => ValidateRecords(showSuccess: true))));
         RefreshRecentFileItems();
@@ -435,6 +446,8 @@ public sealed class MainForm : Form
             try
             {
                 UpdateRecordValue(e.RowIndex, e.ColumnIndex);
+                AdjustWrappedRowHeights();
+                grid.InvalidateRow(e.RowIndex);
             }
             catch (Exception ex)
             {
@@ -450,6 +463,117 @@ public sealed class MainForm : Form
             }
         };
         grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
+    }
+
+    private void ChooseDisplayWrapOptions()
+    {
+        using var form = new DisplayWrapOptionsForm(displayWrapOptions);
+        if (form.ShowDialog(this) == DialogResult.OK) ApplyDisplayWrapOptions(form.Options);
+    }
+
+    private void ApplyDisplayWrapOptions(DisplayWrapOptions options)
+    {
+        grid.EndEdit();
+        displayWrapOptions = options;
+        wrapDisplayButton.Checked = options.Enabled;
+        RefreshGridSizing();
+        SizeColumnsToFitData();
+        grid.Invalidate();
+    }
+
+    private IReadOnlyList<string>? WrappedDisplayLines(int row, int column)
+    {
+        if (!displayWrapOptions.Enabled || row < 0 || column < 0
+            || (layout == GridLayout.RecordRows && RecordIndexFromGridRow(row) < 0)
+            || !TryGetCellField(row, column, out var field)) return null;
+        var value = grid[column, row].Value?.ToString() ?? string.Empty;
+        var encoding = IsCsv ? JapaneseEncodings.ForCsv(currentCsvEncoding)
+            : field.Type == FieldDataType.FullWidthText ? NationalTextEncodingHelper.GetEncoding(currentNationalTextEncoding)
+            : TextDataEncoding;
+        try
+        {
+            if (encoding.GetByteCount(value) < displayWrapOptions.ThresholdBytes
+                && !value.Contains('\r') && !value.Contains('\n')) return null;
+            // Preserve the existing fixed-length padding markers; measure spaces
+            // before converting them to the visible marker glyphs.
+            var padding = !IsCsv && field.Type is FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText
+                ? Math.Max(0, GetVisibleTextValue(field, value).Length - value.Length) : 0;
+            var padded = value + new string(field.Type == FieldDataType.FullWidthText ? '\u3000' : ' ', padding);
+            return ByteTextWrapper.Lines(padded, encoding, displayWrapOptions.LineBytes)
+                .Select(part => BuildVisibleTextValue(field, part, 0)).ToArray();
+        }
+        catch (EncoderFallbackException)
+        {
+            // Invalid values remain editable and retain their validation error.
+            return null;
+        }
+    }
+
+    private void AdjustWrappedRowHeights()
+    {
+        if (!displayWrapOptions.Enabled) return;
+        foreach (DataGridViewRow row in grid.Rows)
+        {
+            var height = grid.RowTemplate.Height;
+            foreach (DataGridViewCell cell in row.Cells)
+            {
+                var lines = WrappedDisplayLines(row.Index, cell.ColumnIndex);
+                if (lines is not null)
+                    height = Math.Max(height, lines.Count * ((cell.InheritedStyle.Font ?? grid.Font).Height + 2) + 6);
+            }
+            row.Height = Math.Clamp(height, row.MinimumHeight, 65536);
+        }
+    }
+
+    private void SizeWrappedColumns()
+    {
+        foreach (DataGridViewColumn column in grid.Columns)
+        {
+            var width = TextRenderer.MeasureText(column.HeaderText, column.InheritedStyle.Font ?? grid.Font).Width + 20;
+            foreach (DataGridViewRow row in grid.Rows)
+            {
+                var cell = row.Cells[column.Index];
+                var lines = WrappedDisplayLines(row.Index, column.Index);
+                if (lines is null)
+                {
+                    var value = cell.Value?.ToString() ?? string.Empty;
+                    if (TryGetCellField(row.Index, column.Index, out var field)
+                        && !(layout == GridLayout.RecordRows && RecordIndexFromGridRow(row.Index) < 0)
+                        && (IsCsv || field.Type is FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText))
+                        value = GetVisibleTextValue(field, value);
+                    lines = [value];
+                }
+                foreach (var line in lines)
+                    width = Math.Max(width, TextRenderer.MeasureText(line, cell.InheritedStyle.Font ?? grid.Font,
+                        Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + cell.InheritedStyle.Padding.Horizontal + 2);
+            }
+            column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
+        }
+    }
+
+    private bool TryPaintWrappedCell(DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.Graphics is null || e.CellStyle is null) return false;
+        var lines = WrappedDisplayLines(e.RowIndex, e.ColumnIndex);
+        if (lines is null) return false;
+        e.Paint(e.CellBounds, e.PaintParts & ~DataGridViewPaintParts.ContentForeground);
+        var font = e.CellStyle.Font ?? grid.Font;
+        var selected = (e.State & DataGridViewElementStates.Selected) != 0;
+        var padding = e.CellStyle.Padding;
+        var bounds = new Rectangle(e.CellBounds.Left + padding.Left, e.CellBounds.Top + padding.Top + 2,
+            e.CellBounds.Width - padding.Horizontal - 1, font.Height + 2);
+        foreach (var line in lines)
+        {
+            if (bounds.Top >= e.CellBounds.Bottom) break;
+            if (!selected) PaintVisibleSpaceHighlights(e.Graphics, font, bounds, line);
+            TextRenderer.DrawText(e.Graphics, line, font, bounds,
+                selected ? e.CellStyle.SelectionForeColor : e.CellStyle.ForeColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix
+                    | TextFormatFlags.SingleLine | TextFormatFlags.PreserveGraphicsClipping);
+            bounds.Y += font.Height + 2;
+        }
+        e.Handled = true;
+        return true;
     }
 
     private void ChooseVisibleFields()
@@ -614,6 +738,7 @@ public sealed class MainForm : Form
         {
             row.Height = grid.RowTemplate.Height;
         }
+        AdjustWrappedRowHeights();
     }
 
     private void OpenDefinition()
@@ -682,7 +807,7 @@ public sealed class MainForm : Form
                 var format = GetOptionValue(args, "--format");
                 if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)
                     || (format is null && Path.GetExtension(dataPath).Equals(".csv", StringComparison.OrdinalIgnoreCase)))
-                    LoadCsvData(dataPath, ParseCsvEncoding(GetOptionValue(args, "--csv-encoding")));
+                    LoadCsvData(dataPath, ParseCsvEncoding(GetOptionValue(args, "--csv-encoding")), ParseCsvHeader(GetOptionValue(args, "--csv-header")));
                 else
                     LoadData(dataPath, separatorMode, nationalTextEncoding, ParseTextEncoding(GetOptionValue(args, "--text-encoding")));
             }
@@ -711,6 +836,7 @@ public sealed class MainForm : Form
         var (loadedFields, xmlLayout) = definition.Value;
         // 読み込み・選択が完了してから現在の定義を置き換える。
         currentDataFileFormat = DataFileFormat.FixedLength;
+        currentCsvHasHeader = false;
         currentDataEncodingProfile = xmlLayout?.EncodingProfile ?? (IsCopybookPath(path)
             ? DataEncodingProfile.Utf8WithNationalText
             : DataEncodingProfile.ShiftJis);
@@ -819,6 +945,7 @@ public sealed class MainForm : Form
         else
         {
             currentDataFileFormat = DataFileFormat.FixedLength;
+            currentCsvHasHeader = false;
             currentDataEncodingProfile = definition.Value.XmlLayout?.EncodingProfile ?? (IsCopybookPath(path)
                 ? DataEncodingProfile.Utf8WithNationalText : DataEncodingProfile.ShiftJis);
             currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
@@ -878,7 +1005,7 @@ public sealed class MainForm : Form
                 ? field with { NationalByteWidth = width } : field).ToList();
         }
         var loadedRecords = string.IsNullOrWhiteSpace(dataPath) ? null
-            : IsCsv ? CsvDataReader.Read(dataPath, loadedFields, currentCsvEncoding)
+            : IsCsv ? CsvDataReader.Read(dataPath, loadedFields, currentCsvEncoding, currentCsvHasHeader)
             : FixedLengthDataReader.Read(dataPath, loadedFields, currentSeparatorMode,
                 currentDataEncodingProfile, currentNationalTextEncoding);
 
@@ -913,6 +1040,7 @@ public sealed class MainForm : Form
         currentDataEncodingProfile = textEncoding ?? currentDataEncodingProfile;
         ApplyNationalTextEncoding(nationalTextEncoding);
         currentDataFileFormat = DataFileFormat.FixedLength;
+        currentCsvHasHeader = false;
 
         records.Clear();
         records.AddRange(loadedRecords);
@@ -938,15 +1066,16 @@ public sealed class MainForm : Form
         }
     }
 
-    private void LoadCsvData(string path, CsvTextEncoding encoding)
+    private void LoadCsvData(string path, CsvTextEncoding encoding, bool hasHeader = false)
     {
         // 解析成功までは現在のデータ・保存先・固定長の文字コードを変更しない。
-        var loadedRecords = CsvDataReader.Read(path, fields, encoding);
+        var loadedRecords = CsvDataReader.Read(path, fields, encoding, hasHeader);
         records.Clear();
         records.AddRange(loadedRecords);
         NormalizeRecords();
         currentDataFileFormat = DataFileFormat.Csv;
         currentCsvEncoding = encoding;
+        currentCsvHasHeader = hasHeader;
         saveDataPath = path;
         SetPathText(dataPathTextBox, path);
         AddRecentFile(recentDataFiles, path);
@@ -1037,7 +1166,7 @@ public sealed class MainForm : Form
             }
 
             if (loadOptions.IsCsv)
-                LoadCsvData(path, loadOptions.CsvEncoding);
+                LoadCsvData(path, loadOptions.CsvEncoding, loadOptions.CsvHasHeader);
             else
                 LoadData(path, loadOptions.SeparatorMode, loadOptions.NationalTextEncoding, loadOptions.TextEncoding);
             RefreshGrid();
@@ -1223,6 +1352,13 @@ public sealed class MainForm : Form
         };
     }
 
+    private static bool ParseCsvHeader(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        null or "none" or "false" => false,
+        "present" or "true" => true,
+        _ => throw new InvalidDataException("CSVヘッダーはpresent（あり）またはnone（なし）を指定してください。")
+    };
+
     private static CsvTextEncoding ParseCsvEncoding(string? value) => NormalizeEncoding(value) switch
     {
         null or "utf8" => CsvTextEncoding.Utf8,
@@ -1286,8 +1422,8 @@ public sealed class MainForm : Form
             Name = "DataFormat", DropDownStyle = ComboBoxStyle.DropDownList,
             Location = new Point(90, 16), Width = 245
         };
-        formatCombo.Items.AddRange(["固定長", "可変長 CSV（ヘッダーなし）"]);
-        formatCombo.SelectedIndex = remembered is not null ? (remembered.Format == DataFileFormat.Csv ? 1 : 0)
+        formatCombo.Items.AddRange(["固定長", "可変長 CSV（ヘッダーなし）", "可変長 CSV（ヘッダーあり）"]);
+        formatCombo.SelectedIndex = remembered is not null ? (remembered.Format == DataFileFormat.Csv ? (remembered.CsvHasHeader ? 2 : 1) : 0)
             : Path.GetExtension(dataPath).Equals(".csv", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         var csvEncodingLabel = new Label { Text = "CSV文字コード", AutoSize = true, Location = new Point(380, 20) };
         var csvEncodingCombo = new ComboBox
@@ -1433,8 +1569,8 @@ public sealed class MainForm : Form
             var nationalTextEncoding = buttons.First(button => button.Checked).Tag is NationalTextEncoding encoding
                 ? encoding
                 : NationalTextEncoding.ShiftJis;
-            return new DataLoadOptions(separatorMode, nationalTextEncoding, formatCombo.SelectedIndex == 1,
-                (CsvTextEncoding)csvEncodingCombo.SelectedIndex, (DataEncodingProfile)textEncodingCombo.SelectedIndex);
+            return new DataLoadOptions(separatorMode, nationalTextEncoding, formatCombo.SelectedIndex > 0,
+                (CsvTextEncoding)csvEncodingCombo.SelectedIndex, (DataEncodingProfile)textEncodingCombo.SelectedIndex, formatCombo.SelectedIndex == 2);
         }
 
         void UpdatePreview()
@@ -1448,10 +1584,11 @@ public sealed class MainForm : Form
                     EnsureKnownSampleSelection(dataPath, options.SeparatorMode, options.NationalTextEncoding);
                 var previewFields = options.IsCsv ? fields.ToList() : BuildFieldsForNationalTextEncoding(options.NationalTextEncoding);
                 var previewRecords = options.IsCsv
-                    ? CsvDataReader.Read(dataPath, previewFields, options.CsvEncoding)
+                    ? CsvDataReader.Read(dataPath, previewFields, options.CsvEncoding, options.CsvHasHeader)
                     : FixedLengthDataReader.Read(dataPath, previewFields, options.SeparatorMode,
                         options.TextEncoding ?? currentDataEncodingProfile, options.NationalTextEncoding);
                 ShowDataPreview(previewGrid, previewStatusLabel, previewFields, previewRecords, options.IsCsv);
+                if (options.IsCsv && options.CsvHasHeader) previewStatusLabel.Text += "（先頭行はヘッダー）";
                 if (remembered is not null) previewStatusLabel.Text += "（前回の読込条件）";
                 okButton.Enabled = true;
             }
@@ -1742,7 +1879,7 @@ public sealed class MainForm : Form
     }
 
     private DataSaveOptions CurrentSaveOptions() => new(currentDataFileFormat, currentCsvEncoding,
-        currentSeparatorMode, currentNationalTextEncoding, currentDataEncodingProfile);
+        currentSeparatorMode, currentNationalTextEncoding, currentDataEncodingProfile, currentCsvHasHeader);
 
     private void WriteData(string path, DataSaveOptions options)
     {
@@ -1751,7 +1888,7 @@ public sealed class MainForm : Form
                 || (options.TextEncoding ?? currentDataEncodingProfile) != currentDataEncodingProfile));
         if (options.Format == DataFileFormat.Csv)
         {
-            CsvDataWriter.Write(path, fields, records, options.CsvEncoding);
+            CsvDataWriter.Write(path, fields, records, options.CsvEncoding, options.CsvHasHeader);
         }
         else
         {
@@ -1768,6 +1905,7 @@ public sealed class MainForm : Form
         }
         currentDataFileFormat = options.Format;
         currentCsvEncoding = options.CsvEncoding;
+        currentCsvHasHeader = options.Format == DataFileFormat.Csv && options.CsvHasHeader;
         saveDataPath = path;
         SetPathText(dataPathTextBox, path);
         AddRecentFile(recentDataFiles, path);
@@ -1857,6 +1995,7 @@ public sealed class MainForm : Form
         var imported = ExcelImporter.Read(path);
         ValidateImportedDefinition(imported.Fields);
         currentDataFileFormat = DataFileFormat.FixedLength;
+        currentCsvHasHeader = false;
         // 読み込み済みXMLと同じ項目構造のExcelなら、文字コードと区切りを継承する。
         if (currentXmlLayout is null)
         {
@@ -1990,7 +2129,7 @@ public sealed class MainForm : Form
         IReadOnlyList<string> errors;
         if (IsCsv)
         {
-            try { CsvDataWriter.Encode(fields, records, currentCsvEncoding); errors = []; }
+            try { CsvDataWriter.Encode(fields, records, currentCsvEncoding, currentCsvHasHeader); errors = []; }
             catch (Exception ex) { errors = [ex.Message]; }
         }
         else errors = RecordValidator.Validate(fields, records, currentDataEncodingProfile, currentNationalTextEncoding);
@@ -2257,6 +2396,7 @@ public sealed class MainForm : Form
 
     private void SizeColumnsToFitData()
     {
+        if (displayWrapOptions.Enabled) { SizeWrappedColumns(); return; }
         foreach (DataGridViewColumn column in grid.Columns)
         {
             var width = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: false);
@@ -2507,6 +2647,7 @@ public sealed class MainForm : Form
 
     private void PaintTextPaddingArea(DataGridViewCellPaintingEventArgs e)
     {
+        if (TryPaintWrappedCell(e)) return;
         if (TryPaintOccursRecordHeaderArea(e))
         {
             return;
@@ -2837,7 +2978,7 @@ public sealed class MainForm : Form
     {
         if (IsCsv)
         {
-            separatorModeTextBox.Text = $"可変長CSV / {JapaneseEncodings.Name(currentCsvEncoding)} / ヘッダーなし / 空白を保持";
+            separatorModeTextBox.Text = $"可変長CSV / {JapaneseEncodings.Name(currentCsvEncoding)} / {(currentCsvHasHeader ? "ヘッダーあり" : "ヘッダーなし")} / 空白を保持";
             return;
         }
         var separatorText = currentSeparatorMode == RecordSeparatorMode.None
@@ -2980,7 +3121,8 @@ public sealed class MainForm : Form
         NationalTextEncoding NationalTextEncoding,
         bool IsCsv = false,
         CsvTextEncoding CsvEncoding = CsvTextEncoding.Utf8,
-        DataEncodingProfile? TextEncoding = null);
+        DataEncodingProfile? TextEncoding = null,
+        bool CsvHasHeader = false);
 
     private sealed record FieldGridRow(
         int FieldIndex,

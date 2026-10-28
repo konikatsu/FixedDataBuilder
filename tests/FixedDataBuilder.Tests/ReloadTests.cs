@@ -42,7 +42,7 @@ internal static partial class Program
                 using var form = new MainForm(["--definition", definition]);
                 var codec = encoding == CsvTextEncoding.Utf8 ? new UTF8Encoding(false) : Encoding.GetEncoding("shift_jis");
                 File.WriteAllText(data, "\"前\"\r\n", codec);
-                Invoke(form, "LoadCsvData", data, encoding);
+                Invoke(form, "LoadCsvData", data, encoding, false);
                 Get<HashSet<int>>(form, "hiddenFieldIndexes").Add(0);
                 File.WriteAllText(data, "\" あ　\"\r\n\"\"\r\n\"000001\"\r\n", codec);
                 Invoke(form, "ReloadCurrentFilesCore");

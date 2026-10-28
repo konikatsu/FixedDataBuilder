@@ -92,7 +92,7 @@ internal static partial class Program
             var previous = Get<List<List<string>>>(form, "records").ToArray();
             var savePath = Get<string>(form, "saveDataPath");
             File.WriteAllText(scratch, "bad,columns");
-            Throws<TargetInvocationException>(() => Invoke(form, "LoadCsvData", scratch, CsvTextEncoding.Utf8));
+            Throws<TargetInvocationException>(() => Invoke(form, "LoadCsvData", scratch, CsvTextEncoding.Utf8, false));
             WithDialog("データ読込条件", DialogResult.Cancel,
                 () => Drop(Get<TextBox>(form, "dataPathTextBox"), scratch), dialog =>
                     Equal(false, Descendants(dialog).OfType<Button>().Single(button => button.Text == "OK").Enabled));
@@ -185,7 +185,7 @@ internal static partial class Program
                 using var form = new MainForm(["--definition", definition]);
                 var formFields = Get<List<FieldDefinition>>(form, "fields");
                 formFields.Insert(1, new FieldDefinition("別数値", type, 6, RedefinesName: fields[0].Name));
-                Invoke(form, "LoadCsvData", data, CsvTextEncoding.Utf8);
+                Invoke(form, "LoadCsvData", data, CsvTextEncoding.Utf8, false);
                 Equal("0", Get<List<List<string>>>(form, "records")[0][1]);
                 var target = Path.Combine(temporaryDirectory, "numeric-redefines.dat");
                 Invoke(form, "WriteData", target, new DataSaveOptions(DataFileFormat.FixedLength, CsvTextEncoding.Utf8,
