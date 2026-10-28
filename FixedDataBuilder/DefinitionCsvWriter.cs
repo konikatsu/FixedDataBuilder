@@ -6,9 +6,11 @@ public sealed record DefinitionCsvRow(string Name, string Definition, string Com
 
 public static class DefinitionCsvWriter
 {
-    public static void Write(string path, IReadOnlyList<DefinitionCsvRow> rows)
+    public static void Write(string path, IReadOnlyList<DefinitionCsvRow> rows, DefinitionTextEncoding encoding = DefinitionTextEncoding.Utf8)
     {
-        File.WriteAllText(path, BuildCsv(rows), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        // Encode fully before opening the destination, so an unrepresentable character cannot truncate an existing definition.
+        var bytes = DefinitionFileText.ForEncoding(encoding).GetBytes(BuildCsv(rows));
+        File.WriteAllBytes(path, bytes);
     }
 
     public static string BuildCsv(IReadOnlyList<DefinitionCsvRow> rows)

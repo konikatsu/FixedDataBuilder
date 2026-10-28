@@ -464,7 +464,8 @@ public sealed partial class MainForm : Form
             CreateMenuItem("レコード削除", (_, _) => DeleteRecord())));
         menuStrip.Items.Add(CreateMenu("定義",
             CreateMenuItem("定義作成...", (_, _) => CreateDefinition(editCurrent: false)),
-            CreateMenuItem("定義修正...", (_, _) => CreateDefinition(editCurrent: true))));
+            CreateMenuItem("定義修正...", (_, _) => CreateDefinition(editCurrent: true)),
+            BuildDefinitionEncodingMenu()));
         wrapDisplayButton.CheckedChanged += (_, _) =>
         {
             if (displayWrapOptions.Enabled != wrapDisplayButton.Checked)
@@ -906,6 +907,7 @@ public sealed partial class MainForm : Form
 
         try
         {
+            SetDefinitionTextEncoding(DefinitionFileText.Parse(GetOptionValue(args, "--definition-encoding")));
             if (!LoadDefinition(definitionPath, GetOptionValue(args, "--xml-layout"))) return;
             records.Clear();
             records.Add(CreateEmptyRecord());
@@ -999,7 +1001,8 @@ public sealed partial class MainForm : Form
         }
         else
         {
-            loadedFields = fromCopybook ? CopybookDefinitionReader.Read(path) : DefinitionCsvReader.Read(path);
+            loadedFields = fromCopybook ? CopybookDefinitionReader.Read(path, definitionTextEncoding)
+                : DefinitionCsvReader.Read(path, definitionTextEncoding);
         }
 
         return (loadedFields, xmlLayout);
@@ -1841,14 +1844,16 @@ public sealed partial class MainForm : Form
         }
 
         if (!ConfirmDiscardChanges("定義を編集")) return;
-        using var form = new DefinitionEditorForm(editCurrent ? fields : []);
+        using var form = new DefinitionEditorForm(editCurrent ? fields : [], InitialDefinitionSaveEncoding(editCurrent));
         if (form.ShowDialog(this) != DialogResult.OK || string.IsNullOrWhiteSpace(form.SavedPath))
         {
             return;
         }
 
+        var previousDefinitionEncoding = definitionTextEncoding;
         try
         {
+            SetDefinitionTextEncoding(form.SavedEncoding);
             if (!LoadDefinition(form.SavedPath)) return;
             ClearPathText(dataPathTextBox);
             saveDataPath = null;
@@ -1860,6 +1865,7 @@ public sealed partial class MainForm : Form
         }
         catch (Exception ex)
         {
+            SetDefinitionTextEncoding(previousDefinitionEncoding);
             MessageBox.Show(this, ex.Message, "定義読込エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

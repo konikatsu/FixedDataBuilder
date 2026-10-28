@@ -7,9 +7,9 @@ namespace FixedDataBuilder;
 
 public static partial class DefinitionCsvReader
 {
-    public static IReadOnlyList<FieldDefinition> Read(string path)
+    public static IReadOnlyList<FieldDefinition> Read(string path, DefinitionTextEncoding encoding = DefinitionTextEncoding.Auto)
     {
-        using var reader = new TextFieldParser(path, Encoding.UTF8, true)
+        using var reader = new TextFieldParser(new StringReader(DefinitionFileText.Read(path, encoding)))
         {
             TextFieldType = FieldType.Delimited,
             HasFieldsEnclosedInQuotes = true,

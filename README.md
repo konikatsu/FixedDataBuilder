@@ -12,6 +12,28 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 [v0.1.63 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.63) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
+## v0.1.64：定義ファイルのUTF-8・SJIS・MS932対応（確認用）
+
+定義CSVとCOBOLコピー句を、UTF-8・SJIS・MS932で読み込めるようにしました。定義CSVの保存時にも文字コードを選べます。
+
+- **読み込み**：初期値は自動判別です。手動指定する場合は「定義 → 定義の文字コード（読込）」でUTF-8・SJIS・MS932を選んでから定義ファイルを開きます。開いている定義は、指定後に「定義を再読み込み」で反映します。
+- **保存**：定義作成・修正画面の「保存文字コード」でUTF-8・SJIS・MS932を選びます。自動読込した既存ファイルの修正では、判別した文字コードを初期値にします。UTF-8での新規保存はBOMなしです。
+- **データの文字コードとは別設定**です。定義をSJIS、データをUTF-8にするなど、別々に指定できます。
+
+自動判別はBOMがあればその形式を優先し、BOMがなければUTF-8、読み取れなければMS932として読みます。SJIS固有の文字の対応を使いたい場合や、自動判別で文字が正しく表示されない場合は、SJISまたはMS932を明示指定してください。①などの拡張文字はMS932またはUTF-8を選びます。指定文字コードで保存できない文字がある場合は、既存の保存先を開く前にエラーにします。
+
+確認用の定義は [`comment-definition.csv`](samples/comment-definition.csv)（UTF-8）、[`comment-definition-sjis.csv`](samples/comment-definition-sjis.csv)（SJIS）、[`comment-definition-ms932.csv`](samples/comment-definition-ms932.csv)（MS932・①を含む）です。いずれも [`comment-data-utf8.csv`](samples/comment-data-utf8.csv) を「可変長CSV・UTF-8・ヘッダーあり」で読むための定義です。
+
+CLIで指定する場合：
+
+```powershell
+.\FixedDataBuilder.exe --definition "definition.csv" --definition-encoding sjis
+```
+
+`--definition-encoding` は `auto`・`utf8`・`sjis`・`ms932` を指定できます。読込メニューの設定は起動中に保持します。
+
+警告0・エラー0でビルド済みです。利用者の指定により、製品EXEと自動テストEXEはまだ実行していません。8件の文字コード回帰試験を追加し、計156件をビルドしていますが、成功確認済みとはしていません。v0.1.64は確認用の作業ブランチとローカル軽量版を用意し、公開リリースとmainは起動確認済みv0.1.63のままです。新しい画面画像も未撮影です。
+
 ## v0.1.63：定義に期待値・確認コメントを記載
 
 定義CSVに任意の3列目「コメント」を追加し、項目ごとの期待値や確認観点を書けます。同じ項目のコメントを全レコードで共通に参照します。
@@ -28,7 +50,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 コメントは確認用の文章です。期待値との自動比較や合否判定は行いません。コメントは定義CSVに保持し、データファイルや従来形式のExcel出力には含めません。
 
-従来の「項目名,定義」の2列形式も利用できます。コメントがない定義は従来どおり2列で保存します。旧形式「項目名,型,桁数」では4列目にコメントを記載できます。コメント中にカンマ・引用符・改行を含める場合はCSVの引用符で囲み、内部の引用符は二重にします。定義CSVはUTF-8です。
+従来の「項目名,定義」の2列形式も利用できます。コメントがない定義は従来どおり2列で保存します。旧形式「項目名,型,桁数」では4列目にコメントを記載できます。コメント中にカンマ・引用符・改行を含める場合はCSVの引用符で囲み、内部の引用符は二重にします。v0.1.63の定義CSVはUTF-8です。
 
 確認用に [`samples/comment-definition.csv`](samples/comment-definition.csv) と [`samples/comment-data-utf8.csv`](samples/comment-data-utf8.csv) を同梱しています。データは「可変長CSV・UTF-8・ヘッダーあり」で読み込んでください。
 

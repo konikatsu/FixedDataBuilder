@@ -5,10 +5,10 @@ namespace FixedDataBuilder;
 
 public static partial class CopybookDefinitionReader
 {
-    public static IReadOnlyList<FieldDefinition> Read(string path)
+    public static IReadOnlyList<FieldDefinition> Read(string path, DefinitionTextEncoding encoding = DefinitionTextEncoding.Auto)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var statements = ReadStatements(path);
+        var statements = ReadStatements(path, encoding);
         var nodes = BuildFieldTree(statements);
         var fields = new List<FieldDefinition>();
 
@@ -57,9 +57,9 @@ public static partial class CopybookDefinitionReader
         return roots;
     }
 
-    private static IReadOnlyList<(string Statement, int LineNumber)> ReadStatements(string path)
+    private static IReadOnlyList<(string Statement, int LineNumber)> ReadStatements(string path, DefinitionTextEncoding encoding)
     {
-        var lines = File.ReadAllLines(path, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true));
+        var lines = DefinitionFileText.Read(path, encoding).Split(["\r\n", "\n", "\r"], StringSplitOptions.None);
         var statements = new List<(string Statement, int LineNumber)>();
         var builder = new StringBuilder();
         var statementLineNumber = 0;

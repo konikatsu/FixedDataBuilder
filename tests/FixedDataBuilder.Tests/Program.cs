@@ -313,6 +313,7 @@ internal static partial class Program
             RunManualHexResizeTests(repo);
             RunSingleRecordViewTests(repo);
             RunFieldCommentTests(repo);
+            RunDefinitionEncodingTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

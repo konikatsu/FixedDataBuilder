@@ -8,13 +8,20 @@ public sealed class DefinitionEditorForm : Form
     private const string TypeSignedNumber = "S9 符号付き数字";
 
     private readonly DataGridView grid = new();
+    private readonly ToolStripComboBox saveEncoding = new()
+    {
+        Name = "DefinitionSaveEncoding", DropDownStyle = ComboBoxStyle.DropDownList, AutoSize = false, Width = 165
+    };
     private readonly IReadOnlyList<FieldDefinition> initialFields;
 
     public string? SavedPath { get; private set; }
+    public DefinitionTextEncoding SavedEncoding => (DefinitionTextEncoding)(saveEncoding.SelectedIndex + 1);
 
-    public DefinitionEditorForm(IReadOnlyList<FieldDefinition> fields)
+    public DefinitionEditorForm(IReadOnlyList<FieldDefinition> fields, DefinitionTextEncoding initialEncoding = DefinitionTextEncoding.Utf8)
     {
         initialFields = fields;
+        saveEncoding.Items.AddRange(DefinitionFileText.Names.Skip(1).Cast<object>().ToArray());
+        saveEncoding.SelectedIndex = Math.Clamp((int)initialEncoding - 1, 0, 2);
 
         Text = "定義ファイル作成";
         StartPosition = FormStartPosition.CenterParent;
@@ -41,6 +48,8 @@ public sealed class DefinitionEditorForm : Form
         toolStrip.Items.Add(CreateButton("複製", (_, _) => DuplicateCurrentRow()));
         toolStrip.Items.Add(CreateButton("削除", (_, _) => DeleteCurrentRow()));
         toolStrip.Items.Add(new ToolStripSeparator());
+        toolStrip.Items.Add(new ToolStripLabel("保存文字コード"));
+        toolStrip.Items.Add(saveEncoding);
         toolStrip.Items.Add(CreateButton("保存", (_, _) => SaveDefinition()));
         toolStrip.Items.Add(CreateButton("閉じる", (_, _) => Close()));
         return toolStrip;
@@ -228,7 +237,7 @@ public sealed class DefinitionEditorForm : Form
         try
         {
             rows = DefinitionCsvWriter.NormalizeRows(ReadRows());
-            ValidateRows(rows);
+            ValidateRows(rows, SavedEncoding);
         }
         catch (Exception ex)
         {
@@ -250,7 +259,7 @@ public sealed class DefinitionEditorForm : Form
 
         try
         {
-            DefinitionCsvWriter.Write(dialog.FileName, rows);
+            DefinitionCsvWriter.Write(dialog.FileName, rows, SavedEncoding);
             SavedPath = dialog.FileName;
             DialogResult = DialogResult.OK;
             Close();
@@ -368,13 +377,13 @@ public sealed class DefinitionEditorForm : Form
         return comp3 ? $"{definition} COMP-3" : definition;
     }
 
-    private static void ValidateRows(IReadOnlyList<DefinitionCsvRow> rows)
+    private static void ValidateRows(IReadOnlyList<DefinitionCsvRow> rows, DefinitionTextEncoding encoding)
     {
         var tempPath = Path.Combine(Path.GetTempPath(), $"FixedDataBuilder-definition-{Guid.NewGuid():N}.csv");
         try
         {
-            DefinitionCsvWriter.Write(tempPath, rows);
-            DefinitionCsvReader.Read(tempPath);
+            DefinitionCsvWriter.Write(tempPath, rows, encoding);
+            DefinitionCsvReader.Read(tempPath, encoding);
         }
         finally
         {
