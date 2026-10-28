@@ -1,5 +1,12 @@
 # README_FOR_CODEX
 
+## v0.1.62：利用者の明示依頼でGitHub Releaseへ公開（2026-10-28）
+
+- 利用者が「これまで通り、リリースに公開」と明示依頼。main統合済みのv62を公開する。既に141件成功・SAC Onで通常の製品EXE起動確認済みのファイルを使用し、再ビルドや差し替えを行わない。別PCでの起動は利用者確認とし未確認であることを説明する。
+- 公開ZIPはFixedDataBuilder-v0.1.62-win-x64-framework-dependent.zip、215705バイト・40ファイル、SHA256=74F54C0E28FC59063B33964628A1EC17297E3B05DADFD22F15C29D4EA5733ADC。EXE EF792045…/DLL 05965AEA…は先の起動確認と同一。付属samples35は公開ファイルのみ。.NET 8 Windows Desktop Runtime x64が必要な軽量版だけを公開し、MSIや同梱版は公開しない。
+- README冒頭のダウンロードとリリース説明リンクをv62へ更新し、最新版の確認用表記を解除する。ReleaseはまずdraftへZIPを添付してサイズ・GitHub digestを検証後に公開する。公開ダウンロードも取得して元ZIPとSHA256一致を確認する。ソース・テスト・samples・製品バイナリは検証済み3891e47と同一。
+- 既存の公開Releaseはv56/v54/v53。最新3版はv62/v56/v54とし、v53は説明とアセットの保管・サイズ・SHA256一致を確認してRelease本体だけを削除する。Gitタグ・ソース履歴・ローカル比較用ファイルは削除しない。証拠と公開/保管/削除/最終確認の記録はreviews/single-record-attributes-v0.1.62/release-v001。
+
 ## v0.1.62：利用者の明示依頼でmainへ統合（2026-10-28）
 
 - 利用者がリポジトリのトップページを確認し「mainに反映」と明示依頼。確認済みv62のコミット3891e473d1a528cf9c2aad0cfe7654f44c72e1faを基準に、旧main34008a99145145184e90b161cc95badc124a078bの履歴を保持するマージを作成。旧mainのSplitContainer版を再導入せず、v62の製品・テスト・samples・配布物をそのまま維持する。

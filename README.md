@@ -6,13 +6,13 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.56 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.56/FixedDataBuilder-v0.1.56-win-x64-framework-dependent.zip)
+[v0.1.62 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.62/FixedDataBuilder-v0.1.62-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.56 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.56) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.62 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.62) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
-## v0.1.62：1件表示に属性を表示（確認用）
+## v0.1.62：1件表示に属性を表示
 
 1件表示の項目名の右に **「属性」列** を追加し、`X(22)`・`N(2)`・`S9(5) COMP-3` などの型と桁数を常に表示します。属性は読み取り専用です。
 
@@ -25,7 +25,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 属性列を追加した後も、内容の編集、行の移動、元データ・保存・Excel出力・HEX・空白数は維持します。Windows x64の.NET非同梱軽量版です。全141件の自動テストに成功し、このPCではSmart App Controlがオンの状態で製品EXEの主画面表示と正常終了を確認しました。別PCでの起動は未確認です。画像は同じ製品DLLを使ったテストの実フォームです。
 
-v0.1.62のソース・画面画像・起動確認済みの配布ファイルは、`main` に反映しています。配布ファイルは [`release/`](release/) にあります。起動確認後は再ビルドしていません。v0.1.62のGitHub Releaseはまだ作成していないため、上部の公開ZIPダウンロードリンクはv0.1.56です。
+v0.1.62のソース・画面画像・起動確認済みの配布ファイルは、`main` に反映しています。上部のダウンロードリンクから軽量版ZIPを取得できます。ZIPを展開して `FixedDataBuilder.exe` を実行してください。起動確認後は再ビルドせず、同じEXE・DLLを配布しています。
 
 ## v0.1.61：各項目の右にHEX・空白数を並べる1件表示（確認用）
 
@@ -65,13 +65,13 @@ Windows x64の.NET非同梱軽量版です。この方式への変更だけでSm
 
 番号は1、2、3…と表示し、項目を非表示にしても元の番号を維持します。OCCURSのグループ見出しには番号を付けません。番号はGUIの見出しであり、元データ・保存・Excel出力・HEXへ追加しません。「レコード縦」の既存の行番号は維持します。
 
-表示文字数の上限と「…」による省略はv0.1.55から引き継ぎます。全130件の自動テストに成功し、このPCのSACオンで製品EXEの主画面表示を確認しました。利用者から別PCでもv0.1.58の起動OKの報告を受けています。v0.1.58は軽量版ZIPとして作成済みですが、GitHub Releaseはまだ作成していません。上の配布リンクはv0.1.56です。
+表示文字数の上限と「…」による省略はv0.1.55から引き継ぎます。全130件の自動テストに成功し、このPCのSACオンで製品EXEの主画面表示を確認しました。利用者から別PCでもv0.1.58の起動OKの報告を受けています。v0.1.58は軽量版ZIPとして作成済みですが、GitHub Releaseはまだ作成していません。上の配布リンクはv0.1.62です。
 
 v0.1.55は起動OK、v0.1.56・v0.1.57は別PCでSAC拒否との利用者報告があります。v0.1.58も起動OKの報告を受けています。高さ調整を含む版だけが拒否されたという比較材料ですが、バイナリのハッシュも異なるため、それだけで高さ調整機能を拒否原因と断定しません。
 
 ## v0.1.55：表示文字数の上限（別PCでの確認用）
 
-v0.1.53をベースに、表示文字数の上限だけを追加した軽量版です。下部HEXエリアのサイズや選択方法はv0.1.53を維持しています。現時点ではGitHub Releaseを作成していません。上の配布リンクはv0.1.56です。
+v0.1.53をベースに、表示文字数の上限だけを追加した軽量版です。下部HEXエリアのサイズや選択方法はv0.1.53を維持しています。現時点ではGitHub Releaseを作成していません。上の配布リンクはv0.1.62です。
 
 `表示 → 折り返し表示設定...` で「折り返し表示」と「表示する文字数に上限を設定」をチェックし、「表示する最大文字数」を指定します。初期値は上限設定OFF・100文字です。バイト単位の折り返し条件とは別に設定でき、上限を超える値の続きを `…` で示します。省略記号は上限の文字数に含めません。
 
