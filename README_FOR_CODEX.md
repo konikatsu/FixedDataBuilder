@@ -1,5 +1,13 @@
 # README_FOR_CODEX
 
+## v0.1.58：利用者が起動OKを報告（2026-10-28）
+
+- 利用者の直接報告「1.58OKでした。」を受領。最新の別PC比較はv55 OK/v56・v57 SAC拒否/v58 OK。起動OKは利用者報告であり、当該実行時点の別PCハッシュとSAC状態を再採取した実測ではない。
+- v58の配布EXE/DLL/ZIPを再照合しハッシュ不変を確認。再ビルドしない。元の未確認記録は履歴として残し、reviews/field-numbers-v0.1.58/v001/user-startup-confirmation-v002.jsonとverification-after-user-confirmation-v002.jsonに追記した。
+- 高さ調整を含む版の差分は有力な切り分け対象。ただし各版のハッシュとSAC評判も異なり、今回v56/57の拒否ログ未取得のため、SplitContainer自体の因果確定とは扱わない。
+- 今回は起動結果の報告のみ。READMEの確認状況をソースブランチで更新しpushする。main/Releaseは変更しない。
+
+
 ## v0.1.58：v55ベースに項目番号だけを追加
 
 - 利用者がv55 OK/v56・v57 SAC拒否を報告し、v55基点にNo.表示だけを追加したv58を依頼。基点c8df26eb1b6999113a70d28812ecda503631abd8。v56/v57からの継承ではない。製品差分はMainFormの番号欄12行とcsproj版数だけ。SplitContainer/dataHexSplit/MinimumSize/手動行高/複数選択の追加なし。
