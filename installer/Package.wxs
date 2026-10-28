@@ -1,0 +1,36 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="FixedDataBuilder" Manufacturer="konikatsu"
+           Version="$(var.ProductVersion)" Language="1041" Codepage="932"
+           UpgradeCode="A24F72A4-E98B-4B80-873D-B4F1F2952B44"
+           Scope="perUser" InstallerVersion="500">
+    <SummaryInformation Description="FixedDataBuilder (.NET 8 Windows Desktop Runtime x64 required)" />
+    <MajorUpgrade DowngradeErrorMessage="新しい版のFixedDataBuilderが既にインストールされています。" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/konikatsu/FixedDataBuilder" />
+    <Property Id="ARPCOMMENTS" Value=".NET 8 Windows Desktop Runtime (x64) が別途必要です。" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="UserProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="FixedDataBuilder">
+          <Directory Id="SAMPLESFOLDER" Name="samples" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="FixedDataBuilder">
+        <Component Id="StartMenuShortcut" Guid="60E2BFC3-158F-4C19-AB51-94D29AB46CB7">
+          <Shortcut Id="StartMenuEntry" Name="FixedDataBuilder"
+                    Description="固定長・CSVデータの作成と編集"
+                    Target="[INSTALLFOLDER]FixedDataBuilder.exe" WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveStartMenuFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\konikatsu\FixedDataBuilder\Installer"
+                         Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="MainFeature" Title="FixedDataBuilder" Level="1">
+      <ComponentGroupRef Id="PayloadFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+  </Package>
+</Wix>

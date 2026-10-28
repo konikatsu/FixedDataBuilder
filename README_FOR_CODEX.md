@@ -1,5 +1,13 @@
 # README_FOR_CODEX
 
+## v0.1.61：MSI作成とSAC独立レビュー（2026-10-28、進行中）
+
+- 利用者が製品EXEの拒否原因調査を依頼。最新ログをreviews/sac-product-v0.1.61/v001へ採取し、v60/v61のEXE差は版情報5バイトのみ・処理セクション一致、両者未署名・MOTWなし、SAC Onを再確認。CiTool一覧はアクセス拒否。最新ログはEXE拒否だけでなく最終DLL F292…のRecord5264も含み、141件成功と時間帯が重なる。成功をSAC全面許可の証拠にしない。
+- 利用者指定のAntigravity CLI Gemini3.8Flash high、Claude Code Opus5.5 max、GPT-6 Astra ultraへ同じREQUEST-v002.mdと封印したソース/証拠68項目を渡す。依頼・結果はreviews/sac-product-v0.1.61/v002。AstraとGeminiは結果保存済み、Claudeは実行中。Geminiの「unknownへリセットと確定」「EAを許可キャッシュと確定」「署名で完全保証」は証拠過剰なので採用しない。補正を総合結果へ残す必要あり。
+- 利用者がレビュー待ちにMSI作成を明示依頼。既存v61製品5ファイル＋公開samples35を再ビルドせず格納。WiX5.0.2をreviews/msi-v0.1.61/v001/toolsへ局所導入、installer/Package.wxsとBuild-Msi.ps1を作成。ユーザー単位、LocalAppData/Programs/FixedDataBuilder、スタートメニュー・アンインストール登録、.NET8非同梱。SAC/証明書設定や製品の自動起動は行わない。
+- MSIのdecompile/展開で40ファイルすべて元ハッシュと一致し、Scope=perUser/Version=0.1.61を確認。製品EXE/DLLハッシュは前節のまま。C:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.61-win-x64-framework-dependent.msi、229376バイト、SHA256=EA190A7BB9C7F453C1CF75CE32EA4C706A051384A48A9BE774007F2BB868870B、未署名。証拠reviews/msi-v0.1.61/v001。通常インストールは実施せず、利用者が担当。
+- 利用者が「MSIにしても、起動できない」と報告。追加読み取りでMSIの15:47:41インストール成功（MsiInstaller1033/11707、status0）、15:47:55に導入先EXEがSAC拒否（3077 Record5304、元と同じFlatHash）、15:48:48アンインストール成功（1034/11724、status0）を確認。実際の導入・削除は利用者操作であり親はしていない。現在導入先ファイルが存在しないことは削除成功と整合。MSI自体の拒否ではなく導入後EXE拒否と分離できた。ログはreviews/msi-v0.1.61/v001。利用者はPC再起動を希望し、作成物は保存済み、Claudeがまだ実行中で再起動により中断するため可能なら完了待ちと説明した。再起動操作はしていない。
+
 ## v0.1.61：項目ごとに開始位置・内容・HEX・空白数を並べる1件表示（2026-10-28）
 
 - 利用者がテキストアートを承認し作成を依頼、続けて開始位置も追加と指示。基点v60=996101b9bac52aeed42c724cd1d90a246a502321、ブランチcodex/single-record-view-v0.1.61。Panel方式の高さ調整を維持。SplitContainer/Splitterは追加していない。
