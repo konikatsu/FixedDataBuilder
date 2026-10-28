@@ -446,6 +446,10 @@ public sealed class MainForm : Form
         grid.AllowUserToAddRows = false;
         grid.AllowUserToDeleteRows = false;
         grid.RowHeadersVisible = false;
+        grid.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        grid.RowHeadersDefaultCellStyle.BackColor = DefinitionBackColor;
+        grid.RowHeadersDefaultCellStyle.SelectionBackColor = DefinitionBackColor;
+        grid.RowHeadersDefaultCellStyle.SelectionForeColor = grid.DefaultCellStyle.ForeColor;
         grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
         grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
@@ -784,6 +788,8 @@ public sealed class MainForm : Form
             row.Height = grid.RowTemplate.Height;
         }
         AdjustWrappedRowHeights();
+        if (grid.RowHeadersVisible)
+            grid.AutoResizeRowHeadersWidth(DataGridViewRowHeadersWidthSizeMode.AutoSizeToAllHeaders);
     }
 
     private void OpenDefinition()
@@ -2418,6 +2424,8 @@ public sealed class MainForm : Form
             recordGridColumnFieldIndexes.Clear();
             RebuildOccursDisplayInfos();
             UpdateLayoutButtons();
+            grid.RowHeadersVisible = layout == GridLayout.FieldRows;
+            grid.TopLeftHeaderCell.Value = layout == GridLayout.FieldRows ? "No." : null;
 
             if (layout == GridLayout.FieldRows)
             {
@@ -2495,6 +2503,8 @@ public sealed class MainForm : Form
             var rowIndex = grid.Rows.Add();
             fieldGridRows.Add(new FieldGridRow(fieldIndex, occursInfo, IsOccursHeader: false));
             var row = grid.Rows[rowIndex];
+            row.HeaderCell.Value = (fieldIndex + 1).ToString(CultureInfo.InvariantCulture);
+            row.HeaderCell.ToolTipText = $"定義順の項目番号: {fieldIndex + 1}";
             row.Cells[0].Value = occursInfo is null ? field.Name : $"  {occursInfo.ChildName}";
             row.Cells[0].ToolTipText = field.Name;
             row.Cells[1].Value = field.DisplayDefinition;
@@ -2520,6 +2530,8 @@ public sealed class MainForm : Form
         var row = grid.Rows[rowIndex];
         row.ReadOnly = true;
         row.DefaultCellStyle.BackColor = OccursHeaderBackColor;
+        row.HeaderCell.Style.BackColor = OccursHeaderBackColor;
+        row.HeaderCell.Style.SelectionBackColor = OccursHeaderBackColor;
         row.DefaultCellStyle.ForeColor = OccursHeaderForeColor;
         row.DefaultCellStyle.SelectionBackColor = OccursHeaderBackColor;
         row.DefaultCellStyle.SelectionForeColor = OccursHeaderForeColor;

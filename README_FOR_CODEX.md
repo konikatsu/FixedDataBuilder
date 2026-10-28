@@ -1,5 +1,13 @@
 # README_FOR_CODEX
 
+## v0.1.57：項目縦表示で項目名の左にNo.を表示
+
+- 利用者が項目名の左に番号を希望。v56は既に公開していたためv57とした。基点は公開v56 34008a99145145184e90b161cc95badc124a078b。製品差分はMainFormとcsproj版数の2ファイル。
+- 項目縦だけDataGridViewの行見出しを表示し、TopLeftHeaderCellにNo.、各項目のHeaderCellにfieldIndex+1を設定。非表示項目による欠番を維持し、OCCURS帯の見出しは空欄。番号欄をデータ列に追加しないため既存の列マッピング・編集・保存・Excel・HEXを保持。行見出し幅はフォントに応じて自動調整。レコード縦は行見出しを隠し、既存の行番号欄を維持。
+- 全132件成功（既存128＋4）、終了0・stderr空。新規は項目名左の番号/データ列維持、非表示/OCCURS、方向切替で保存/Excel/HEX保持、編集先対応を確認。publish --no-build、テストと配布DLL一致。SAC Onで製品EXE主画面・PC側.NET8.0.32確認。EXE SHA256=E92BCE1B967E30BE59065E4C3755F25C12556385568B6D1E5D3A469FC2AB1FB9、DLL SHA256=B133C149C4426965E67225F16617B67C7323BBA32A03AC3837CCC0B16A16DA7E。確認後は再ビルドなし。
+- 項目縦/レコード縦の実フォーム画像をREADMEへ。軽量版フォルダー/ZIPをC:/dev/FixedDataBuilder直下へ作成、別PC確認は未了。ソースブランチだけpushし、main/Releaseはv56を維持。証拠reviews/field-numbers-v0.1.57/v001。未追跡のhidden画像は撮影参考用でREADME参照や公開対象には含めない。
+
+
 ## v0.1.56：v0.1.55に選択項目HEXエリアの高さ調整を追加
 
 - 利用者がv55の起動OKを報告し、v55へ選択項目エリア高さ調整だけを追加したv56の作成とpushを依頼。基点c8df26eb1b6999113a70d28812ecda503631abd8。製品差分はMainFormとcsproj版数の2ファイル。v54の複数行選択・一括行高・manualHeightRows・RowHeightOptionsFormは含めない。
