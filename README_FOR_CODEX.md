@@ -1,5 +1,15 @@
 # README_FOR_CODEX
 
+## v0.1.56：v0.1.55に選択項目HEXエリアの高さ調整を追加
+
+- 利用者がv55の起動OKを報告し、v55へ選択項目エリア高さ調整だけを追加したv56の作成とpushを依頼。基点c8df26eb1b6999113a70d28812ecda503631abd8。製品差分はMainFormとcsproj版数の2ファイル。v54の複数行選択・一括行高・manualHeightRows・RowHeightOptionsFormは含めない。
+- gridとHEXを水平SplitContainer（DataHexSplit）へ配置。境界6px、上最小100/下最小64、初期下82px、FixedPanel.Panel2、メイン最小720x420。ウィンドウ拡大時に調整後の下部高さを維持。選択・データ・HEX・dirty・文字数上限を保持する。高さは起動中の表示設定。
+- 全128件成功（既存126＋サイズ変更/最小サイズ等2件）、終了0・stderr空。警告0・エラー0でビルドしpublish --no-build、テストと配布DLL一致。SAC Onで通常の製品EXEからv56主画面表示、PC側.NET8.0.32使用。EXE SHA256=B00F1D8B00BDF511BFBADE562BFA11375012B8442EC2586ED21BB23632F48844、DLL SHA256=F1D6A1C7FF683596997F00E01C62F76A959D10C6A1D0231C32777EA4B8B97CA2。起動後は再ビルドしない。別PC起動は未確認と明記。
+- 同じテストEXEで実フォームの従来架空5行を撮影。通常・HEX拡大・表示上限・設定の4枚をREADMEへ反映。生業務データ・SACログ・レビューはコミットしない。証拠reviews/hex-pane-v0.1.56/v001。
+- 確認済み5ファイルと公開サンプル35を軽量版ZIPへ。GitHubの公開版は56/54/53を保持、52のReleaseだけローカル保管検証後に削除、タグ・履歴は維持。v55は未公開であるため新規に公開しない。mainにv54履歴を残しつつ、最終ツリーはv55基点の本ブランチと完全一致させる。
+- v54のClaude Code Opus5.5 highレビューはv004に完了。先行v55メモの進行中・起動未確認は当時の記録であり、最新状態は本節を参照。
+
+
 ## v0.1.55：v0.1.53をベースに表示文字数上限だけ追加
 
 - 利用者がv53をベースに、表示文字数の上限と省略記号だけを追加したv55を依頼。v54のSplitContainer、最小画面サイズ、MultiSelect、一括行高、manualHeightRows、RowHeightOptionsFormは含めない。基点f39af9ba3d918ede25719f36018f21f09f603566。製品差分はMainFormのWrappedDisplayLines、DisplayWrapOptionsForm、csproj版数の3ファイルだけ。
