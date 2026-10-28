@@ -90,6 +90,20 @@ internal static partial class Program
                 Capture(save, args[4], expectedHex: null);
                 return 0;
             }
+            if (args.Length >= 6 && args[1] == "--capture-manual-hex")
+            {
+                using var form = CreateCellDisplayForm(recordRows: false);
+                Get<TextBox>(form, "definitionPathTextBox").Text = "（表示確認用サンプル）";
+                Get<TextBox>(form, "dataPathTextBox").Text = "（架空データ・5行）";
+                Capture(form, args[2], expectedHex: null);
+                Invoke(form, "SetHexAreaHeight", 200);
+                Capture(form, args[3], expectedHex: null);
+                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 20, 10, true, 12));
+                Capture(form, args[4], expectedHex: null);
+                using var dialog = new DisplayWrapOptionsForm(new DisplayWrapOptions(true, 20, 10, true, 12));
+                Capture(dialog, args[5], expectedHex: null);
+                return 0;
+            }
             if (args.Length >= 5 && args[1] == "--capture-field-numbers")
             {
                 using var form = CreateCellDisplayForm(recordRows: false);
@@ -277,6 +291,7 @@ internal static partial class Program
             RunSpaceAndZoomTests(repo);
             RunDisplayLimitTests(repo);
             RunFieldNumberTests(repo);
+            RunManualHexResizeTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

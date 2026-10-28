@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.60：SplitContainerを使わないHEX高さ調整（2026-10-28）
+
+- 利用者の明示依頼「SplitContainerを使わない版を作成してみて」。起動OKのv58（729ab1b385e55a770dccc2239f88bc5ba58407ed）からcodex/manual-hex-resize-v0.1.60を作成。v59からの継承ではない。通常のPanelのHeightを上端6pxのグリップのMouseDown/Move/Upで変更する。SplitContainer・Splitterはコントロール階層に存在しない。
+- ドラッグを画面座標で計算、左ボタン限定、MouseUp/CaptureChangedで解除。最小HEX64px・グリッド100pxをDPIに合わせ、実際のドッキングバー高と非クライアント高から最小ウィンドウ寸法を確保する。Layoutの再入防止、最小化中のclamp除外、復元後の高さ保持。高さを設定ファイルへ保存しない。No.・文字数上限・元データ・保存・Excel・HEXを維持。
+- レビューで最小化時の高さ喪失を修正して再ビルド（build-v002.txt）。SAC結果や評判を変えるための再ビルドではなく、製品起動確認は最終ビルドだけ。警告0・エラー0、全133件成功・終了0・stderr空。新規3件で実マウスイベントの座標/Capture/高さ上下限/最小化復元/原値保持を確認。既存130件も成功。
+- publish --no-build、テストと配布DLLのSHA256一致。2026-10-28 14:37 JST、このPCのSAC Onで通常の製品EXEからv0.1.60の主画面表示（PID4144・Handle525724）、PC側.NET8.0.32使用を確認。EXE SHA256=9AFBCBF457FB1216893EF9AC74AD0E73148A428CA4F3B82C450A36A0FADDDC3C、DLL SHA256=1C7D46AD359F870978900F5EDAF50F3757035B5C75C34A55F23DF8ED038D95CF。起動後再ビルドなし。単独製品GUIでのドラッグ操作は未実施であり、自動イベント試験・実フォーム撮影と区別する。
+- C:/dev/FixedDataBuilder直下にFixedDataBuilder-v0.1.60-win-x64-framework-dependentフォルダーと同名ZIPを作成。ZIP211827バイト・40ファイル・SHA256=1EB3B47CD04592E714400EB999EA7F672E002D9ECAFE30DF028A27A194DDBD0B。EXE/DLLはpublish/テスト/フォルダー/ZIP間で一致。付属samplesはGit追跡の公開35ファイルのみ。証拠reviews/manual-hex-resize-v0.1.60/v001。業務データ・ログはコミットしない。
+- READMEの通常・高さ拡大画像は同じDLLのテスト実フォームから架空5行を撮影。ソースブランチをpushする。main/配布release/タグ/GitHub Releaseは今回変更しない。別PC起動は利用者確認待ち。v59は132件成功でもこのPCの製品EXEがSAC拒否。今回v60が通ったことからSplitContainer自体の拒否原因を確定しない。
+
 ## v0.1.58：利用者が起動OKを報告（2026-10-28）
 
 - 利用者の直接報告「1.58OKでした。」を受領。最新の別PC比較はv55 OK/v56・v57 SAC拒否/v58 OK。起動OKは利用者報告であり、当該実行時点の別PCハッシュとSAC状態を再採取した実測ではない。

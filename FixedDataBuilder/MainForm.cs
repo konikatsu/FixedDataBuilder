@@ -47,6 +47,16 @@ public sealed class MainForm : Form
     private readonly Label zoomLabel = new() { Name = "DisplayZoom", AutoSize = true, TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill };
     private int zoomWheelRemainder;
     private readonly WheelZoomDataGridView grid = new();
+    private readonly Panel hexArea = new() { Name = "ResizableHexArea", Dock = DockStyle.Bottom, Height = 88 };
+    private readonly Panel hexResizeGrip = new()
+    {
+        Name = "HexResizeGrip", Dock = DockStyle.Top, Height = 6,
+        Cursor = Cursors.HSplit, BackColor = SystemColors.ControlDark,
+        AccessibleName = "選択項目エリアの高さ調整"
+    };
+    private int? hexResizeStartScreenY;
+    private int hexResizeStartHeight;
+    private bool isResizingHexArea;
     private readonly MenuStrip menuStrip = new();
     private readonly ToolStripMenuItem recentDefinitionFilesMenu = new("最近使った定義ファイル");
     private readonly ToolStripMenuItem recentDataFilesMenu = new("最近使ったデータファイル");
@@ -87,6 +97,7 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Width = 1100;
         Height = 740;
+        MinimumSize = new Size(720, 420);
 
         fieldRowsButton = CreateMenuItem("項目縦", (_, _) => ChangeLayout(GridLayout.FieldRows));
         recordRowsButton = CreateMenuItem("レコード縦", (_, _) => ChangeLayout(GridLayout.RecordRows));
@@ -111,6 +122,12 @@ public sealed class MainForm : Form
         statusStrip.Items.Add(statusLabel);
         UpdateSeparatorModeText();
         EnableFileDrop(this);
+        Layout += (_, _) => SetHexAreaHeight(hexArea.Height);
+        DpiChanged += (_, _) =>
+        {
+            hexResizeGrip.Height = Math.Max(6, (int)Math.Round(6 * DeviceDpi / 96f));
+            SetHexAreaHeight(hexArea.Height);
+        };
         SetStatus("定義ファイルを選択するか、ファイルをドラッグ＆ドロップしてください。");
         LoadStartupFiles(args ?? []);
     }
@@ -233,7 +250,7 @@ public sealed class MainForm : Form
     {
         var panel = new TableLayoutPanel
         {
-            Dock = DockStyle.Bottom,
+            Dock = DockStyle.Fill,
             Height = 82,
             ColumnCount = 1,
             RowCount = 2,
@@ -257,7 +274,58 @@ public sealed class MainForm : Form
         hexTextBox.ScrollBars = ScrollBars.Vertical;
         hexTextBox.Font = new Font(FontFamily.GenericMonospace, 9);
         panel.Controls.Add(hexTextBox, 0, 1);
-        return panel;
+        hexResizeGrip.Height = Math.Max(6, (int)Math.Round(6 * DeviceDpi / 96f));
+        hexArea.Height = panel.Height + hexResizeGrip.Height;
+        hexArea.Controls.Add(panel);
+        hexArea.Controls.Add(hexResizeGrip);
+        hexResizeGrip.MouseDown += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            hexResizeStartScreenY = hexResizeGrip.PointToScreen(e.Location).Y;
+            hexResizeStartHeight = hexArea.Height;
+            hexResizeGrip.Capture = true;
+        };
+        hexResizeGrip.MouseMove += (_, e) =>
+        {
+            if (hexResizeStartScreenY is not int startY || !hexResizeGrip.Capture) return;
+            SetHexAreaHeight(hexResizeStartHeight - (hexResizeGrip.PointToScreen(e.Location).Y - startY));
+        };
+        hexResizeGrip.MouseUp += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            hexResizeStartScreenY = null;
+            hexResizeGrip.Capture = false;
+        };
+        hexResizeGrip.MouseCaptureChanged += (_, _) =>
+        {
+            if (!hexResizeGrip.Capture) hexResizeStartScreenY = null;
+        };
+        return hexArea;
+    }
+
+    private void SetHexAreaHeight(int requestedHeight)
+    {
+        if (isResizingHexArea || hexArea.Parent != this || WindowState == FormWindowState.Minimized) return;
+        var minimumHexHeight = Math.Max(64, (int)Math.Round(64 * DeviceDpi / 96f));
+        var minimumGridHeight = Math.Max(100, (int)Math.Round(100 * DeviceDpi / 96f));
+        // Use the client area and docked bars rather than grid.Height, which can
+        // still contain its previous size while a form layout is in progress.
+        var reservedHeight = Controls.Cast<Control>()
+            .Where(control => control != hexArea && control.Dock is (DockStyle.Top or DockStyle.Bottom))
+            .Sum(control => control.Height);
+        isResizingHexArea = true;
+        try
+        {
+            // Keep both areas usable even when DPI or the docked bars grow.
+            var minimumWindow = new Size(Math.Max(720, (int)Math.Round(720 * DeviceDpi / 96f)),
+                Math.Max((int)Math.Round(420 * DeviceDpi / 96f),
+                    Height - ClientSize.Height + Padding.Vertical + reservedHeight + minimumHexHeight + minimumGridHeight));
+            if (MinimumSize != minimumWindow) MinimumSize = minimumWindow;
+            var maximum = Math.Max(minimumHexHeight, ClientSize.Height - Padding.Vertical - reservedHeight - minimumGridHeight);
+            var height = Math.Clamp(requestedHeight, minimumHexHeight, maximum);
+            if (hexArea.Height != height) hexArea.Height = height;
+        }
+        finally { isResizingHexArea = false; }
     }
 
     private static Label CreatePathLabel(string text)
