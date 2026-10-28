@@ -42,8 +42,11 @@ public sealed class MainForm : Form
     private readonly TextBox xmlLayoutTextBox = new();
     private readonly TextBox dataPathTextBox = new();
     private readonly TextBox separatorModeTextBox = new();
-    private readonly TextBox hexTextBox = new();
-    private readonly DataGridView grid = new();
+    private readonly WheelZoomTextBox hexTextBox = new();
+    private readonly Label selectionSpaceLabel = new() { Name = "SelectedSpaceCount", Text = "半角スペース: — / 全角スペース: —", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+    private readonly Label zoomLabel = new() { Name = "DisplayZoom", AutoSize = true, TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill };
+    private int zoomWheelRemainder;
+    private readonly WheelZoomDataGridView grid = new();
     private readonly MenuStrip menuStrip = new();
     private readonly ToolStripMenuItem recentDefinitionFilesMenu = new("最近使った定義ファイル");
     private readonly ToolStripMenuItem recentDataFilesMenu = new("最近使ったデータファイル");
@@ -239,12 +242,14 @@ public sealed class MainForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20));
         panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        panel.Controls.Add(new Label
-        {
-            Text = "選択項目 HEX",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft
-        }, 0, 0);
+        var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        header.Controls.Add(new Label { Text = "選択項目 HEX", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
+        header.Controls.Add(selectionSpaceLabel, 1, 0);
+        header.Controls.Add(zoomLabel, 2, 0);
+        panel.Controls.Add(header, 0, 0);
 
         hexTextBox.Dock = DockStyle.Fill;
         hexTextBox.ReadOnly = true;
@@ -402,6 +407,8 @@ public sealed class MainForm : Form
             new ToolStripSeparator(),
             CreateMenuItem("表示項目...", (_, _) => ChooseVisibleFields()),
             CreateMenuItem("フォント設定...", (_, _) => ChooseDisplayFont()),
+            CreateMenuItem("拡大", (_, _) => ChangeZoomFromWheel(120)),
+            CreateMenuItem("縮小", (_, _) => ChangeZoomFromWheel(-120)),
             new ToolStripSeparator(),
             wrapDisplayButton,
             CreateMenuItem("折り返し表示設定...", (_, _) => ChooseDisplayWrapOptions())));
@@ -463,6 +470,8 @@ public sealed class MainForm : Form
             }
         };
         grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
+        grid.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
+        hexTextBox.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
     }
 
     private void ChooseDisplayWrapOptions()
@@ -700,8 +709,29 @@ public sealed class MainForm : Form
         grid.ColumnHeadersDefaultCellStyle.Font = displayFont;
         grid.DefaultCellStyle.Font = displayFont;
         hexTextBox.Font = displayFont;
+        if (grid.EditingControl is Control editor) editor.Font = displayFont;
+        zoomLabel.Text = $"{displayFont.SizeInPoints:0.#} pt（Ctrl＋ホイール）";
         RefreshGridSizing();
         SizeColumnsToFitData();
+    }
+
+    private void ChangeZoomFromWheel(int delta)
+    {
+        zoomWheelRemainder += delta;
+        var steps = zoomWheelRemainder / SystemInformation.MouseWheelScrollDelta;
+        zoomWheelRemainder %= SystemInformation.MouseWheelScrollDelta;
+        if (steps == 0 || displayFont is null) return;
+        var size = Math.Clamp(displayFont.SizeInPoints + steps, 6f, 48f);
+        if (Math.Abs(size - displayFont.SizeInPoints) < 0.01f) return;
+        var previous = displayFont;
+        displayFont = new Font(previous.FontFamily, size, previous.Style, GraphicsUnit.Point);
+        ApplyDisplayFont();
+        previous.Dispose();
+        try { SaveSettings(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SetStatus("表示サイズを変更しました（設定を記憶できませんでした）。");
+        }
     }
 
     private static Font CreateDefaultDisplayFont()
@@ -2609,6 +2639,7 @@ public sealed class MainForm : Form
 
     private void UpdateHexView()
     {
+        UpdateSelectionSpaceCount();
         var recordIndex = CurrentRecordIndex();
         var fieldIndex = CurrentFieldIndex();
         if (recordIndex < 0
@@ -2634,6 +2665,20 @@ public sealed class MainForm : Form
         {
             hexTextBox.Text = $"HEX 表示エラー: {ex.Message}";
         }
+    }
+
+    private void UpdateSelectionSpaceCount()
+    {
+        var record = CurrentRecordIndex();
+        var field = CurrentFieldIndex();
+        if (grid.CurrentCell is null || (layout == GridLayout.FieldRows && grid.CurrentCell.ColumnIndex < 2)
+            || record < 0 || record >= records.Count || field < 0 || field >= fields.Count || field >= records[record].Count)
+        {
+            selectionSpaceLabel.Text = "半角スペース: — / 全角スペース: —";
+            return;
+        }
+        var summary = SelectionSpaceSummary.Count(records[record][field], fields[field], IsCsv, TextDataEncoding);
+        selectionSpaceLabel.Text = summary.DisplayText;
     }
 
     private void ApplyCellValidationStyle(DataGridViewCell cell, FieldDefinition field, string value, Color? validBackColor = null)

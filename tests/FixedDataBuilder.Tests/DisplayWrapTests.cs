@@ -44,6 +44,9 @@ internal static partial class Program
                 var beforeRecords = Get<List<List<string>>>(form, "records").SelectMany(r => r).ToArray();
                 Get<ToolStripMenuItem>(form, "wrapDisplayButton").PerformClick();
                 Equal(true, grid.Rows[row].Height > beforeHeight);
+                // Below-threshold fixed values still display their full padding.
+                // Include all values before requiring the column itself to narrow.
+                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 1, 10));
                 Equal(true, grid.Columns[column].Width < beforeWidth);
                 Equal(beforeValue, grid[column, row].Value);
                 Equal(true, beforeRecords.SequenceEqual(Get<List<List<string>>>(form, "records").SelectMany(r => r)));

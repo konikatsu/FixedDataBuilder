@@ -22,6 +22,8 @@ internal static partial class Program
         var previousHistory = File.Exists(recentPath) ? File.ReadAllBytes(recentPath) : null;
         var preferencesPath = DataLoadSettingsStore.DefaultPath;
         var previousPreferences = File.Exists(preferencesPath) ? File.ReadAllBytes(preferencesPath) : null;
+        var fontSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FixedDataBuilder", "settings.txt");
+        var previousFontSettings = File.Exists(fontSettingsPath) ? File.ReadAllBytes(fontSettingsPath) : null;
         try
         {
             var repo = Path.GetFullPath(args[0]);
@@ -246,6 +248,7 @@ internal static partial class Program
             RunJapaneseEncodingTests(repo);
             RunCsvHeaderTests(repo);
             RunDisplayWrapTests(repo);
+            RunSpaceAndZoomTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);
@@ -320,6 +323,8 @@ internal static partial class Program
             else if (File.Exists(recentPath)) File.Delete(recentPath);
             if (previousPreferences is not null) File.WriteAllBytes(preferencesPath, previousPreferences);
             else if (File.Exists(preferencesPath)) File.Delete(preferencesPath);
+            if (previousFontSettings is not null) File.WriteAllBytes(fontSettingsPath, previousFontSettings);
+            else if (File.Exists(fontSettingsPath)) File.Delete(fontSettingsPath);
             // 一意の専用一時ディレクトリのみを削除する。
             Directory.Delete(temporaryDirectory, true);
         }

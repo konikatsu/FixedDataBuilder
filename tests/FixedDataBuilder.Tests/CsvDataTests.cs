@@ -27,6 +27,7 @@ internal static partial class Program
                 File.WriteAllText(scratch, "000001,\"東京\r\n中央\n支店\",12,\r\n", new UTF8Encoding(bom));
                 var rows = CsvDataReader.Read(scratch, fields);
                 Equal(1, rows.Count);
+                Equal("000001", rows[0][0]);
                 Equal("東京\r\n中央\n支店", rows[0][1]);
                 Equal("", rows[0][3]);
             }

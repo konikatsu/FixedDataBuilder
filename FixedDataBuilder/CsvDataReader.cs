@@ -11,7 +11,10 @@ public static class CsvDataReader
         CsvTextEncoding textEncoding = CsvTextEncoding.Utf8, bool hasHeader = false)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = JapaneseEncodings.ForCsv(textEncoding);
+        // StreamReader consumes a UTF-8 preamble even with encoding auto-detection disabled.
+        // Writers and HEX use BOM-less UTF-8, but readers must recognize an optional BOM.
+        var encoding = textEncoding == CsvTextEncoding.Utf8 ? new UTF8Encoding(true, true)
+            : JapaneseEncodings.ForCsv(textEncoding);
         var columnCount = fields.Count(field => !field.IsRedefines);
         if (columnCount == 0) throw new InvalidDataException("定義書に項目がありません。");
 
