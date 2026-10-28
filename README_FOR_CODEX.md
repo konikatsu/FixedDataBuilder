@@ -1,5 +1,15 @@
 # README_FOR_CODEX
 
+## v0.1.59：v58に選択項目エリア高さ調整を追加（製品SAC拒否）
+
+- 利用者がv58に高さ調整を追加した版を依頼。基点729ab1b385e55a770dccc2239f88bc5ba58407ed（機能コードac6b7a6）。製品差分はMainFormとcsproj版数の2ファイル。MainFormはv57と完全一致する機能構成となる。以前と同じSplitContainer方式であり新方式ではない。
+- 上下SplitContainer、上最小100/下最小64、初期下82、固定Panel2、境界6、メイン最小720x420。No.と表示文字数上限を維持。複数行選択や手動行高は追加しない。
+- ビルド警告0・エラー0、全132件成功・終了0・stderr空。既存130＋高さ調整2件。No.の保持もサイズ変更試験へ追加。publish --no-buildで製品/テストDLLのハッシュ一致。
+- 製品EXEの通常Start-ProcessはSAC Onで拒否。CodeIntegrity 3077 RecordId5252、2026-10-28T04:41:26Z、VerifiedAndReputableDesktop、GUID {0283ac0f-fff1-49ae-ada1-8a933130cad6}、Status0xc0e90002、関連3089署名数0。拒否対象はEXE。MainFormの高さ変更処理が製品で実行されて失敗した記録ではない。
+- EXE SHA256=770463EA47DCC4F4CA05E3A6246E5B961BD345293C08500D30BEFE172609F36D、DLL SHA256=31A986025411C47797A7223052FF40F31E2D13696555EA634DDBB5C32865713A。拒否後に再ビルド・別ホスト実行・SAC等の設定変更は行わない。
+- 画像は拒否前に同じDLLのテストEXEから実フォームを撮影。製品起動成功と混同しない。確認用ZIP/フォルダーをC:/dev/FixedDataBuilder直下へ作り、GitHub Release/main/releaseフォルダーは既存v56を維持。ソースブランチだけpush。別PCの起動結果は未確認。証拠reviews/hex-pane-v0.1.59/v001。
+
+
 ## v0.1.58：利用者が起動OKを報告（2026-10-28）
 
 - 利用者の直接報告「1.58OKでした。」を受領。最新の別PC比較はv55 OK/v56・v57 SAC拒否/v58 OK。起動OKは利用者報告であり、当該実行時点の別PCハッシュとSAC状態を再採取した実測ではない。

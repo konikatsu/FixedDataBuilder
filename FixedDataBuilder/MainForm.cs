@@ -47,6 +47,12 @@ public sealed class MainForm : Form
     private readonly Label zoomLabel = new() { Name = "DisplayZoom", AutoSize = true, TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill };
     private int zoomWheelRemainder;
     private readonly WheelZoomDataGridView grid = new();
+    private readonly SplitContainer dataHexSplit = new()
+    {
+        Name = "DataHexSplit", Size = new Size(1000, 450), Orientation = Orientation.Horizontal,
+        SplitterWidth = 6, SplitterDistance = 362, Panel1MinSize = 100, Panel2MinSize = 64,
+        FixedPanel = FixedPanel.Panel2, Dock = DockStyle.Fill, BackColor = SystemColors.ControlDark
+    };
     private readonly MenuStrip menuStrip = new();
     private readonly ToolStripMenuItem recentDefinitionFilesMenu = new("最近使った定義ファイル");
     private readonly ToolStripMenuItem recentDataFilesMenu = new("最近使ったデータファイル");
@@ -87,6 +93,7 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Width = 1100;
         Height = 740;
+        MinimumSize = new Size(720, 420);
 
         fieldRowsButton = CreateMenuItem("項目縦", (_, _) => ChangeLayout(GridLayout.FieldRows));
         recordRowsButton = CreateMenuItem("レコード縦", (_, _) => ChangeLayout(GridLayout.RecordRows));
@@ -95,8 +102,10 @@ public sealed class MainForm : Form
         LoadSettings();
         displayFont ??= CreateDefaultDisplayFont();
 
-        Controls.Add(grid);
-        Controls.Add(BuildHexPanel());
+        dataHexSplit.Panel1.Controls.Add(grid);
+        dataHexSplit.Panel2.BackColor = SystemColors.Control;
+        dataHexSplit.Panel2.Controls.Add(BuildHexPanel());
+        Controls.Add(dataHexSplit);
         Controls.Add(statusStrip);
         Controls.Add(BuildFilePanel());
         Controls.Add(menuStrip);
@@ -233,7 +242,7 @@ public sealed class MainForm : Form
     {
         var panel = new TableLayoutPanel
         {
-            Dock = DockStyle.Bottom,
+            Dock = DockStyle.Fill,
             Height = 82,
             ColumnCount = 1,
             RowCount = 2,
