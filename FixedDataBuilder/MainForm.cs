@@ -471,6 +471,7 @@ public sealed partial class MainForm : Form
             if (displayWrapOptions.Enabled != wrapDisplayButton.Checked)
                 ApplyDisplayWrapOptions(displayWrapOptions with { Enabled = wrapDisplayButton.Checked });
         };
+        byteRulerButton.CheckedChanged += (_, _) => ChangeByteRulerVisibility();
         menuStrip.Items.Add(CreateMenu("表示",
             fieldRowsButton,
             recordRowsButton,
@@ -481,6 +482,7 @@ public sealed partial class MainForm : Form
             CreateMenuItem("拡大", (_, _) => ChangeZoomFromWheel(120)),
             CreateMenuItem("縮小", (_, _) => ChangeZoomFromWheel(-120)),
             new ToolStripSeparator(),
+            byteRulerButton,
             wrapDisplayButton,
             CreateMenuItem("折り返し表示設定...", (_, _) => ChooseDisplayWrapOptions())));
         menuStrip.Items.Add(CreateMenu("ツール",
@@ -547,10 +549,11 @@ public sealed partial class MainForm : Form
         grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
         grid.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
         hexTextBox.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
-        grid.ColumnWidthChanged += (_, _) =>
+        grid.ColumnWidthChanged += (_, e) =>
         {
             if (isSingleRecordView && !isRefreshingGrid) AdjustSingleRecordRowHeights();
             if (!isRefreshingGrid) AdjustRecordCommentHeight();
+            if (!isRefreshingGrid) UpdateByteRulerDisplay(e.Column.Index);
         };
         grid.SizeChanged += (_, _) => { if (!isRefreshingGrid) AdjustRecordCommentHeight(); };
     }
@@ -607,7 +610,7 @@ public sealed partial class MainForm : Form
 
     private void AdjustWrappedRowHeights()
     {
-        if (!displayWrapOptions.Enabled) { AdjustSingleRecordRowHeights(); AdjustRecordCommentHeight(); return; }
+        if (!displayWrapOptions.Enabled) { AdjustSingleRecordRowHeights(); AdjustRecordCommentHeight(); UpdateByteRulerDisplay(); return; }
         foreach (DataGridViewRow row in grid.Rows)
         {
             var height = grid.RowTemplate.Height;
@@ -621,6 +624,7 @@ public sealed partial class MainForm : Form
         }
         AdjustSingleRecordRowHeights();
         AdjustRecordCommentHeight();
+        UpdateByteRulerDisplay();
     }
 
     private void SizeWrappedColumns()
@@ -630,9 +634,11 @@ public sealed partial class MainForm : Form
             var width = TextRenderer.MeasureText(column.HeaderText, column.InheritedStyle.Font ?? grid.Font).Width + 20;
             if (recordCommentRowIndex >= 0 && column.Index == 0)
                 width = Math.Max(width, TextRenderer.MeasureText("コメント", grid.Font).Width + 10);
+            if (recordRulerRowIndex >= 0 && column.Index == 0)
+                width = Math.Max(width, TextRenderer.MeasureText("バイト目盛り", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
-                if (layout == GridLayout.RecordRows && row.Index == recordCommentRowIndex) continue;
+                if (layout == GridLayout.RecordRows && (row.Index == recordCommentRowIndex || row.Index == recordRulerRowIndex)) continue;
                 var cell = row.Cells[column.Index];
                 var lines = WrappedDisplayLines(row.Index, column.Index);
                 if (lines is null)
@@ -2113,7 +2119,7 @@ public sealed partial class MainForm : Form
         AddRecentFile(recentDataFiles, path);
         UpdateSeparatorModeText();
         if (refreshNeeded) RefreshGrid();
-        else UpdateHexView();
+        else { RefreshByteRulers(); UpdateHexView(); }
         SetUnsavedChanges(false);
         RememberCurrentLoadSettings(path);
     }
@@ -2258,7 +2264,7 @@ public sealed partial class MainForm : Form
 
         foreach (DataGridViewRow gridRow in grid.Rows)
         {
-            if (gridRow.IsNewRow)
+            if (gridRow.IsNewRow || (layout == GridLayout.RecordRows && gridRow.Index == recordRulerRowIndex))
             {
                 continue;
             }
@@ -2518,6 +2524,7 @@ public sealed partial class MainForm : Form
         records[recordRowsRecordIndex][fieldIndex] = recordRowsFormattedValue;
         grid[columnIndex, rowIndex].Value = recordRowsFormattedValue;
         ApplyCellValidationStyle(grid[columnIndex, rowIndex], recordRowsField, recordRowsFormattedValue);
+        RefreshByteRulers(fieldIndex);
         UpdateHexView();
     }
 
@@ -2596,6 +2603,9 @@ public sealed partial class MainForm : Form
             recordGridColumnFieldIndexes.Clear();
             recordRowsDataStartIndex = 3;
             recordCommentRowIndex = recordOccursRowIndex = -1;
+            recordRulerRowIndex = -1;
+            byteRulerLengths.Clear();
+            byteRulerErrors.Clear();
             RebuildOccursDisplayInfos();
             UpdateLayoutButtons();
             grid.RowHeadersVisible = layout == GridLayout.FieldRows;
@@ -2624,18 +2634,21 @@ public sealed partial class MainForm : Form
     private void SizeColumnsToFitData()
     {
         if (isSingleRecordView) { SizeSingleRecordColumns(); return; }
-        if (displayWrapOptions.Enabled) { SizeWrappedColumns(); AdjustRecordCommentHeight(); return; }
+        if (displayWrapOptions.Enabled) { SizeWrappedColumns(); AdjustRecordCommentHeight(); UpdateByteRulerDisplay(); return; }
         foreach (DataGridViewColumn column in grid.Columns)
         {
-            var width = column.GetPreferredWidth(recordCommentRowIndex >= 0
+            var auxiliaryRows = recordCommentRowIndex >= 0 || recordRulerRowIndex >= 0;
+            var width = column.GetPreferredWidth(auxiliaryRows
                 ? DataGridViewAutoSizeColumnMode.ColumnHeader : DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: false);
             width = Math.Max(width, TextRenderer.MeasureText(column.HeaderText, column.HeaderCell.InheritedStyle.Font ?? grid.Font).Width + 20);
             if (recordCommentRowIndex >= 0 && column.Index == 0)
                 width = Math.Max(width, TextRenderer.MeasureText("コメント", grid.Font).Width + 10);
+            if (recordRulerRowIndex >= 0 && column.Index == 0)
+                width = Math.Max(width, TextRenderer.MeasureText("バイト目盛り", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
-                if (layout == GridLayout.RecordRows && row.Index == recordCommentRowIndex) continue;
-                if (recordCommentRowIndex >= 0) width = Math.Max(width, row.Cells[column.Index].PreferredSize.Width);
+                if (layout == GridLayout.RecordRows && (row.Index == recordCommentRowIndex || row.Index == recordRulerRowIndex)) continue;
+                if (auxiliaryRows) width = Math.Max(width, row.Cells[column.Index].PreferredSize.Width);
                 if (layout == GridLayout.RecordRows && RecordIndexFromGridRow(row.Index) < 0) continue;
                 if (!TryGetCellField(row.Index, column.Index, out var field)
                     || (!IsCsv && field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText))) continue;
@@ -2651,6 +2664,7 @@ public sealed partial class MainForm : Form
             column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
         }
         AdjustRecordCommentHeight();
+        UpdateByteRulerDisplay();
     }
 
     private void RefreshFieldRowsGrid()
@@ -2810,6 +2824,7 @@ public sealed partial class MainForm : Form
             recordOccursRowIndex = grid.Rows.Count;
             AddOccursRecordHeaderRow();
         }
+        AddByteRulerRow();
         recordRowsDataStartIndex = grid.Rows.Count;
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
@@ -3253,6 +3268,7 @@ public sealed partial class MainForm : Form
 
     private void UpdateLayoutButtons()
     {
+        byteRulerButton.Enabled = layout == GridLayout.RecordRows && !isSingleRecordView && fields.Count > 0;
         fieldRowsButton.Checked = !isSingleRecordView && layout == GridLayout.FieldRows;
         recordRowsButton.Checked = !isSingleRecordView && layout == GridLayout.RecordRows;
     }

@@ -317,6 +317,7 @@ internal static partial class Program
             RunDataEncodingDetectionTests(repo);
             RunHorizontalHeaderTests(repo);
             RunExcelHorizontalExportTests(repo);
+            RunByteRulerTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

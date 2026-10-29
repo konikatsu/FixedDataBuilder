@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.1.68</Version>
-    <AssemblyVersion>0.1.68.0</AssemblyVersion>
-    <FileVersion>0.1.68.0</FileVersion>
-    <InformationalVersion>0.1.68</InformationalVersion>
+    <Version>0.1.69</Version>
+    <AssemblyVersion>0.1.69.0</AssemblyVersion>
+    <FileVersion>0.1.69.0</FileVersion>
+    <InformationalVersion>0.1.69</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
