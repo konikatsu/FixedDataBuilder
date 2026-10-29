@@ -1,11 +1,9 @@
-using System.Globalization;
-
 namespace FixedDataBuilder;
 
 public sealed partial class MainForm
 {
     private static readonly Color CommentHeaderBackColor = Color.FromArgb(225, 242, 252);
-    private int recordRowsDataStartIndex = 2;
+    private int recordRowsDataStartIndex = 3;
     private int recordCommentRowIndex = -1;
     private int recordOccursRowIndex = -1;
 
@@ -39,21 +37,5 @@ public sealed partial class MainForm
     private string RecordItemName(int fieldIndex) => occursDisplayInfos.TryGetValue(fieldIndex, out var info)
         ? info.ChildName : fields[fieldIndex].Name;
 
-    private string ExcelColumnHeader(DataGridViewColumn column)
-    {
-        var fieldIndex = layout == GridLayout.RecordRows ? FieldIndexFromRecordColumn(column.Index) : -1;
-        return fieldIndex < 0 ? column.HeaderText : RecordItemName(fieldIndex);
-    }
-
-    private IReadOnlyList<ExcelCell> CsvPositionsForExcel()
-    {
-        var row = new List<ExcelCell> { new("位置", ExcelCellKind.Header) };
-        for (var column = 1; column < grid.Columns.Count; column++)
-        {
-            var fieldIndex = FieldIndexFromRecordColumn(column);
-            var number = fields.Take(fieldIndex + 1).Count(field => !field.IsRedefines);
-            row.Add(new ExcelCell("CSV列" + number.ToString(CultureInfo.InvariantCulture), ExcelCellKind.Header));
-        }
-        return row;
-    }
+    private static string ExcelBackground(Color color) => color.ToArgb().ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
 }

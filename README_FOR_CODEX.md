@@ -1,5 +1,13 @@
 # README_FOR_CODEX
 
+## v0.1.67：横表示とExcelの見出しセル分離・コメントと背景色（2026-10-29、起動確認待ち）
+
+- 利用者は横表示Excelへコメント出力、番号と項目名の別セル化、画面同様の背景色を依頼。基点f3fb7fc30ad55a064ef48bf593f4f39f68b9457c、ブランチcodex/excel-horizontal-v0.1.67。横表示のColumnHeaderはNo.nだけにし、項目名を最初のfrozen/read-only行へ移動。型・固定長位置・コメント・OCCURS帯の後からデータとする。CSVの位置行は出力しない。
+- 横表示Excelは画面の番号/項目名/型/固定長位置/コメント/OCCURS/データを別行・セルで出力。見出しと行番号の背景は画面のInheritedStyleからARGBへ、コメントはFFE1F2FCの水色。ExcelCellに任意背景色を追加しスタイル/塗りつぶしを重複なく生成。予約fill gray125は保持するが実セルはsolid。コメントは列幅計算から除外し、折返しの高さを計算、最大409.5pt。XML改行はEntitizeでCR/LF・空白を保持し、全セルをinlineStrとして数式を実行しない。
+- ExcelImporterは番号行＋項目名行＋型行の新形式を認識し、位置/コメント/OCCURS帯をmetadataとして読む。コメントをFieldDefinition.Commentへ復元。以前の単一セル内改行/2段/3段形式は既存パスを維持。LoadExcelと定義CSVへのコメント保存に対応する。データ保存やHEXの処理は変更しない。
+- 既存見出し試験を新しい行番号/構成へ更新し、画面とExcelの値/色一致、実XMLのsolid/折返し/高さ、コメント編集の取り込みとCSV保存、固定長/OCCURS/非表示番号、背景色不正時の保存先保持の5件を追加し計180件。製品と自動テストの実行は利用者担当を継続し、こちらではビルド/publish --no-build/静的確認/パッケージのみ。合格や実画面確認をしたとは記載しない。
+- 証拠reviews/excel-horizontal-v0.1.67/v001。確認用軽量版とソース/READMEの作業ブランチを用意し、release/とmain/公開Releaseはv66を維持。v67の起動成功を利用者が報告した後、同じバイナリを再ビルドせず公開する。最新3版は公開時v67/v66/v65、v63Releaseは保管検証後に整理しタグ/履歴/ローカルを保持する。業務データ/ログ/過去画像は削除・追加せず、画像撮影EXEも起動しない。
+
 ## v0.1.66：横表示の番号・コメント・CSV位置行非表示（2026-10-29、再起動後の利用者起動確認で公開）
 
 - アプリ再起動前の要件をreviews/horizontal-headers-v0.1.66/v001/RESTART-CHECKPOINT-v001.mdへ保存し、利用者の「再開して」で継続。基点2102b98b1106c61679171008c09a2f1cd2485e0a、codex/horizontal-headers-v0.1.66。横表示（レコード縦）の項目名の上にNo.nを表示し、定義順の元番号を保持する。

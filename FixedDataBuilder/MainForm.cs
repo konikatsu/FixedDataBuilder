@@ -854,7 +854,7 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        grid.ColumnHeadersHeight = Math.Max(28, grid.Font.Height * (layout == GridLayout.RecordRows ? 2 : 1) + 12);
+        grid.ColumnHeadersHeight = Math.Max(28, grid.Font.Height + 12);
         grid.RowTemplate.Height = Math.Max(22, grid.Font.Height + 8);
         foreach (DataGridViewRow row in grid.Rows)
         {
@@ -2252,12 +2252,13 @@ public sealed partial class MainForm : Form
         var rows = new List<IReadOnlyList<ExcelCell>>();
         rows.Add(grid.Columns
             .Cast<DataGridViewColumn>()
-            .Select(column => new ExcelCell(ExcelColumnHeader(column), ExcelCellKind.Header))
+            .Select(column => new ExcelCell(column.HeaderText, ExcelCellKind.Header,
+                layout == GridLayout.RecordRows ? ExcelBackground(column.HeaderCell.InheritedStyle.BackColor) : null))
             .ToList());
 
         foreach (DataGridViewRow gridRow in grid.Rows)
         {
-            if (gridRow.IsNewRow || (layout == GridLayout.RecordRows && gridRow.Index == recordCommentRowIndex))
+            if (gridRow.IsNewRow)
             {
                 continue;
             }
@@ -2265,15 +2266,16 @@ public sealed partial class MainForm : Form
             var row = new List<ExcelCell>();
             for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
             {
-                var kind = layout == GridLayout.RecordRows && (gridRow.Index == 0 || (!IsCsv && gridRow.Index == 1))
-                    ? ExcelCellKind.Header
+                var kind = layout == GridLayout.RecordRows && gridRow.Index == recordCommentRowIndex ? ExcelCellKind.Comment
+                    : layout == GridLayout.RecordRows && gridRow.Index < RecordRowsDataStartIndex() ? ExcelCellKind.Header
                     : IsDefinitionCellForExcel(columnIndex) ? ExcelCellKind.Definition : ExcelCellKind.Normal;
-                row.Add(new ExcelCell(gridRow.Cells[columnIndex].Value?.ToString() ?? string.Empty, kind));
+                var cell = gridRow.Cells[columnIndex];
+                var background = layout == GridLayout.RecordRows && (gridRow.Index < RecordRowsDataStartIndex() || columnIndex == 0)
+                    ? ExcelBackground(cell.InheritedStyle.BackColor) : null;
+                row.Add(new ExcelCell(cell.Value?.ToString() ?? string.Empty, kind, background));
             }
 
             rows.Add(row);
-            // Screen-only changes must not alter the importable Excel header contract.
-            if (layout == GridLayout.RecordRows && IsCsv && gridRow.Index == 0) rows.Add(CsvPositionsForExcel());
         }
 
         return rows;
@@ -2592,7 +2594,7 @@ public sealed partial class MainForm : Form
             grid.Rows.Clear();
             fieldGridRows.Clear();
             recordGridColumnFieldIndexes.Clear();
-            recordRowsDataStartIndex = 2;
+            recordRowsDataStartIndex = 3;
             recordCommentRowIndex = recordOccursRowIndex = -1;
             RebuildOccursDisplayInfos();
             UpdateLayoutButtons();
@@ -2760,6 +2762,7 @@ public sealed partial class MainForm : Form
         recordGridColumnFieldIndexes.Add(-1);
         ApplyDefinitionColumnStyle(grid.Columns[0]);
 
+        var names = new List<string> { "項目名" };
         var definitions = new List<string> { "型" };
         var positions = new List<string> { "位置" };
         var comments = new List<string> { "コメント" };
@@ -2772,7 +2775,8 @@ public sealed partial class MainForm : Form
             {
                 occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
                 var ruler = IsCsv ? $"CSV列{fields.Take(fieldIndex + 1).Count(item => !item.IsRedefines)}" : $"[{byteStart}-{byteEnd}]";
-                var header = $"No.{fieldIndex + 1}\n{RecordItemName(fieldIndex)}";
+                var header = $"No.{fieldIndex + 1}";
+                names.Add(RecordItemName(fieldIndex));
                 definitions.Add(field.DisplayDefinition);
                 positions.Add(ruler);
                 comments.Add(field.Comment);
@@ -2794,6 +2798,9 @@ public sealed partial class MainForm : Form
             }
         }
 
+        AddRecordDefinitionRow(names);
+        for (var column = 1; column < grid.Columns.Count; column++)
+            grid[column, 0].ToolTipText = FieldDefinitionToolTip(fields[FieldIndexFromRecordColumn(column)]);
         AddRecordDefinitionRow(definitions);
         if (!IsCsv) AddRecordDefinitionRow(positions);
         if (comments.Skip(1).Any(comment => !string.IsNullOrWhiteSpace(comment))) AddRecordCommentRow(comments);

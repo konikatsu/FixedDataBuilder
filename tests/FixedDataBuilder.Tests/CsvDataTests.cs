@@ -127,9 +127,10 @@ internal static partial class Program
             using var form = new MainForm(["--definition", definition, "--data", data, "--layout", "record"]);
             var grid = Get<DataGridView>(form, "grid");
             var row = (int)Invoke(form, "RecordRowsDataStartIndex")!;
-            Equal(1, row);
+            Equal(2, row);
             Equal("12", grid[3, row].Value);
-            Equal("No.1\nコード", grid.Columns[1].HeaderText);
+            Equal("No.1", grid.Columns[1].HeaderText);
+            Equal("コード", grid[1, 0].Value);
             Equal("ab", Invoke(form, "GetVisibleTextValue", fields[1], "ab"));
             Equal("ab･□", Invoke(form, "GetVisibleTextValue", fields[1], "ab 　"));
             grid[3, row].Value = "00002";

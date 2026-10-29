@@ -89,6 +89,7 @@ public static class ExcelImporter
 
     private static ExcelImportResult ReadRecordRows(IReadOnlyList<IReadOnlyList<string>> rows)
     {
+        if (Cell(rows, 1, 0) == "項目名" && Cell(rows, 2, 0) == "型") return ReadNumberedRecordRows(rows);
         var threeLineHeader = Cell(rows, 1, 0) == "型" && Cell(rows, 2, 0) == "位置";
         var twoLineHeader = threeLineHeader || IsTwoLineRecordHeader(rows);
         var dataStartRow = threeLineHeader ? 3 : twoLineHeader ? 2 : 1;
@@ -137,6 +138,34 @@ public static class ExcelImporter
             throw new InvalidDataException("Excel にレコードがありません。");
         }
 
+        return new ExcelImportResult(fields, records, "レコード縦");
+    }
+
+    private static ExcelImportResult ReadNumberedRecordRows(IReadOnlyList<IReadOnlyList<string>> rows)
+    {
+        var start = 3;
+        if (Cell(rows, start, 0) == "位置") start++;
+        var commentRow = Cell(rows, start, 0) == "コメント" ? start++ : -1;
+        if (Cell(rows, start, 0) == "OCCURS") start++;
+        var fields = new List<FieldDefinition>();
+        var columns = new List<int>();
+        for (var column = 1; column < rows.Max(row => row.Count); column++)
+        {
+            var name = Cell(rows, 1, column).Trim();
+            var definition = Cell(rows, 2, column).Trim();
+            if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(definition)) continue;
+            var field = DefinitionCsvReader.ParseFieldDefinition(name, definition, 3);
+            fields.Add(field with { Comment = commentRow < 0 ? "" : Cell(rows, commentRow, column) });
+            columns.Add(column);
+        }
+        if (fields.Count == 0) throw new InvalidDataException("Excel に定義項目がありません。");
+        var records = new List<List<string>>();
+        for (var row = start; row < rows.Count; row++)
+        {
+            if (rows[row].All(string.IsNullOrWhiteSpace)) continue;
+            records.Add(columns.Select(column => Cell(rows, row, column)).ToList());
+        }
+        if (records.Count == 0) throw new InvalidDataException("Excel にレコードがありません。");
         return new ExcelImportResult(fields, records, "レコード縦");
     }
 

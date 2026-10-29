@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using System.Xml;
+using System.Text;
+using System.Globalization;
 
 namespace FixedDataBuilder;
 
@@ -7,10 +9,11 @@ public enum ExcelCellKind
 {
     Normal,
     Header,
-    Definition
+    Definition,
+    Comment
 }
 
-public sealed record ExcelCell(string Text, ExcelCellKind Kind = ExcelCellKind.Normal);
+public sealed record ExcelCell(string Text, ExcelCellKind Kind = ExcelCellKind.Normal, string? BackgroundColor = null);
 
 public static class ExcelExporter
 {
@@ -20,6 +23,7 @@ public static class ExcelExporter
 
     public static void Write(string path, string sheetName, IReadOnlyList<IReadOnlyList<ExcelCell>> rows)
     {
+        var styles = new ExcelStyles(rows);
         if (File.Exists(path))
         {
             File.Delete(path);
@@ -30,8 +34,8 @@ public static class ExcelExporter
         WriteRootRelationships(archive);
         WriteWorkbook(archive, sheetName);
         WriteWorkbookRelationships(archive);
-        WriteStyles(archive);
-        WriteWorksheet(archive, rows);
+        WriteStyles(archive, styles);
+        WriteWorksheet(archive, rows, styles);
     }
 
     private static void WriteContentTypes(ZipArchive archive)
@@ -113,7 +117,7 @@ public static class ExcelExporter
         writer.WriteEndElement();
     }
 
-    private static void WriteStyles(ZipArchive archive)
+    private static void WriteStyles(ZipArchive archive, ExcelStyles styles)
     {
         using var writer = CreateXmlWriter(archive, "xl/styles.xml");
         writer.WriteStartDocument();
@@ -126,11 +130,11 @@ public static class ExcelExporter
         writer.WriteEndElement();
 
         writer.WriteStartElement("fills");
-        writer.WriteAttributeString("count", "3");
+        writer.WriteAttributeString("count", (styles.Colors.Count + 2).ToString(CultureInfo.InvariantCulture));
         WriteFill(writer, null);
         // Excelの標準fill 0/1は予約したまま、実際の塗りつぶしにはfill 2を使う。
         WriteFill(writer, null, patternType: "gray125");
-        WriteFill(writer, "FFDDEBF7");
+        foreach (var color in styles.Colors) WriteFill(writer, color);
         writer.WriteEndElement();
 
         writer.WriteStartElement("borders");
@@ -150,10 +154,14 @@ public static class ExcelExporter
         writer.WriteEndElement();
 
         writer.WriteStartElement("cellXfs");
-        writer.WriteAttributeString("count", "3");
-        WriteCellFormat(writer, fontId: 0, fillId: 0, applyFill: false, applyFont: false);
-        WriteCellFormat(writer, fontId: 1, fillId: 2, applyFill: true, applyFont: true);
-        WriteCellFormat(writer, fontId: 0, fillId: 2, applyFill: true, applyFont: false);
+        writer.WriteAttributeString("count", styles.Entries.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (var style in styles.Entries)
+        {
+            var color = ExcelStyles.FillColor(style);
+            var fillId = color is null ? 0 : styles.Colors.IndexOf(color) + 2;
+            WriteCellFormat(writer, style.Kind == ExcelCellKind.Header ? 1 : 0, fillId,
+                applyFill: color is not null, applyFont: style.Kind == ExcelCellKind.Header);
+        }
         writer.WriteEndElement();
 
         writer.WriteEndElement();
@@ -212,16 +220,19 @@ public static class ExcelExporter
         }
         writer.WriteStartElement("alignment");
         writer.WriteAttributeString("wrapText", "1");
+        writer.WriteAttributeString("horizontal", "left");
+        writer.WriteAttributeString("vertical", "top");
         writer.WriteEndElement();
         writer.WriteEndElement();
     }
 
-    private static void WriteWorksheet(ZipArchive archive, IReadOnlyList<IReadOnlyList<ExcelCell>> rows)
+    private static void WriteWorksheet(ZipArchive archive, IReadOnlyList<IReadOnlyList<ExcelCell>> rows, ExcelStyles styles)
     {
         using var writer = CreateXmlWriter(archive, "xl/worksheets/sheet1.xml");
         writer.WriteStartDocument();
         writer.WriteStartElement("worksheet", SpreadsheetNamespace);
-        WriteColumns(writer, rows);
+        var widths = ColumnWidths(rows);
+        WriteColumns(writer, widths);
         writer.WriteStartElement("sheetData");
 
         for (var rowIndex = 0; rowIndex < rows.Count; rowIndex++)
@@ -230,9 +241,17 @@ public static class ExcelExporter
             writer.WriteAttributeString("r", (rowIndex + 1).ToString());
 
             var row = rows[rowIndex];
+            if (row.Any(cell => cell.Kind == ExcelCellKind.Comment))
+            {
+                var lines = row.Select((cell, column) => cell.Text.Replace("\r\n", "\n").Replace('\r', '\n')
+                    .Split('\n').Sum(line => Math.Max(1, (int)Math.Ceiling((double)TextWidth(line) / Math.Max(1, widths[column] - 2)))))
+                    .DefaultIfEmpty(1).Max();
+                writer.WriteAttributeString("ht", Math.Clamp(lines * 15d + 6, 21, 409.5).ToString(CultureInfo.InvariantCulture));
+                writer.WriteAttributeString("customHeight", "1");
+            }
             for (var columnIndex = 0; columnIndex < row.Count; columnIndex++)
             {
-                WriteCell(writer, rowIndex, columnIndex, row[columnIndex]);
+                WriteCell(writer, rowIndex, columnIndex, row[columnIndex], styles);
             }
 
             writer.WriteEndElement();
@@ -243,40 +262,41 @@ public static class ExcelExporter
         writer.WriteEndDocument();
     }
 
-    private static void WriteColumns(XmlWriter writer, IReadOnlyList<IReadOnlyList<ExcelCell>> rows)
+    private static List<int> ColumnWidths(IReadOnlyList<IReadOnlyList<ExcelCell>> rows)
     {
         var columnCount = rows.Count == 0 ? 0 : rows.Max(row => row.Count);
-        if (columnCount == 0)
-        {
-            return;
-        }
+        return Enumerable.Range(0, columnCount).Select(column => Math.Clamp(rows
+            .Where(row => column < row.Count && row[column].Kind != ExcelCellKind.Comment)
+            .Select(row => row[column].Text.Replace('\r', '\n').Split('\n').Max(TextWidth))
+            .DefaultIfEmpty(6).Max() + 2, 8, 32)).ToList();
+    }
+
+    private static int TextWidth(string value) => value.EnumerateRunes().Sum(rune =>
+        rune.Value <= 0xff || rune.Value is >= 0xff61 and <= 0xff9f ? 1 : 2);
+
+    private static void WriteColumns(XmlWriter writer, IReadOnlyList<int> widths)
+    {
+        if (widths.Count == 0) return;
 
         writer.WriteStartElement("cols");
-        for (var columnIndex = 0; columnIndex < columnCount; columnIndex++)
+        for (var columnIndex = 0; columnIndex < widths.Count; columnIndex++)
         {
-            var width = rows
-                .Where(row => columnIndex < row.Count)
-                .Select(row => row[columnIndex].Text.Split('\n').Max(part => part.Length))
-                .DefaultIfEmpty(8)
-                .Max();
-            width = Math.Clamp(width + 2, 8, 32);
-
             writer.WriteStartElement("col");
             writer.WriteAttributeString("min", (columnIndex + 1).ToString());
             writer.WriteAttributeString("max", (columnIndex + 1).ToString());
-            writer.WriteAttributeString("width", width.ToString());
+            writer.WriteAttributeString("width", widths[columnIndex].ToString(CultureInfo.InvariantCulture));
             writer.WriteAttributeString("customWidth", "1");
             writer.WriteEndElement();
         }
         writer.WriteEndElement();
     }
 
-    private static void WriteCell(XmlWriter writer, int rowIndex, int columnIndex, ExcelCell cell)
+    private static void WriteCell(XmlWriter writer, int rowIndex, int columnIndex, ExcelCell cell, ExcelStyles styles)
     {
         writer.WriteStartElement("c");
         writer.WriteAttributeString("r", ToCellReference(rowIndex, columnIndex));
         writer.WriteAttributeString("t", "inlineStr");
-        writer.WriteAttributeString("s", CellStyleIndex(cell.Kind).ToString());
+        writer.WriteAttributeString("s", styles.Index(cell).ToString(CultureInfo.InvariantCulture));
         writer.WriteStartElement("is");
         writer.WriteStartElement("t");
         writer.WriteAttributeString("xml", "space", null, "preserve");
@@ -286,12 +306,40 @@ public static class ExcelExporter
         writer.WriteEndElement();
     }
 
-    private static int CellStyleIndex(ExcelCellKind kind) => kind switch
+    private sealed record ExcelStyle(ExcelCellKind Kind, string? Background);
+
+    private sealed class ExcelStyles
     {
-        ExcelCellKind.Header => 1,
-        ExcelCellKind.Definition => 2,
-        _ => 0
-    };
+        public List<ExcelStyle> Entries { get; } = [new(ExcelCellKind.Normal, null), new(ExcelCellKind.Header, null), new(ExcelCellKind.Definition, null)];
+        public List<string> Colors { get; } = ["FFDDEBF7"];
+        private readonly Dictionary<ExcelStyle, int> indices = new();
+        public ExcelStyles(IReadOnlyList<IReadOnlyList<ExcelCell>> rows)
+        {
+            for (var index = 0; index < Entries.Count; index++) indices.Add(Entries[index], index);
+            foreach (var cell in rows.SelectMany(row => row))
+            {
+                var style = Key(cell);
+                if (indices.ContainsKey(style)) continue;
+                indices.Add(style, Entries.Count);
+                Entries.Add(style);
+                var color = FillColor(style);
+                if (color is not null && !Colors.Contains(color)) Colors.Add(color);
+            }
+        }
+        public int Index(ExcelCell cell) => indices[Key(cell)];
+        private static ExcelStyle Key(ExcelCell cell)
+        {
+            if (cell.BackgroundColor is { } color && (color.Length != 8 || color.Any(ch => !Uri.IsHexDigit(ch))))
+                throw new ArgumentException("Excelの背景色はARGBの8桁16進数で指定してください。");
+            return new(cell.Kind, cell.BackgroundColor?.ToUpperInvariant());
+        }
+        public static string? FillColor(ExcelStyle style) => style.Background ?? (style.Kind switch
+        {
+            ExcelCellKind.Header or ExcelCellKind.Definition => "FFDDEBF7",
+            ExcelCellKind.Comment => "FFE1F2FC",
+            _ => null
+        });
+    }
 
     private static string ToCellReference(int rowIndex, int columnIndex)
     {
@@ -313,6 +361,7 @@ public static class ExcelExporter
         return XmlWriter.Create(entry.Open(), new XmlWriterSettings
         {
             Encoding = System.Text.Encoding.UTF8,
+            NewLineHandling = NewLineHandling.Entitize,
             Indent = false,
             CloseOutput = true
         });

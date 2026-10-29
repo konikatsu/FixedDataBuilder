@@ -18,8 +18,9 @@ internal static partial class Program
                 grid.ColumnHeadersDefaultCellStyle.Font = font;
                 Invoke(form, "RefreshGridSizing");
                 using var bitmap = RenderGrid(form);
-                var plain = grid.GetCellDisplayRectangle(recordRows ? 1 : 2, recordRows ? 2 : 0, false);
-                var spaces = grid.GetCellDisplayRectangle(recordRows ? 1 : 6, recordRows ? 6 : 0, false);
+                var start = recordRows ? (int)Invoke(form, "RecordRowsDataStartIndex")! : 0;
+                var plain = grid.GetCellDisplayRectangle(recordRows ? 1 : 2, start, false);
+                var spaces = grid.GetCellDisplayRectangle(recordRows ? 1 : 6, recordRows ? start + 4 : 0, false);
                 var plainStart = FirstTextPixel(bitmap, plain, white: false);
                 var spacesStart = FirstTextPixel(bitmap, spaces, white: false);
                 Equal(plainStart, spacesStart);
@@ -39,17 +40,20 @@ internal static partial class Program
                 if (recordRows)
                 {
                     Equal("行", grid.Columns[0].HeaderText);
-                    for (var rowIndex = 2; rowIndex < grid.Rows.Count; rowIndex++)
+                    var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
+                    for (var rowIndex = start; rowIndex < grid.Rows.Count; rowIndex++)
                     {
-                        Equal((rowIndex - 1).ToString(), grid[0, rowIndex].Value);
+                        Equal((rowIndex - start + 1).ToString(), grid[0, rowIndex].Value);
                         Equal(true, grid[0, rowIndex].ReadOnly);
                     }
-                    Equal("No.1\n識別番号", grid.Columns[1].HeaderText);
-                    Equal("No.2\n番号", grid.Columns[2].HeaderText);
-                    Equal("X(22)", grid[1, 0].Value);
-                    Equal("X(15)", grid[2, 0].Value);
-                    Equal("[1-22]", grid[1, 1].Value);
-                    Equal("[23-37]", grid[2, 1].Value);
+                    Equal("No.1", grid.Columns[1].HeaderText);
+                    Equal("No.2", grid.Columns[2].HeaderText);
+                    Equal("識別番号", grid[1, 0].Value);
+                    Equal("番号", grid[2, 0].Value);
+                    Equal("X(22)", grid[1, 1].Value);
+                    Equal("X(15)", grid[2, 1].Value);
+                    Equal("[1-22]", grid[1, 2].Value);
+                    Equal("[23-37]", grid[2, 2].Value);
                 }
             }
         });
@@ -68,7 +72,7 @@ internal static partial class Program
                         Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
                     Equal(true, grid.Columns[0].Width >= headerWidth);
                 }
-                var cell = grid[recordRows ? 1 : 2, recordRows ? 2 : 0];
+                var cell = grid[recordRows ? 1 : 2, recordRows ? (int)Invoke(form, "RecordRowsDataStartIndex")! : 0];
                 var visibleName = "ジナン" + new string('\u25A1', 7);
                 var textWidth = TextRenderer.MeasureText(visibleName, cell.InheritedStyle.Font,
                     Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
@@ -83,7 +87,7 @@ internal static partial class Program
                 foreach (var record in Get<List<List<string>>>(form, "records")) record[0] = "123";
                 Invoke(form, "RefreshGrid");
                 var grid = Get<DataGridView>(form, "grid");
-                var cell = grid[recordRows ? 1 : 2, recordRows ? 2 : 0];
+                var cell = grid[recordRows ? 1 : 2, recordRows ? (int)Invoke(form, "RecordRowsDataStartIndex")! : 0];
                 var visibleValue = "123" + new string('\uFF65', 19);
                 var textWidth = TextRenderer.MeasureText(visibleValue, cell.InheritedStyle.Font,
                     Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
@@ -112,10 +116,11 @@ internal static partial class Program
             {
                 using var form = CreateCellDisplayForm(recordRows);
                 var grid = Get<DataGridView>(form, "grid");
-                var plainBounds = grid.GetCellDisplayRectangle(recordRows ? 1 : 2, recordRows ? 2 : 0, false);
+                var start = recordRows ? (int)Invoke(form, "RecordRowsDataStartIndex")! : 0;
+                var plainBounds = grid.GetCellDisplayRectangle(recordRows ? 1 : 2, start, false);
                 using var plainBitmap = RenderGrid(form);
                 var expected = FirstTextPixel(plainBitmap, plainBounds, white: false);
-                var cell = grid[recordRows ? 1 : 6, recordRows ? 6 : 0];
+                var cell = grid[recordRows ? 1 : 6, recordRows ? start + 4 : 0];
                 grid.CurrentCell = cell;
                 cell.Selected = true;
                 using var selectedBitmap = RenderGrid(form);

@@ -32,8 +32,8 @@ internal static partial class Program
         {
             using var form = CreateCellDisplayForm(recordRows: true);
             var grid = Get<DataGridView>(form, "grid");
-            Equal(7, grid.Rows.Count);
-            for (var index = 0; index < 2; index++)
+            Equal(8, grid.Rows.Count);
+            for (var index = 0; index < 3; index++)
             {
                 Equal(true, grid.Rows[index].Frozen);
                 Equal(true, grid.Rows[index].ReadOnly);
@@ -46,10 +46,11 @@ internal static partial class Program
             }
             Get<HashSet<int>>(form, "hiddenFieldIndexes").Add(0);
             Invoke(form, "RefreshGrid");
-            Equal("No.2\n番号", grid.Columns[1].HeaderText);
-            Equal("X(15)", grid[1, 0].Value);
-            Equal("[23-37]", grid[1, 1].Value);
-            Equal("1", grid[0, 2].Value);
+            Equal("No.2", grid.Columns[1].HeaderText);
+            Equal("番号", grid[1, 0].Value);
+            Equal("X(15)", grid[1, 1].Value);
+            Equal("[23-37]", grid[1, 2].Value);
+            Equal("1", grid[0, 3].Value);
             Equal(5, Get<List<List<string>>>(form, "records").Count);
         });
         Test("Record actions and HEX select data rows correctly below the separated headers", () =>
@@ -57,7 +58,7 @@ internal static partial class Program
             using var form = CreateCellDisplayForm(recordRows: true);
             var grid = Get<DataGridView>(form, "grid");
             Invoke(form, "SelectRecord", 0);
-            Equal(2, grid.CurrentCell.RowIndex);
+            Equal(3, grid.CurrentCell.RowIndex);
             Equal(0, Invoke(form, "CurrentRecordIndex"));
             Equal(true, Get<TextBox>(form, "hexTextBox").Text.StartsWith("31 32 33"));
             Invoke(form, "DuplicateRecord");
@@ -70,16 +71,17 @@ internal static partial class Program
             Equal(5, Invoke(form, "CurrentRecordIndex"));
             Equal("6", grid[0, grid.CurrentCell.RowIndex].Value);
         });
-        Test("Excel writes three header rows with blue header styles and round trips old and new formats", () =>
+        Test("Excel separates numbers and names and still imports legacy two and three row headers", () =>
         {
             using var form = CreateCellDisplayForm(recordRows: true);
             var rows = (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(form, "BuildExcelRows")!;
-            Equal(8, rows.Count);
-            Equal("識別番号", rows[0][1].Text);
-            Equal("X(22)", rows[1][1].Text);
-            Equal("[1-22]", rows[2][1].Text);
-            Equal("1", rows[3][0].Text);
-            foreach (var row in rows.Take(3))
+            Equal(9, rows.Count);
+            Equal("No.1", rows[0][1].Text);
+            Equal("識別番号", rows[1][1].Text);
+            Equal("X(22)", rows[2][1].Text);
+            Equal("[1-22]", rows[3][1].Text);
+            Equal("1", rows[4][0].Text);
+            foreach (var row in rows.Take(4))
             foreach (var cell in row) Equal(ExcelCellKind.Header, cell.Kind);
             var path = Path.Combine(temporaryDirectory, "three-header-rows.xlsx");
             ExcelExporter.Write(path, "レコード縦", rows);
@@ -89,9 +91,13 @@ internal static partial class Program
             Equal("1234567890123456789012", imported.Records[0][0]);
             Equal("123       9012", imported.Records[4][0]);
 
-            var twoRowHeader = rows.Take(2).Select(row => row.ToArray()).ToArray();
+            var legacyRows = rows.Skip(1).Select(row => row.ToArray()).ToArray();
+            legacyRows[0][0] = new ExcelCell("行", ExcelCellKind.Header);
+            ExcelExporter.Write(path, "レコード縦", legacyRows);
+            Equal(5, ExcelImporter.Read(path).Records.Count);
+            var twoRowHeader = legacyRows.Take(2).Select(row => row.ToArray()).ToArray();
             twoRowHeader[1][0] = new ExcelCell("");
-            ExcelExporter.Write(path, "レコード縦", twoRowHeader.Concat(rows.Skip(3)).ToArray());
+            ExcelExporter.Write(path, "レコード縦", twoRowHeader.Concat(legacyRows.Skip(3)).ToArray());
             var oldTwoRows = ExcelImporter.Read(path);
             Equal(5, oldTwoRows.Records.Count);
             Equal(true, imported.Records.SelectMany(row => row).SequenceEqual(oldTwoRows.Records.SelectMany(row => row)));
@@ -103,18 +109,19 @@ internal static partial class Program
                 "--data", Path.Combine(repo, "samples", "copybook-group-occurs-data-crlf-utf8-n-utf16le.dat"),
                 "--separator", "crlf", "--national-encoding", "utf16", "--layout", "record"]);
             var grid = Get<DataGridView>(form, "grid");
-            Equal("型", grid[0, 0].Value);
-            Equal("位置", grid[0, 1].Value);
-            Equal("OCCURS", grid[0, 2].Value);
-            Equal("1", grid[0, 3].Value);
+            Equal("項目名", grid[0, 0].Value);
+            Equal("型", grid[0, 1].Value);
+            Equal("位置", grid[0, 2].Value);
+            Equal("OCCURS", grid[0, 3].Value);
+            Equal("1", grid[0, 4].Value);
             Invoke(form, "SelectRecord", 0);
-            Equal(3, grid.CurrentCell.RowIndex);
+            Equal(4, grid.CurrentCell.RowIndex);
             Equal(0, Invoke(form, "CurrentRecordIndex"));
             var path = Path.Combine(temporaryDirectory, "occurs-three-header-rows.xlsx");
             ExcelExporter.Write(path, "レコード縦", (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(form, "BuildExcelRows")!);
             var imported = ExcelImporter.Read(path);
             Equal(Get<List<List<string>>>(form, "records").Count, imported.Records.Count);
-            Equal(grid[1, 3].Value?.ToString(), imported.Records[0][0]);
+            Equal(grid[1, 4].Value?.ToString(), imported.Records[0][0]);
         });
     }
 }
