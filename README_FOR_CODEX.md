@@ -1,6 +1,6 @@
 # README_FOR_CODEX
 
-## v0.1.66：横表示の番号・コメント・CSV位置行非表示（2026-10-29、起動確認待ち）
+## v0.1.66：横表示の番号・コメント・CSV位置行非表示（2026-10-29、製品SAC拒否で未公開）
 
 - アプリ再起動前の要件をreviews/horizontal-headers-v0.1.66/v001/RESTART-CHECKPOINT-v001.mdへ保存し、利用者の「再開して」で継続。基点2102b98b1106c61679171008c09a2f1cd2485e0a、codex/horizontal-headers-v0.1.66。横表示（レコード縦）の項目名の上にNo.nを表示し、定義順の元番号を保持する。
 - コメントがある表示項目に水色・readonly・frozenの折返し行を追加。最大約6行かつ表の約1/3までに高さを調整し、全文はToolTipに保持。コメントを列幅算定から除外して、長文で列が広がり過ぎないようにする。列幅・画面サイズ・ズーム変更で高さを調整する。コメントへのデータ表示省略や空白強調は適用しない。
@@ -8,6 +8,9 @@
 - Excel見出しは定義/子項目名から生成しNo.を含めず、コメント行を除外する。CSV位置行はExcel出力だけ補完し、従来の3段見出し・取り込み契約を維持。データ保存には番号/コメントを追加しない。
 - HeaderRows/CellDisplay/CsvDataの既存期待値を更新し、横表示・コメント・OCCURS・編集/HEX/Excel・長文/ズーム・形式変換の5件を追加して計175件。利用者が製品/自動テストを全て実行する指示を継続し、こちらはビルド・publish --no-build・パッケージ・ハッシュ確認だけ行う。起動やテスト成功とは記載しない。
 - 確認用軽量版とソース/READMEの作業ブランチを準備し、公開用release/とmain/GitHub Releaseはv65を維持する。利用者からv66の具体的な製品EXEの起動OKを得てから、同じバイナリを再ビルドせず公開する。公開時の最新3版はv66/v65/v63で、v62のReleaseだけ保管・検証後に整理しタグ/履歴/ローカルは残す。
+- build-v001は警告0・エラー0、publish --no-build。ZIP225004バイト・45ファイル（製品5＋samples40）、SHA256=5A933202A46D3CECB06D781E84B507D46A95865B2251EAC024F4CC737D6D092D。EXE3A221C7E1868425A30614101DB512CAEB5443FBF9B3F6171A41CE0A3FE99B4E8、DLL46936B167F86CD17EB553DE1EAD78C79CE54ED2DA7CD19E057506176F432424A。テスト内製品DLLも一致。製品/自動テストはこちらでは実行していない。
+- 利用者がv66の具体的なEXEパスへの確認に「ブロックされた」と回答。読取専用のCodeIntegrityログで3077 Record5365/5369/5373、PolicyName=VerifiedAndReputableDesktop、Status=0xc0e90002、対象File Nameはv66製品EXE、FlatHashは上記EXEと一致。explorer.exeからの試行。OriginalFileNameがdll表記でも対象をDLL拒否と取り違えない。新機能の特定APIを拒否原因と断定しない。
+- 起動確認済みだけ公開する指示に従いmain/Release/公開releaseファイルはv65のまま、作業ブランチだけソースとREADMEをpush。v66バイナリ/ZIPは再ビルドや差し替えせず保持。証拠reviews/horizontal-headers-v0.1.66/v001のpackage-verification-v001.json、user-startup-block-v001.json、codeintegrity-user-block-v001.xml。次回ユーザーの明確な起動成功報告または追加調査の指示を待つ。
 
 ## v0.1.65：入力データの文字コードを初期判別（2026-10-29、利用者起動確認後の公開）
 
