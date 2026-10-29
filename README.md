@@ -6,13 +6,13 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.63 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.63/FixedDataBuilder-v0.1.63-win-x64-framework-dependent.zip)
+[v0.1.65 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.65/FixedDataBuilder-v0.1.65-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.63 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.63) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.65 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.65) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
-## v0.1.65：入力データの文字コードを初期判別（起動確認待ち）
+## v0.1.65：入力データの文字コードを初期判別
 
 データファイルを開くとき、「データ読込条件」の文字コード欄へ自動判別した候補を初期選択します。その後はUTF-8・SJIS・MS932へ自由に変更できます。
 
@@ -25,7 +25,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 CLIでは `--csv-encoding auto` または `--text-encoding auto` で判別してから読み込めます。指定を省略した場合の従来の動作は維持します。比較には既存の [`encoding-utf8.csv`](samples/encoding-utf8.csv)・[`encoding-ms932.csv`](samples/encoding-ms932.csv)・[`encoding-sjis.csv`](samples/encoding-sjis.csv) と [`encoding-comparison-definition.csv`](samples/encoding-comparison-definition.csv) を利用できます。
 
-v0.1.64の定義ファイル自動判別も含みます。警告0・エラー0でビルドし、14件の回帰試験を追加しました。製品EXEと計170件の自動テストは利用者が実行する方針のため、こちらでは起動していません。軽量版を確認用に用意し、起動確認後に同じファイルを公開します。新しい画面画像は未撮影で、以下の画像は過去版の参考です。
+v0.1.64の定義ファイル自動判別も含みます。警告0・エラー0でビルドし、利用者から製品EXEの起動OKの報告を受けています。同じEXE・DLLを再ビルドせず軽量版として配布します。**自動テストは利用者が実行する方針のため、14件を追加した計170件は未実行です。テスト合格を確認した版ではありません。** ソースと配布ファイルをmainへ反映し、上部から軽量版をダウンロードできます。新しい画面画像は未撮影で、以下の画像は過去版の参考です。
 
 ## v0.1.64：定義ファイルのUTF-8・SJIS・MS932対応
 
@@ -124,13 +124,13 @@ Windows x64の.NET非同梱軽量版です。この方式への変更だけでSm
 
 番号は1、2、3…と表示し、項目を非表示にしても元の番号を維持します。OCCURSのグループ見出しには番号を付けません。番号はGUIの見出しであり、元データ・保存・Excel出力・HEXへ追加しません。「レコード縦」の既存の行番号は維持します。
 
-表示文字数の上限と「…」による省略はv0.1.55から引き継ぎます。全130件の自動テストに成功し、このPCのSACオンで製品EXEの主画面表示を確認しました。利用者から別PCでもv0.1.58の起動OKの報告を受けています。v0.1.58は軽量版ZIPとして作成済みですが、GitHub Releaseはまだ作成していません。上の配布リンクはv0.1.63です。
+表示文字数の上限と「…」による省略はv0.1.55から引き継ぎます。全130件の自動テストに成功し、このPCのSACオンで製品EXEの主画面表示を確認しました。利用者から別PCでもv0.1.58の起動OKの報告を受けています。v0.1.58は軽量版ZIPとして作成済みですが、GitHub Releaseはまだ作成していません。上の配布リンクはv0.1.65です。
 
 v0.1.55は起動OK、v0.1.56・v0.1.57は別PCでSAC拒否との利用者報告があります。v0.1.58も起動OKの報告を受けています。高さ調整を含む版だけが拒否されたという比較材料ですが、バイナリのハッシュも異なるため、それだけで高さ調整機能を拒否原因と断定しません。
 
 ## v0.1.55：表示文字数の上限（別PCでの確認用）
 
-v0.1.53をベースに、表示文字数の上限だけを追加した軽量版です。下部HEXエリアのサイズや選択方法はv0.1.53を維持しています。現時点ではGitHub Releaseを作成していません。上の配布リンクはv0.1.63です。
+v0.1.53をベースに、表示文字数の上限だけを追加した軽量版です。下部HEXエリアのサイズや選択方法はv0.1.53を維持しています。現時点ではGitHub Releaseを作成していません。上の配布リンクはv0.1.65です。
 
 `表示 → 折り返し表示設定...` で「折り返し表示」と「表示する文字数に上限を設定」をチェックし、「表示する最大文字数」を指定します。初期値は上限設定OFF・100文字です。バイト単位の折り返し条件とは別に設定でき、上限を超える値の続きを `…` で示します。省略記号は上限の文字数に含めません。
 
