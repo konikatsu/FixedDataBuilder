@@ -46,7 +46,7 @@ internal static partial class Program
             }
             Get<HashSet<int>>(form, "hiddenFieldIndexes").Add(0);
             Invoke(form, "RefreshGrid");
-            Equal("番号", grid.Columns[1].HeaderText);
+            Equal("No.2\n番号", grid.Columns[1].HeaderText);
             Equal("X(15)", grid[1, 0].Value);
             Equal("[23-37]", grid[1, 1].Value);
             Equal("1", grid[0, 2].Value);

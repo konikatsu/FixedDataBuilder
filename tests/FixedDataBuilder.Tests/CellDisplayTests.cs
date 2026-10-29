@@ -44,8 +44,8 @@ internal static partial class Program
                         Equal((rowIndex - 1).ToString(), grid[0, rowIndex].Value);
                         Equal(true, grid[0, rowIndex].ReadOnly);
                     }
-                    Equal("識別番号", grid.Columns[1].HeaderText);
-                    Equal("番号", grid.Columns[2].HeaderText);
+                    Equal("No.1\n識別番号", grid.Columns[1].HeaderText);
+                    Equal("No.2\n番号", grid.Columns[2].HeaderText);
                     Equal("X(22)", grid[1, 0].Value);
                     Equal("X(15)", grid[2, 0].Value);
                     Equal("[1-22]", grid[1, 1].Value);

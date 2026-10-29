@@ -550,7 +550,9 @@ public sealed partial class MainForm : Form
         grid.ColumnWidthChanged += (_, _) =>
         {
             if (isSingleRecordView && !isRefreshingGrid) AdjustSingleRecordRowHeights();
+            if (!isRefreshingGrid) AdjustRecordCommentHeight();
         };
+        grid.SizeChanged += (_, _) => { if (!isRefreshingGrid) AdjustRecordCommentHeight(); };
     }
 
     private void ChooseDisplayWrapOptions()
@@ -605,7 +607,7 @@ public sealed partial class MainForm : Form
 
     private void AdjustWrappedRowHeights()
     {
-        if (!displayWrapOptions.Enabled) { AdjustSingleRecordRowHeights(); return; }
+        if (!displayWrapOptions.Enabled) { AdjustSingleRecordRowHeights(); AdjustRecordCommentHeight(); return; }
         foreach (DataGridViewRow row in grid.Rows)
         {
             var height = grid.RowTemplate.Height;
@@ -618,6 +620,7 @@ public sealed partial class MainForm : Form
             row.Height = Math.Clamp(height, row.MinimumHeight, 65536);
         }
         AdjustSingleRecordRowHeights();
+        AdjustRecordCommentHeight();
     }
 
     private void SizeWrappedColumns()
@@ -625,8 +628,11 @@ public sealed partial class MainForm : Form
         foreach (DataGridViewColumn column in grid.Columns)
         {
             var width = TextRenderer.MeasureText(column.HeaderText, column.InheritedStyle.Font ?? grid.Font).Width + 20;
+            if (recordCommentRowIndex >= 0 && column.Index == 0)
+                width = Math.Max(width, TextRenderer.MeasureText("コメント", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
+                if (layout == GridLayout.RecordRows && row.Index == recordCommentRowIndex) continue;
                 var cell = row.Cells[column.Index];
                 var lines = WrappedDisplayLines(row.Index, column.Index);
                 if (lines is null)
@@ -848,7 +854,7 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        grid.ColumnHeadersHeight = Math.Max(28, grid.Font.Height + 12);
+        grid.ColumnHeadersHeight = Math.Max(28, grid.Font.Height * (layout == GridLayout.RecordRows ? 2 : 1) + 12);
         grid.RowTemplate.Height = Math.Max(22, grid.Font.Height + 8);
         foreach (DataGridViewRow row in grid.Rows)
         {
@@ -2246,12 +2252,12 @@ public sealed partial class MainForm : Form
         var rows = new List<IReadOnlyList<ExcelCell>>();
         rows.Add(grid.Columns
             .Cast<DataGridViewColumn>()
-            .Select(column => new ExcelCell(column.HeaderText, ExcelCellKind.Header))
+            .Select(column => new ExcelCell(ExcelColumnHeader(column), ExcelCellKind.Header))
             .ToList());
 
         foreach (DataGridViewRow gridRow in grid.Rows)
         {
-            if (gridRow.IsNewRow)
+            if (gridRow.IsNewRow || (layout == GridLayout.RecordRows && gridRow.Index == recordCommentRowIndex))
             {
                 continue;
             }
@@ -2259,13 +2265,15 @@ public sealed partial class MainForm : Form
             var row = new List<ExcelCell>();
             for (var columnIndex = 0; columnIndex < grid.Columns.Count; columnIndex++)
             {
-                var kind = layout == GridLayout.RecordRows && gridRow.Index < 2
+                var kind = layout == GridLayout.RecordRows && (gridRow.Index == 0 || (!IsCsv && gridRow.Index == 1))
                     ? ExcelCellKind.Header
                     : IsDefinitionCellForExcel(columnIndex) ? ExcelCellKind.Definition : ExcelCellKind.Normal;
                 row.Add(new ExcelCell(gridRow.Cells[columnIndex].Value?.ToString() ?? string.Empty, kind));
             }
 
             rows.Add(row);
+            // Screen-only changes must not alter the importable Excel header contract.
+            if (layout == GridLayout.RecordRows && IsCsv && gridRow.Index == 0) rows.Add(CsvPositionsForExcel());
         }
 
         return rows;
@@ -2421,7 +2429,7 @@ public sealed partial class MainForm : Form
 
     private int RecordRowsDataStartIndex()
     {
-        return 2 + (occursDisplayInfos.Count > 0 ? 1 : 0);
+        return recordRowsDataStartIndex;
     }
 
     private int RecordIndexFromGridRow(int rowIndex)
@@ -2584,6 +2592,8 @@ public sealed partial class MainForm : Form
             grid.Rows.Clear();
             fieldGridRows.Clear();
             recordGridColumnFieldIndexes.Clear();
+            recordRowsDataStartIndex = 2;
+            recordCommentRowIndex = recordOccursRowIndex = -1;
             RebuildOccursDisplayInfos();
             UpdateLayoutButtons();
             grid.RowHeadersVisible = layout == GridLayout.FieldRows;
@@ -2612,12 +2622,18 @@ public sealed partial class MainForm : Form
     private void SizeColumnsToFitData()
     {
         if (isSingleRecordView) { SizeSingleRecordColumns(); return; }
-        if (displayWrapOptions.Enabled) { SizeWrappedColumns(); return; }
+        if (displayWrapOptions.Enabled) { SizeWrappedColumns(); AdjustRecordCommentHeight(); return; }
         foreach (DataGridViewColumn column in grid.Columns)
         {
-            var width = column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: false);
+            var width = column.GetPreferredWidth(recordCommentRowIndex >= 0
+                ? DataGridViewAutoSizeColumnMode.ColumnHeader : DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: false);
+            width = Math.Max(width, TextRenderer.MeasureText(column.HeaderText, column.HeaderCell.InheritedStyle.Font ?? grid.Font).Width + 20);
+            if (recordCommentRowIndex >= 0 && column.Index == 0)
+                width = Math.Max(width, TextRenderer.MeasureText("コメント", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
+                if (layout == GridLayout.RecordRows && row.Index == recordCommentRowIndex) continue;
+                if (recordCommentRowIndex >= 0) width = Math.Max(width, row.Cells[column.Index].PreferredSize.Width);
                 if (layout == GridLayout.RecordRows && RecordIndexFromGridRow(row.Index) < 0) continue;
                 if (!TryGetCellField(row.Index, column.Index, out var field)
                     || (!IsCsv && field.Type is not (FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText))) continue;
@@ -2632,6 +2648,7 @@ public sealed partial class MainForm : Form
             }
             column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
         }
+        AdjustRecordCommentHeight();
     }
 
     private void RefreshFieldRowsGrid()
@@ -2745,6 +2762,7 @@ public sealed partial class MainForm : Form
 
         var definitions = new List<string> { "型" };
         var positions = new List<string> { "位置" };
+        var comments = new List<string> { "コメント" };
         var byteStart = 1;
         for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
         {
@@ -2754,14 +2772,16 @@ public sealed partial class MainForm : Form
             {
                 occursDisplayInfos.TryGetValue(fieldIndex, out var occursInfo);
                 var ruler = IsCsv ? $"CSV列{fields.Take(fieldIndex + 1).Count(item => !item.IsRedefines)}" : $"[{byteStart}-{byteEnd}]";
-                var header = occursInfo is null ? field.Name : occursInfo.ChildName;
+                var header = $"No.{fieldIndex + 1}\n{RecordItemName(fieldIndex)}";
                 definitions.Add(field.DisplayDefinition);
                 positions.Add(ruler);
+                comments.Add(field.Comment);
                 var column = CreateEditableColumn(
                     $"Field{fieldIndex + 1}",
                     header,
                     170);
                 column.HeaderCell.Style.BackColor = occursInfo is null ? DefinitionHeaderBackColor : OccursHeaderBackColor;
+                column.HeaderCell.Style.WrapMode = DataGridViewTriState.True;
                 column.HeaderCell.ToolTipText = FieldDefinitionToolTip(field);
 
                 grid.Columns.Add(column);
@@ -2775,12 +2795,15 @@ public sealed partial class MainForm : Form
         }
 
         AddRecordDefinitionRow(definitions);
-        AddRecordDefinitionRow(positions);
+        if (!IsCsv) AddRecordDefinitionRow(positions);
+        if (comments.Skip(1).Any(comment => !string.IsNullOrWhiteSpace(comment))) AddRecordCommentRow(comments);
 
         if (occursDisplayInfos.Count > 0)
         {
+            recordOccursRowIndex = grid.Rows.Count;
             AddOccursRecordHeaderRow();
         }
+        recordRowsDataStartIndex = grid.Rows.Count;
 
         for (var recordIndex = 0; recordIndex < records.Count; recordIndex++)
         {
@@ -2956,7 +2979,7 @@ public sealed partial class MainForm : Form
     {
         if (layout != GridLayout.RecordRows
             || occursDisplayInfos.Count == 0
-            || e.RowIndex != 2
+            || recordOccursRowIndex < 0 || e.RowIndex != recordOccursRowIndex
             || e.ColumnIndex < 0
             || e.Graphics is null
             || e.CellStyle is null)
