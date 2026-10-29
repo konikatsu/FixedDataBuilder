@@ -175,7 +175,7 @@ internal static partial class Program
                 ExcelExporter.Write(path, layoutName, rows);
                 if (layoutName == "レコード縦")
                 {
-                    Equal("行", rows[0][0].Text);
+                    Equal("カラム番号", rows[0][0].Text);
                     Equal("項目名", rows[1][0].Text);
                     Equal("型", rows[2][0].Text);
                     Equal("位置", rows[3][0].Text);

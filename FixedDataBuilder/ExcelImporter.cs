@@ -26,7 +26,7 @@ public static class ExcelImporter
             return ReadFieldRows(rows);
         }
 
-        if (Cell(rows, 0, 0) is "行" or "レコード")
+        if (Cell(rows, 0, 0) is "カラム番号" or "行" or "レコード")
         {
             return ReadRecordRows(rows);
         }

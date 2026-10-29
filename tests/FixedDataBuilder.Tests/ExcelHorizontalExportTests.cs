@@ -21,6 +21,7 @@ internal static partial class Program
             using var form = Open("excel-screen");
             var grid = Get<DataGridView>(form, "grid");
             var rows = Rows(form);
+            Equal("カラム番号", rows[0][0].Text);
             Equal("No.1", rows[0][1].Text);
             Equal("コード", rows[1][1].Text);
             Equal("X(4)", rows[2][1].Text);

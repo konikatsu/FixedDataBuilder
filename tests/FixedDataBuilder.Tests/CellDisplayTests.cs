@@ -39,7 +39,7 @@ internal static partial class Program
                     Equal(DataGridViewContentAlignment.MiddleLeft, cell.InheritedStyle.Alignment);
                 if (recordRows)
                 {
-                    Equal("行", grid.Columns[0].HeaderText);
+                    Equal("カラム番号", grid.Columns[0].HeaderText);
                     var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
                     for (var rowIndex = start; rowIndex < grid.Rows.Count; rowIndex++)
                     {

@@ -2758,7 +2758,7 @@ public sealed partial class MainForm : Form
     {
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.EnableResizing;
         grid.ColumnHeadersHeight = 28;
-        grid.Columns.Add(CreateReadOnlyColumn("Record", "行", 50, frozen: true));
+        grid.Columns.Add(CreateReadOnlyColumn("Record", "カラム番号", 50, frozen: true));
         recordGridColumnFieldIndexes.Add(-1);
         ApplyDefinitionColumnStyle(grid.Columns[0]);
 
