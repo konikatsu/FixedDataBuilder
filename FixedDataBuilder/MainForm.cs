@@ -926,9 +926,20 @@ public sealed partial class MainForm : Form
                 var format = GetOptionValue(args, "--format");
                 if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)
                     || (format is null && Path.GetExtension(dataPath).Equals(".csv", StringComparison.OrdinalIgnoreCase)))
-                    LoadCsvData(dataPath, ParseCsvEncoding(GetOptionValue(args, "--csv-encoding")), ParseCsvHeader(GetOptionValue(args, "--csv-header")));
+                {
+                    var encodingOption = GetOptionValue(args, "--csv-encoding");
+                    var hasHeader = ParseCsvHeader(GetOptionValue(args, "--csv-header"));
+                    if (string.Equals(encodingOption, "auto", StringComparison.OrdinalIgnoreCase))
+                        LoadAutomaticData(dataPath, true, separatorMode, nationalTextEncoding, hasHeader);
+                    else LoadCsvData(dataPath, ParseCsvEncoding(encodingOption), hasHeader);
+                }
                 else
-                    LoadData(dataPath, separatorMode, nationalTextEncoding, ParseTextEncoding(GetOptionValue(args, "--text-encoding")));
+                {
+                    var encodingOption = GetOptionValue(args, "--text-encoding");
+                    if (string.Equals(encodingOption, "auto", StringComparison.OrdinalIgnoreCase) && currentXmlLayout is null)
+                        LoadAutomaticData(dataPath, false, separatorMode, nationalTextEncoding);
+                    else LoadData(dataPath, separatorMode, nationalTextEncoding, ParseTextEncoding(encodingOption));
+                }
             }
 
             var startupLayout = ParseStartupLayout(GetOptionValue(args, "--layout"));
@@ -1539,8 +1550,8 @@ public sealed partial class MainForm : Form
             FormBorderStyle = FormBorderStyle.Sizable,
             MinimizeBox = false,
             MaximizeBox = true,
-            ClientSize = new Size(760, 586),
-            MinimumSize = new Size(680, 546)
+            ClientSize = new Size(760, 616),
+            MinimumSize = new Size(680, 576)
         };
 
         var formatLabel = new Label { Text = "入力形式", AutoSize = true, Location = new Point(16, 20) };
@@ -1630,7 +1641,7 @@ public sealed partial class MainForm : Form
         {
             Text = "OK",
             DialogResult = DialogResult.OK,
-            Location = new Point(580, 540),
+            Location = new Point(580, 570),
             Width = 75,
             Anchor = AnchorStyles.Right | AnchorStyles.Bottom
         };
@@ -1638,41 +1649,50 @@ public sealed partial class MainForm : Form
         {
             Text = "キャンセル",
             DialogResult = DialogResult.Cancel,
-            Location = new Point(664, 540),
+            Location = new Point(664, 570),
             Width = 75,
             Anchor = AnchorStyles.Right | AnchorStyles.Bottom
         };
         var previewButton = new Button
         {
             Text = "プレビュー更新",
-            Location = new Point(16, 540),
+            Location = new Point(16, 570),
             Width = 120,
             Anchor = AnchorStyles.Left | AnchorStyles.Bottom
+        };
+        var detectEncodingButton = new Button
+        {
+            Name = "DetectDataEncoding", Text = "文字コードを再判別", Location = new Point(16, 194), Width = 160
+        };
+        var detectionLabel = new Label
+        {
+            Name = "DataEncodingDetection", Location = new Point(186, 196), Size = new Size(554, 26),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoEllipsis = true
         };
         var encodingHelp = new Label
         {
             Name = "EncodingHelp",
-            Text = "半角の英字・数字はUTF-8・SJIS・MS932で同じです。\r\nSJISは拡張文字なし。①・髙などを含む場合はMS932。",
-            Location = new Point(16, 194),
+            Text = "半角の英字・数字はUTF-8・SJIS・MS932で同じです。SJISとの厳密な区別は手動指定。\r\n型N・改行条件は手動指定です。条件変更後は「文字コードを再判別」を押してください。",
+            Location = new Point(16, 224),
             Size = new Size(724, 40),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var previewLabel = new Label
         {
             Text = "プレビュー（先頭5レコード）",
-            Location = new Point(16, 242),
+            Location = new Point(16, 272),
             AutoSize = true
         };
         var previewStatusLabel = new Label
         {
-            Location = new Point(190, 242),
+            Location = new Point(190, 272),
             Size = new Size(550, 20),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             TextAlign = ContentAlignment.MiddleLeft
         };
         var previewGrid = new DataGridView
         {
-            Location = new Point(16, 264),
+            Location = new Point(16, 294),
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
@@ -1688,6 +1708,9 @@ public sealed partial class MainForm : Form
             BackgroundColor = SystemColors.AppWorkspace
         };
 
+        var updatingEncodingDefaults = false;
+        var forceEncodingDetection = false;
+
         DataLoadOptions CurrentOptions()
         {
             var separatorMode = noLineBreakRadio.Checked
@@ -1698,6 +1721,40 @@ public sealed partial class MainForm : Form
                 : NationalTextEncoding.ShiftJis;
             return new DataLoadOptions(separatorMode, nationalTextEncoding, formatCombo.SelectedIndex > 0,
                 (CsvTextEncoding)csvEncodingCombo.SelectedIndex, (DataEncodingProfile)textEncodingCombo.SelectedIndex, formatCombo.SelectedIndex == 2);
+        }
+
+        void DetectInitialEncoding()
+        {
+            // Populate concrete defaults only. Manual edits and F5 keep the selected codec.
+            // A stored explicit choice wins: SJIS and MS932 cannot be distinguished reliably.
+            if (remembered is not null && !forceEncodingDetection)
+            {
+                detectionLabel.Text = "文字コード：前回の指定を使用（再判別で更新できます）";
+                return;
+            }
+            try
+            {
+                detectionLabel.ForeColor = SystemColors.ControlText;
+                var options = CurrentOptions();
+                if (!options.IsCsv && currentXmlLayout is not null)
+                {
+                    detectionLabel.Text = "文字コード：定義の指定を使用";
+                    return;
+                }
+                var detection = options.IsCsv ? DataEncodingDetector.Csv(dataPath)
+                    : DataEncodingDetector.Fixed(dataPath, BuildFieldsForNationalTextEncoding(options.NationalTextEncoding), options.SeparatorMode);
+                updatingEncodingDefaults = true;
+                if (options.IsCsv) csvEncodingCombo.SelectedIndex = (int)detection.Encoding!.Value;
+                else textEncodingCombo.SelectedIndex = (int)detection.FixedEncoding(options.TextEncoding ?? currentDataEncodingProfile);
+                detectionLabel.Text = "初期候補：" + detection.Description;
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException
+                or NotSupportedException or UnauthorizedAccessException)
+            {
+                detectionLabel.ForeColor = Color.Firebrick;
+                detectionLabel.Text = "判別できません：" + ex.Message;
+            }
+            finally { updatingEncodingDefaults = false; }
         }
 
         void UpdatePreview()
@@ -1726,10 +1783,16 @@ public sealed partial class MainForm : Form
             }
         }
 
+        detectEncodingButton.Click += (_, _) =>
+        {
+            forceEncodingDetection = true;
+            DetectInitialEncoding();
+            UpdatePreview();
+        };
         previewButton.Click += (_, _) => UpdatePreview();
-        formatCombo.SelectedIndexChanged += (_, _) => UpdatePreview();
-        csvEncodingCombo.SelectedIndexChanged += (_, _) => UpdatePreview();
-        textEncodingCombo.SelectedIndexChanged += (_, _) => UpdatePreview();
+        formatCombo.SelectedIndexChanged += (_, _) => { DetectInitialEncoding(); UpdatePreview(); };
+        csvEncodingCombo.SelectedIndexChanged += (_, _) => { if (!updatingEncodingDefaults) UpdatePreview(); };
+        textEncodingCombo.SelectedIndexChanged += (_, _) => { if (!updatingEncodingDefaults) UpdatePreview(); };
         foreach (var radioButton in buttons.Concat([lineBreakRadio, noLineBreakRadio]))
         {
             radioButton.CheckedChanged += (_, _) =>
@@ -1742,9 +1805,11 @@ public sealed partial class MainForm : Form
         }
 
         form.Controls.AddRange([formatLabel, formatCombo, csvEncodingLabel, csvEncodingCombo,
-            separatorGroup, nationalEncodingGroup, encodingHelp, previewLabel, previewStatusLabel, previewGrid, previewButton, okButton, cancelButton]);
+            separatorGroup, nationalEncodingGroup, detectEncodingButton, detectionLabel, encodingHelp,
+            previewLabel, previewStatusLabel, previewGrid, previewButton, okButton, cancelButton]);
         form.AcceptButton = okButton;
         form.CancelButton = cancelButton;
+        DetectInitialEncoding();
         UpdatePreview();
 
         if (form.ShowDialog(this) != DialogResult.OK)

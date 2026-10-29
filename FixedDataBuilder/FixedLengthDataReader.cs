@@ -29,7 +29,7 @@ public static class FixedLengthDataReader
         return records.Select(record => DecodeRecord(record, fields, encoding, nationalTextEncoding)).ToList();
     }
 
-    private static List<byte[]> SplitRecords(byte[] bytes, int recordLength, RecordSeparatorMode separatorMode)
+    internal static List<byte[]> SplitRecords(byte[] bytes, int recordLength, RecordSeparatorMode separatorMode)
     {
         return separatorMode switch
         {

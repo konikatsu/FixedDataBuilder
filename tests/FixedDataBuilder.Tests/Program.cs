@@ -314,6 +314,7 @@ internal static partial class Program
             RunSingleRecordViewTests(repo);
             RunFieldCommentTests(repo);
             RunDefinitionEncodingTests(repo);
+            RunDataEncodingDetectionTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);
