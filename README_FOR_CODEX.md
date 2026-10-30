@@ -1,5 +1,13 @@
 # README_FOR_CODEX
 
+## v0.1.75：上下2つのレコード一覧（2026-10-30、起動確認待ち）
+
+- 利用者が「比較は目視。入力と出力を並べたい」「上段が入力レコード一覧、下段が出力レコード一覧、それぞれスクロールと上下入替」「マッピング不要」と明確化。以前のルール画面へ進ませる仕様を改め、MainFormの入口をVisualComparisonFormへ変更する。ボタン/ツールメニューは「入力・出力を並べて表示...」。
+- 基点3fa1924（v74/main）をfetchで確認しcodex/visual-comparison-v0.1.75で実装。入力/出力は独立したreadonly VirtualMode DataGridView。全件の行を保持し各定義の項目をカラムへ表示、metadata行固定、各側で縦横scroll・行ジャンプ・選択内容/空白数。上下入替は同じpaneを移しviewportを復元、データの役割を交換しない。SplitContainerは使わない。
+- 既存の独立dataset/読込dialogを再利用、候補/マッピング/行対応/期待値/一致判定のUIを新画面に出さない。元fileとMainFormのdirty/recordを変更しない。固定長は原本保持時の文字格納空白を可視化、snapshotは従来の論理値と補完表示。CSV aliasは物理列なしを明示。UTF8定義をMS932指定した画像のエラーは公開sampleでも先頭byte E9 A0 85 E7からindex2の85 E7と確認、読込errorへ定義/data/filename/指定codecを付記する。
+- VisualComparisonTests10件を追加し全337件、未実行。利用者が製品・テスト・撮影helperを起動する指示を継続、assistantはbuild/publish --no-build/package/static確認のみ。旧製品・既公開ZIPは変更しない。起動OKの同一artifactのみmain/Releaseへ反映。新画面画像を捏造しない。レビューは迷う点がある場合に版数付きrequest/resultsへ、Argonの有用性を判断し必要時Claude単独。
+- 証拠reviews/visual-comparison-v0.1.75/v001。確認前の公開main/Releaseはv74を維持し、source branchのみpushする。公開後は最新3版v75/v74/v73を残し、v72 Releaseだけmetadata・実ZIPの保管/sha確認後整理、tag/history/localは保持。
+
 ## v0.1.74：読み取り専用の入力・出力比較（2026-10-30、利用者起動確認後の公開）
 
 - v73の生成機能と並行してcodex/comparison-v0.1.74で開発。v73レビュー修正46f0fa5をmergeし、生成も含めて提供する。利用者の起動確認を得てmain/Release/公開releaseをv74へ更新し、製品/テストは利用者が起動する。ユーザーが起動OKを報告した同一バイナリだけ公開する。

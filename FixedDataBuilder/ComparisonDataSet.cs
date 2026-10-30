@@ -103,19 +103,20 @@ public sealed class ComparisonDataSet
         DefinitionTextEncoding definitionEncoding = DefinitionTextEncoding.Auto)
     {
         ValidateProfile(profile);
+        if (!Enum.IsDefined(definitionEncoding)) throw new ArgumentOutOfRangeException(nameof(definitionEncoding));
         // Hold read-only handles while the existing path-based readers parse the same files.
         // FileShare.Read denies concurrent writes/deletion rather than mixing parsed and raw snapshots.
         using var definitionSnapshot = new FileStream(definitionPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var dataSnapshot = new FileStream(dataPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var definitionBytes = SnapshotBytes(definitionSnapshot);
         var extension = Path.GetExtension(definitionPath);
-        IReadOnlyList<FieldDefinition> fields = extension.Equals(".cbl", StringComparison.OrdinalIgnoreCase)
+        IReadOnlyList<FieldDefinition> fields = ReadEncoded<IReadOnlyList<FieldDefinition>>(definitionPath, "定義", DefinitionFileText.Name(definitionEncoding), () => extension.Equals(".cbl", StringComparison.OrdinalIgnoreCase)
             || extension.Equals(".cpy", StringComparison.OrdinalIgnoreCase)
             || extension.Equals(".cob", StringComparison.OrdinalIgnoreCase)
             ? CopybookDefinitionReader.Read(definitionPath, definitionEncoding)
             : extension.Equals(".csv", StringComparison.OrdinalIgnoreCase)
                 ? DefinitionCsvReader.Read(definitionPath, definitionEncoding)
-                : throw new NotSupportedException("比較用の定義読込はCSV・COBOLコピー句が対象です。");
+                : throw new NotSupportedException("比較用の定義読込はCSV・COBOLコピー句が対象です。"));
         if (profile.Format == DataFileFormat.FixedLength)
         {
             var width = NationalTextEncodingHelper.FixedByteWidth(profile.NationalEncoding);
@@ -123,10 +124,20 @@ public sealed class ComparisonDataSet
                 ? field with { NationalByteWidth = width } : field).ToArray();
         }
         var bytes = SnapshotBytes(dataSnapshot);
-        var records = profile.Format == DataFileFormat.Csv
+        var records = ReadEncoded(dataPath, "データ", profile.Format == DataFileFormat.Csv ? JapaneseEncodings.Name(profile.CsvEncoding)
+            : JapaneseEncodings.Name(profile.DataEncoding), () => profile.Format == DataFileFormat.Csv
             ? CsvDataReader.Read(dataPath, fields, profile.CsvEncoding, profile.CsvHasHeader)
-            : FixedLengthDataReader.Read(dataPath, fields, profile.SeparatorMode, profile.DataEncoding, profile.NationalEncoding);
+            : FixedLengthDataReader.Read(dataPath, fields, profile.SeparatorMode, profile.DataEncoding, profile.NationalEncoding));
         return new(fields, records, profile, definitionPath, dataPath, bytes, definitionBytes, definitionEncoding);
+    }
+
+    private static T ReadEncoded<T>(string path, string kind, string encoding, Func<T> read)
+    {
+        try { return read(); }
+        catch (DecoderFallbackException ex)
+        {
+            throw new DecoderFallbackException($"{kind}ファイルを「{encoding}」として読み取れません。\r\n対象: {Path.GetFileName(path)}\r\n{kind}の文字コード指定を確認してください。\r\n{ex.Message}", ex);
+        }
     }
 
     private static byte[] SnapshotBytes(FileStream stream)

@@ -515,7 +515,7 @@ public sealed class ComparisonForm : Form
         { statusText.Text = exception.Message; }
     }
 
-    private sealed class ComparisonLoadForm : Form
+    internal sealed class ComparisonLoadForm : Form
     {
         private readonly TextBox definitionPath = new() { Dock = DockStyle.Fill };
         private readonly TextBox dataPath = new() { Dock = DockStyle.Fill };

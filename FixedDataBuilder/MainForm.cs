@@ -3508,7 +3508,7 @@ public sealed partial class MainForm : Form
         column.HeaderCell.Style.BackColor = DefinitionHeaderBackColor;
     }
 
-    private static string FormatValueForDisplay(FieldDefinition field, string value, bool isCsv = false)
+    internal static string FormatValueForDisplay(FieldDefinition field, string value, bool isCsv = false)
     {
         if (isCsv) return value;
         return field.Type switch
