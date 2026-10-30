@@ -1,6 +1,6 @@
 # README_FOR_CODEX
 
-## v0.1.74：読み取り専用の入力・出力比較（2026-10-30、作成中）
+## v0.1.74：読み取り専用の入力・出力比較（2026-10-30、起動確認待ち）
 
 - v73の生成機能と並行してcodex/comparison-v0.1.74で開発。v73レビュー修正46f0fa5をmergeし、生成も含めて提供する。main/Release/公開releaseは起動確認済みv73を維持し、製品/テストは利用者が起動する。ユーザーが起動OKを報告した同一バイナリだけ公開する。
 - 独立した不変dataset・各profile/指紋とraw sourceを保持。MainFormからは現在編集値のコピーでrawなし、比較画面からCSV/COPYと固定長/CSVを読み直すとsource bytesを取得。定義/データのread-only handleを解析中保持しlogicalとrawの出所を混ぜない。XML入口は公開しない。
@@ -12,6 +12,7 @@
 - 候補arrayをkey group単位でreadonly共有、候補総参照50万件を要素走査前に制限。Create/Saveは4MB制限付きstreamで割当を抑え、作成結果は子collectionもreadonly化。定義codec要求modeをdatasetへ保持、再読込復元/Overflow等error表示、CSVで不要な固定長offset制約を外し、emptyConcatの無変更再編集を維持。
 - 最終予定はEngine24/Rule10/Form21/Integration4/CSVAlias1=比較60件。v73最終265をmergeし合計325件、全件未実行。追加レビューは有用性で判断し、修正差分の最終確認はClaude highのみ予定。バイナリは利用者起動確認後だけ公開し、確認後は再ビルドしない。
 - review-v002はClaude high単独。92ファイルの封印差分を読ませ主要修正確認済み。残った読込時modeと次回メニュー設定の区別、4MB案内を修正し、内部点検の明示Ambiguous状態差も修正。review-v003は追加CLIなしの静的相互点検・差分/hashであり、Claudeが最終小変更まで確認したとは扱わない。MainFormの成功時appliedDefinitionTextEncodingをsnapshotへ渡し、失敗/メニュー変更だけでは更新しない。最終試験はEngine24/Rule10/Form22/Integration5/CSVAlias1=62＋生成265、合計327件、未実行。
+- 最終build-integrated-v005は--no-incremental、警告0/エラー0、source前後hash一致/test内製品DLL一致。publish --no-build、製品5+samples45=50項目ZIP361046バイト、SHA256=2304F8ED3D40E695636A9FD6CAEB4525ADBFEDDE474A0678839BDCB1A146F0DA。v73の既公開ZIP/製品を変更せず、v74製品/testsはassistantが起動していない。作業ブランチのみpushし、利用者のv74具体パスの起動確認を待つ。公開後は最新3版v74/v73/v72を保持し、v71 Releaseだけ実ZIP・metadata保管/検証後整理する。
 
 ## v0.1.73：正常な1行を複製するテストデータ生成（2026-10-30、利用者起動確認後の公開）
 
