@@ -6,13 +6,13 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.73 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.73/FixedDataBuilder-v0.1.73-win-x64-framework-dependent.zip)
+[v0.1.74 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.74/FixedDataBuilder-v0.1.74-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.73 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.73) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.74 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.74) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
-## v0.1.74 起動確認待ち：入力と出力を並べて比較
+## v0.1.74：入力と出力を並べて比較
 
 **「入力と出力を比較...」** ボタン（または **ツール → 入力と出力を比較...**）で別の比較画面を開きます。現在の出力をコピーし、入力の定義CSV・COBOLコピー句とデータを別途読み込んで、出力の項目順に入力値・期待値・出力値を並べます。メイン画面のデータを変更しません。
 
@@ -26,9 +26,9 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 比較設定をJSONへ保存して再利用できます。定義やデータの指紋が変わった場合は自動適用せず、現在の設定を保持します。キーの重複候補が多すぎる場合は、キー項目を追加して絞り込んでください。設定ファイルの上限は4,000,000バイトです。候補が一意でも行対応の件数や式が多い場合は超えるため、確認対象を分けてください。**比較記録を保存...** は選択した出力行の行対応・式・期待値・出力値・算出過程をJSONへ保存します。確認中の入力行と確定済みの行対応は別々に記録し、未確定を「入力なし」と断定しません。候補と根拠、値の取得失敗も画面と同じ状態で残します。PNGや画像コピーは従来のメイン一覧の機能です。
 
-[架空サンプルの操作手順](samples/comparison-example.md)を用意しました。製品と自動テストの実行は利用者が行います。生成機能も含めた計327件の自動テストは未実行で、ダウンロードは上記の起動確認済みv0.1.73です。
+[架空サンプルの操作手順](samples/comparison-example.md)を用意しました。製品と自動テストの実行は利用者が行います。**生成機能も含む自動テスト327件は未実行です。テスト合格を確認した版ではありません。**
 
-確認用軽量版は警告0・エラー0でビルドし、コードレビューの指摘を反映しました。利用者の起動確認を得てから、同じEXE・DLLを再ビルドせず公開します。新しい画面画像は未撮影です。
+警告0・エラー0でビルドし、利用者からv0.1.74製品EXEの起動OKの報告を受けています。同じEXE・DLLを再ビルドせず軽量版として公開します。新しい画面画像と機能の実画面確認、別PCでの起動は未確認です。
 
 ## v0.1.73：正常な1行からテストデータを生成
 
