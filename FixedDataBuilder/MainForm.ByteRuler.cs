@@ -9,6 +9,9 @@ public sealed partial class MainForm
     private readonly Dictionary<int, int> byteRulerLengths = new();
     private readonly Dictionary<int, string> byteRulerErrors = new();
     private bool changingByteRuler;
+    private Font? byteRulerMetricsFont;
+    private int byteRulerMetricsDpi;
+    private float byteRulerMetricsWidth;
 
     private void ChangeByteRulerVisibility()
     {
@@ -36,7 +39,8 @@ public sealed partial class MainForm
         row.Frozen = true;
         row.DefaultCellStyle.BackColor = Color.FromArgb(242, 245, 248);
         row.DefaultCellStyle.SelectionBackColor = row.DefaultCellStyle.BackColor;
-        row.DefaultCellStyle.SelectionForeColor = grid.ForeColor;
+        row.DefaultCellStyle.ForeColor = Color.FromArgb(125, 132, 142);
+        row.DefaultCellStyle.SelectionForeColor = row.DefaultCellStyle.ForeColor;
         row.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
         row.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
         row.Cells[0].Value = "バイト目盛り";
@@ -73,8 +77,7 @@ public sealed partial class MainForm
         if (layout != GridLayout.RecordRows || recordRulerRowIndex < 0 || recordRulerRowIndex >= grid.Rows.Count) return;
         var row = grid.Rows[recordRulerRowIndex];
         row.Height = Math.Max(grid.RowTemplate.Height, grid.Font.Height * 2 + 8);
-        var digitWidth = Math.Max(1f, TextRenderer.MeasureText("0123456789", grid.Font, Size.Empty,
-            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width / 10f);
+        var digitWidth = ByteRulerDigitWidth();
         for (var column = 1; column < grid.Columns.Count; column++)
         {
             if (onlyColumn is not null && onlyColumn != column) continue;
@@ -93,5 +96,69 @@ public sealed partial class MainForm
                 + (IsCsv ? $"文字コード: {JapaneseEncodings.Name(currentCsvEncoding)}。" : "型N・COMP-3は実際の格納バイト数です。")
                 + "文字の画面幅とは別の単位です。…は目盛りの続きがあることを示します。";
         }
+        grid.Invalidate();
+    }
+
+    private float ByteRulerDigitWidth()
+    {
+        if (ReferenceEquals(byteRulerMetricsFont, grid.Font) && byteRulerMetricsDpi == grid.DeviceDpi) return byteRulerMetricsWidth;
+        byteRulerMetricsFont = grid.Font;
+        byteRulerMetricsDpi = grid.DeviceDpi;
+        byteRulerMetricsWidth = Math.Max(1, "0123456789".Max(digit =>
+            TextRenderer.MeasureText(digit.ToString(), grid.Font, Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width));
+        return byteRulerMetricsWidth;
+    }
+
+    private bool TryPaintByteRulerCell(DataGridViewCellPaintingEventArgs e)
+    {
+        if (layout != GridLayout.RecordRows || recordRulerRowIndex < 0 || e.RowIndex != recordRulerRowIndex
+            || e.ColumnIndex < 1 || e.Graphics is null || e.CellStyle is null) return false;
+        e.Paint(e.ClipBounds, e.PaintParts & ~DataGridViewPaintParts.ContentForeground);
+        var text = e.FormattedValue?.ToString() ?? "";
+        var font = e.CellStyle.Font ?? grid.Font;
+        var left = e.CellBounds.Left + e.CellStyle.Padding.Left + 4;
+        var top = e.CellBounds.Top + (e.CellBounds.Height - 2 * font.Height) / 2;
+        var width = ByteRulerDigitWidth();
+        var flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine
+            | TextFormatFlags.PreserveGraphicsClipping;
+        if (!text.Contains('\n'))
+            TextRenderer.DrawText(e.Graphics, text, font, new Point(left, top), e.CellStyle.ForeColor, flags);
+        else
+        {
+            var lines = text.Split('\n');
+            for (var line = 0; line < lines.Length; line++)
+            for (var slot = 0; slot < lines[line].Length; slot++)
+                if (lines[line][slot] != ' ')
+                    TextRenderer.DrawText(e.Graphics, lines[line][slot].ToString(), font,
+                        new Point(left + (int)Math.Round(slot * width), top + line * font.Height), e.CellStyle.ForeColor, flags);
+        }
+        e.Handled = true;
+        return true;
+    }
+
+    private void PaintByteGuideLines(DataGridViewCellPaintingEventArgs e)
+    {
+        if (layout != GridLayout.RecordRows || recordRulerRowIndex < 0 || e.RowIndex < recordRulerRowIndex
+            || e.ColumnIndex < 1 || e.Graphics is null || e.CellStyle is null) return;
+        var field = FieldIndexFromRecordColumn(e.ColumnIndex);
+        if (!byteRulerLengths.TryGetValue(field, out var length) || length < 10) return;
+        if (!e.Handled) { e.Paint(e.ClipBounds, e.PaintParts); e.Handled = true; }
+        var width = ByteRulerDigitWidth();
+        var left = e.CellBounds.Left + e.CellStyle.Padding.Left + 4;
+        var slots = Math.Clamp((int)Math.Floor((e.CellBounds.Width - e.CellStyle.Padding.Horizontal - 8) / width), 0, 2048);
+        if (length > slots) slots--;
+        using var pen = new Pen(Color.FromArgb(135, 70, 125, 205)) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+        var state = e.Graphics.Save();
+        try
+        {
+            e.Graphics.SetClip(Rectangle.Intersect(e.ClipBounds, e.CellBounds), System.Drawing.Drawing2D.CombineMode.Intersect);
+            foreach (var position in ByteRulerText.GuidePositions(length, slots))
+            {
+                var x = left + (int)Math.Round(position * width);
+                e.Graphics.DrawLine(pen, x, e.CellBounds.Top + 1, x, e.CellBounds.Bottom - 2);
+            }
+        }
+        finally { e.Graphics.Restore(state); }
     }
 }

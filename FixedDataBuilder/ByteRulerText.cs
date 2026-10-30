@@ -4,6 +4,13 @@ namespace FixedDataBuilder;
 
 public static class ByteRulerText
 {
+    public static IEnumerable<int> GuidePositions(int byteLength, int visiblePositions)
+    {
+        if (byteLength < 0) throw new ArgumentOutOfRangeException(nameof(byteLength));
+        var end = Math.Min(byteLength, Math.Clamp(visiblePositions, 0, 2048));
+        for (var position = 10; position <= end; position += 10) yield return position;
+    }
+
     // Bound output by the current column width, even for a huge defined byte length.
     public static string Format(int byteLength, int visiblePositions)
     {

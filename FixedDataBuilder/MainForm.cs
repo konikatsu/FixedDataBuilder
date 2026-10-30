@@ -442,6 +442,7 @@ public sealed partial class MainForm : Form
 
     private void BuildMenuStrip()
     {
+        captureAllImagesButton.Click += (_, _) => ExportGridImages();
         menuStrip.Dock = DockStyle.Top;
         menuStrip.Items.Add(CreateMenu("ファイル",
             CreateMenuItem("定義を開く...", (_, _) => OpenDefinition()),
@@ -456,6 +457,7 @@ public sealed partial class MainForm : Form
             new ToolStripSeparator(),
             CreateMenuItem("Excel出力...", (_, _) => ExportExcel()),
             CreateMenuItem("Excel取込...", (_, _) => ImportExcel()),
+            captureAllImagesButton,
             new ToolStripSeparator(),
             CreateMenuItem("終了", (_, _) => Close())));
         menuStrip.Items.Add(CreateMenu("編集",
@@ -546,7 +548,7 @@ public sealed partial class MainForm : Form
                 UpdateHexView();
             }
         };
-        grid.CellPainting += (_, e) => PaintTextPaddingArea(e);
+        grid.CellPainting += (_, e) => { PaintTextPaddingArea(e); PaintByteGuideLines(e); };
         grid.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
         hexTextBox.ZoomWheel += (_, e) => ChangeZoomFromWheel(e.Delta);
         grid.ColumnWidthChanged += (_, e) =>
@@ -2945,6 +2947,7 @@ public sealed partial class MainForm : Form
 
     private void PaintTextPaddingArea(DataGridViewCellPaintingEventArgs e)
     {
+        if (TryPaintByteRulerCell(e)) return;
         if (TryPaintWrappedCell(e)) return;
         if (TryPaintOccursRecordHeaderArea(e))
         {
@@ -3268,6 +3271,7 @@ public sealed partial class MainForm : Form
 
     private void UpdateLayoutButtons()
     {
+        captureAllImagesButton.Enabled = !isSingleRecordView && records.Count > 0 && VisibleFieldIndexes().Count > 0;
         byteRulerButton.Enabled = layout == GridLayout.RecordRows && !isSingleRecordView && fields.Count > 0;
         fieldRowsButton.Checked = !isSingleRecordView && layout == GridLayout.FieldRows;
         recordRowsButton.Checked = !isSingleRecordView && layout == GridLayout.RecordRows;
