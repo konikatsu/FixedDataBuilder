@@ -6,13 +6,13 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.72 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.72/FixedDataBuilder-v0.1.72-win-x64-framework-dependent.zip)
+[v0.1.73 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.73/FixedDataBuilder-v0.1.73-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.72 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.72) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.73 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.73) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
-## v0.1.73 起動確認待ち：正常な1行からテストデータを生成
+## v0.1.73：正常な1行からテストデータを生成
 
 **「テストデータ作成...」** ボタン（または **ツール → テストデータ作成...**）で、基準行・変更対象の項目・作成する値・行数・保存形式を選びます。対象外の項目は基準行をそのまま複製します。日付や業務コードの妥当性は自動では判断しないため、正常な基準行を用意し、変更したい項目だけ選んでください。
 
@@ -28,7 +28,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 **ツール → 生成条件・対応表を保存...** で、条件・基準ファイル名・行と項目のケース番号・生成値・現在値をJSONへ保存できます。データ列へ番号を追加しません。値を編集した場合は変更を記録し、行の追加・削除・再読み込み・定義変更で対応が失われた場合は保存を無効にします。この記録は対象処理の実行や業務上の合格を示すものではありません。
 
-現在は開発ブランチで準備中です。ダウンロードは上記の起動確認済みv0.1.72です。製品と自動テストの実行は利用者が行い、v0.1.73の起動確認後に公開します。追加した確認を含む計265件の自動テストは未実行です。
+警告0・エラー0でビルドし、利用者からv0.1.73製品EXEの起動OKの報告を受けています。同じEXE・DLLを再ビルドせず軽量版として公開します。**自動テスト265件は未実行です。テスト合格を確認した版ではありません。** 機能の実画面確認と別PCでの起動は未確認です。
 
 ## v0.1.72：データを上寄せ表示
 

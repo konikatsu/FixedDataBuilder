@@ -1,6 +1,6 @@
 # README_FOR_CODEX
 
-## v0.1.73：正常な1行を複製するテストデータ生成（2026-10-30、作成中）
+## v0.1.73：正常な1行を複製するテストデータ生成（2026-10-30、利用者起動確認後の公開）
 
 - ユーザーが生成と比較機能の提案を承認。生成は既存正常行を複製し選択条件だけ変える方式。C7_04相談とローカル検討をreviews/test-data-generationおよびcomparison-modeの版数付き資料に保持。v73を生成、v74を独立した読み取り専用比較として並行実装する。
 - 基点499127ea5a9426ba84cca18914b4a8d0651e632a（v72/main）。codex/test-data-generation-v0.1.73でモデル・エンジン・条件画面・MainForm統合を分担。数値は浮動小数点を使わず文字列生成、必要正常件数不足は停止。適用不能条件は理由を示し、CSV不正値は1行1原因。REDEFINES除外、対象外値保持、割当量の上限と厳密な符号化事前確認。固定長の既存Writerを変更しない。
@@ -10,6 +10,8 @@
 - reviews/test-data-generation-v0.1.73/review-v001に依頼・封印75ファイル・2回答・検証記録を保存。Claudeのreport WriteはCLI権限で拒否されたため、権限を緩めずWrite提案の正式本文だけ回収し由来を記録。Claude実modelIDはclaude-opus-5-5をmetadataで確認、Geminiは指定引数と申告のみでサーバーIDは未検証。effort実効値を独立に保証しない。
 - 指摘を個別査定し、内部＋末尾の空白/共通識別行/N幅変更とreport保持/無編集数値の再整形/FillWeight合計制約/生成適用rollback/有効ケース0/条件件数の手入力を修正。固定長shortは注記して従来ゼロ埋め維持。小数の整数桁あふれ生成・0.1先頭ゼロ・非ASCIIの既存validatorに関する誤読は追加制限を入れず、理由をローカル査定資料へ残す。reportはstream serialize＋一時file置換で大きなJSON文字列を作らず、元data/定義上書きを拒否。試験数263件は未実行。
 - review-v002で主修正を再確認。残ったCSV生成時のN幅整合と、NumericUpDownの基底の自動clamp経路を最小修正し、review-v003へ公式.NET8 sourceの根拠と静的相互点検・差分/hashを保存。3回目のCLIは依頼していない。範囲外/未入力の値を勝手に上限へ変えて生成しない。有効値の標準矢印動作は維持。最終試験数265件、全件未実行。Argonが有用でない場合はClaudeだけでよいとの追加指示を記録、今回は空白位置と基底clamp経路の具体指摘が有用だった。
+
+- 最終build-v005は--no-incremental、警告0/エラー0。source前後hash一致、test内製品DLL一致を記録。publish --no-build、ZIP283437バイト/45項目、SHA256=B382A8DE3392FD0B4444AED9017BFB6DAA1D988781CEC3AD960D1732B11DF4FB。利用者が具体的EXE質問へ「起動できた」と回答、同じバイナリを再ビルドせず公開。自動テスト265件は未実行、assistantは製品/tests/GUIを起動していない。最新3版v73/v72/v71を残し、v70 Releaseだけmetadata/実ZIPの保管・SHA確認後整理、tag/history/localは保持。
 
 ## v0.1.72：データの上寄せ（2026-10-30、利用者起動確認後の公開）
 
