@@ -71,7 +71,11 @@ public static class TestDataGenerator
         var invalidCount = csv ? targets.Sum(index =>
             (IsNumeric(fields[index]) && Has(settings, GenerationRequirement.InvalidNumeric) ? 1 : 0)
             + (Has(settings, GenerationRequirement.Overlength) ? 1 : 0)) : 0;
-        var rowCount = (long)settings.NormalRecordCount + invalidCount;
+        // Reserve common identifier slots before creating any values. The estimate also covers
+        // Analyze requests whose requested row count is smaller than the required coverage.
+        var predictedBaseCount = targets.Max(index => NormalPatternCount(fields[index], settings));
+        var predictedRequiredCount = predictedBaseCount + (Has(settings, GenerationRequirement.Identifier) ? 2 : 0);
+        var rowCount = (long)Math.Max(settings.NormalRecordCount, predictedRequiredCount) + invalidCount;
         var targetSet = targets.ToHashSet();
         long maximumRowChars = 0, maximumCaseChars = 0;
         for (var index = 0; index < fields.Count; index++)
@@ -85,7 +89,7 @@ public static class TestDataGenerator
             || maximumRowChars * rowCount + maximumCaseChars > MaximumTotalCharacters)
         {
             Block($"生成量が上限（合計{MaximumRecordCount:N0}レコード、{MaximumCellCount:N0}セル、{MaximumTotalCharacters:N0}文字）を超えます。");
-            return Plan(0, invalidCount);
+            return Plan(predictedRequiredCount, invalidCount);
         }
 
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -114,7 +118,11 @@ public static class TestDataGenerator
                 if (Has(settings, GenerationRequirement.NumericAllZero)) Add("numeric.all-zero", "全桁ゼロ", DecimalValue(new('0', field.Length), field));
                 if (Has(settings, GenerationRequirement.NumericFullLength)) Add("numeric.full-length", "全桁・非ゼロ開始の循環数字", DecimalValue(CyclicDigits(field.Length), field));
                 if (Has(settings, GenerationRequirement.NumericMaximum)) Add("numeric.maximum", "最大値（全桁9）", DecimalValue(new('9', field.Length), field));
-                if (Has(settings, GenerationRequirement.NumericShort)) Add("numeric.short", "短い数値表記（7）", "7");
+                if (Has(settings, GenerationRequirement.NumericShort))
+                {
+                    Add("numeric.short", "短い数値表記（7）", "7");
+                    if (!csv) issues.Add(new(index, nameof(GenerationRequirement.NumericShort), "短い値7を作成します。固定長保存時は従来通り定義の桁数へゼロ埋めされます。"));
+                }
                 if (Has(settings, GenerationRequirement.NumericNegativeMaximum))
                 {
                     if (IsSigned(field)) Add("numeric.negative-maximum", "負の最大絶対値", "-" + DecimalValue(new('9', field.Length), field));
@@ -141,12 +149,16 @@ public static class TestDataGenerator
                 }
                 while (positions != 0)
                 {
-                    var chosen = Enumerable.Range(1, 7).Where(mask => (mask & positions) == mask && MinimumSpaceLength(mask) <= field.Length)
-                        .OrderByDescending(mask => System.Numerics.BitOperations.PopCount((uint)mask)).ThenBy(mask => mask).First();
+                    var chosen = SelectSpaceMask(positions, field.Length);
                     var chars = new string(marker, field.Length).ToCharArray();
                     var space = field.Type == FieldDataType.FullWidthText ? '\u3000' : ' ';
                     if ((chosen & 1) != 0) chars[0] = space;
-                    if ((chosen & 2) != 0) chars[field.Length / 2] = space;
+                    if ((chosen & 2) != 0)
+                    {
+                        var firstInternal = (chosen & 1) != 0 ? 2 : 1;
+                        var lastInternal = field.Length - ((chosen & 4) != 0 ? 3 : 2);
+                        chars[Math.Clamp(field.Length / 2, firstInternal, lastInternal)] = space;
+                    }
                     if ((chosen & 4) != 0) chars[^1] = space;
                     Add($"text.spaces-{chosen}", SpaceGoal(chosen), new string(chars));
                     positions &= ~chosen;
@@ -170,11 +182,6 @@ public static class TestDataGenerator
                     }
                 }
             }
-            if (Has(settings, GenerationRequirement.Identifier))
-            {
-                Add("identifier.column", "列識別子（桁数制約による重複あり）", IdentifierValue(field, index + 1, 'C'));
-                Add("identifier.row", "行識別子（他の列と同じ行番号）", IdentifierValue(field, fieldCases.Count + 1, 'R'));
-            }
             if (!csv)
                 foreach (var requirement in new[] { GenerationRequirement.InvalidNumeric, GenerationRequirement.Overlength })
                     if (Has(settings, requirement) && (requirement != GenerationRequirement.InvalidNumeric || IsNumeric(field)))
@@ -185,7 +192,32 @@ public static class TestDataGenerator
                 ValidateValue(field, index, item.Value, item.Goal, generated: true, settings.OutputOptions, outputEncoding, issues);
         }
 
+        if (Has(settings, GenerationRequirement.Identifier))
+        {
+            var baseCount = cases.Values.Max(list => list.Count);
+            foreach (var index in targets)
+            {
+                var aligned = cases[index].ToList();
+                if (aligned.Count < baseCount)
+                {
+                    var padding = new GenerationCellCase(index, CellId(index, "baseline-padding"), "基準値保持（識別子の共通行まで）", baseline[index]);
+                    ValidateValue(fields[index], index, padding.Value, padding.Goal, generated: false, settings.OutputOptions, outputEncoding, issues);
+                    while (aligned.Count < baseCount) aligned.Add(padding);
+                }
+                var column = new GenerationCellCase(index, CellId(index, "identifier.column"), "列識別子（項目番号）", IdentifierValue(fields[index], index + 1, 'C'));
+                var row = new GenerationCellCase(index, CellId(index, "identifier.row"), $"行識別子（正常レコード{baseCount + 2}行目）", IdentifierValue(fields[index], baseCount + 2, 'R'));
+                aligned.Add(column); aligned.Add(row);
+                ValidateValue(fields[index], index, column.Value, column.Goal, generated: true, settings.OutputOptions, outputEncoding, issues);
+                ValidateValue(fields[index], index, row.Value, row.Goal, generated: true, settings.OutputOptions, outputEncoding, issues);
+                if (IsNumeric(fields[index]) && string.Equals(column.Value, row.Value, StringComparison.Ordinal))
+                    issues.Add(new(index, "Identifier", "数値項目の列識別子と行識別子が同じ値になります。数字だけのため識別子の種類を値から区別できず、一意性は保証しません。"));
+                cases[index] = aligned.AsReadOnly();
+            }
+        }
+
         var requiredCount = cases.Values.Max(list => list.Count);
+        if (requiredCount == 0 && invalidCount == 0)
+            issues.Add(new(-1, "Requirements", "選択した条件で作成できるケースがありません。条件・対象項目・出力形式を変更してください。", true));
         if (settings.NormalRecordCount < requiredCount)
             issues.Add(new(-1, "NormalRecordCount", $"選択した要件には正常レコードが最低{requiredCount}件必要です。指定は{settings.NormalRecordCount}件です。", true));
         // A selected field can still use the baseline in slots after its last case.
@@ -201,7 +233,7 @@ public static class TestDataGenerator
                 .Where(item => item.Case is not null).GroupBy(item => item.Case!.Value, StringComparer.Ordinal);
             foreach (var group in signatures.Where(group => group.Count() > 1))
                 foreach (var item in group) issues.Add(new(item.Index, "Identifier", "項目長の制約により列識別子が他の対象列と重複します。全列・全レコードの一意性は保証しません。"));
-            issues.Add(new(-1, "Identifier", "列識別と行識別は別の正常ケースです。行識別子は同じ行の各列で共有し、短い項目では識別子が切り詰められます。"));
+            issues.Add(new(-1, "Identifier", "列識別と行識別は、全対象の通常ケースの後ろの共通2行に作成します。行識別子は実際の正常行番号で、短い項目では識別子が切り詰められます。一意性は保証しません。"));
         }
         return Plan(requiredCount, invalidCount);
     }
@@ -277,6 +309,43 @@ public static class TestDataGenerator
     private static string CyclicDigits(int length) => string.Create(length, 0, (chars, _) => { for (var index = 0; index < chars.Length; index++) chars[index] = "1234567890"[index % 10]; });
     private static string DecimalValue(string digits, FieldDefinition field) => field.DecimalScale == 0 ? digits : digits.Insert(field.IntegerDigitLength, ".");
     private static int MinimumSpaceLength(int mask) => mask switch { 1 or 4 => 2, 2 or 5 => 3, 3 or 6 => 4, 7 => 5, _ => int.MaxValue };
+    private static int SelectSpaceMask(int positions, int length)
+    {
+        var chosen = 0;
+        for (var mask = 1; mask <= 7; mask++)
+            if ((mask & positions) == mask && MinimumSpaceLength(mask) <= length
+                && System.Numerics.BitOperations.PopCount((uint)mask) > System.Numerics.BitOperations.PopCount((uint)chosen)) chosen = mask;
+        return chosen;
+    }
+    private static int ApplicableSpaceMask(FieldDefinition field, TestDataGenerationSettings settings)
+    {
+        var mask = 0;
+        var csv = settings.OutputOptions.Format == DataFileFormat.Csv;
+        if (csv && field.Length >= 2 && Has(settings, GenerationRequirement.TextLeadingSpace)) mask |= 1;
+        if (field.Length >= 3 && Has(settings, GenerationRequirement.TextInternalSpace)) mask |= 2;
+        if (csv && field.Length >= 2 && Has(settings, GenerationRequirement.TextTrailingSpace)) mask |= 4;
+        return mask;
+    }
+    private static int NormalPatternCount(FieldDefinition field, TestDataGenerationSettings settings)
+    {
+        if (IsNumeric(field))
+            return (Has(settings, GenerationRequirement.NumericLeadingZero) && field.Length > 1 ? 1 : 0)
+                + (Has(settings, GenerationRequirement.NumericAllZero) ? 1 : 0) + (Has(settings, GenerationRequirement.NumericFullLength) ? 1 : 0)
+                + (Has(settings, GenerationRequirement.NumericMaximum) ? 1 : 0) + (Has(settings, GenerationRequirement.NumericShort) ? 1 : 0)
+                + (Has(settings, GenerationRequirement.NumericNegativeMaximum) && IsSigned(field) ? 1 : 0)
+                + (Has(settings, GenerationRequirement.NumericMinimumUnit) && field.DecimalScale > 0 ? 1 : 0);
+        var count = Has(settings, GenerationRequirement.TextMaximum) ? 1 : 0;
+        var remaining = ApplicableSpaceMask(field, settings);
+        while (remaining != 0) { remaining &= ~SelectSpaceMask(remaining, field.Length); count++; }
+        if (settings.OutputOptions.Format == DataFileFormat.Csv)
+        {
+            if (Has(settings, GenerationRequirement.TextEmpty)) count++;
+            if (Has(settings, GenerationRequirement.TextHalfSpaces) && field.Type != FieldDataType.FullWidthText) count++;
+            if (Has(settings, GenerationRequirement.TextFullSpaces) && (field.Type == FieldDataType.FullWidthText
+                || field.Type == FieldDataType.Text && field.Length >= (settings.OutputOptions.CsvEncoding == CsvTextEncoding.Utf8 ? 3 : 2))) count++;
+        }
+        return count;
+    }
     private static string SpaceGoal(int mask) => "空白位置：" + string.Join("・", new[] { (Mask: 1, Name: "先頭"), (Mask: 2, Name: "内部"), (Mask: 4, Name: "末尾") }.Where(item => (mask & item.Mask) != 0).Select(item => item.Name));
     private static string IdentifierValue(FieldDefinition field, int number, char prefix)
     {

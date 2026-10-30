@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace FixedDataBuilder;
 
 public sealed class TestDataGenerationForm : Form
@@ -8,9 +10,9 @@ public sealed class TestDataGenerationForm : Form
 
     private readonly IReadOnlyList<FieldDefinition> fields;
     private readonly IReadOnlyList<List<string>> records;
-    private readonly NumericUpDown baselineRecord = new() { Name = "BaselineRecord", Minimum = 1, Maximum = 1, Width = 90 };
+    private readonly CommittingNumericUpDown baselineRecord = new() { Name = "BaselineRecord", Minimum = 1, Maximum = 1, Width = 90 };
     private readonly CheckedListBox targetFields = new() { Name = "TargetFields", CheckOnClick = true, IntegralHeight = false, Height = 126, Dock = DockStyle.Fill };
-    private readonly NumericUpDown normalCount = new() { Name = "NormalRecordCount", Minimum = 1, Maximum = 10000, Value = 4, Width = 92 };
+    private readonly CommittingNumericUpDown normalCount = new() { Name = "NormalRecordCount", Minimum = 1, Maximum = 10000, Value = 4, Width = 92 };
     private readonly Dictionary<GenerationRequirement, CheckBox> requirementChecks = new();
     private readonly ComboBox format = Choice("DataFormat");
     private readonly ComboBox csvEncoding = Choice("CsvEncoding");
@@ -21,9 +23,10 @@ public sealed class TestDataGenerationForm : Form
     private readonly TextBox issues = new() { Name = "GenerationIssues", Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, Height = 94, BackColor = SystemColors.Window };
     private readonly Label generationError = new() { Name = "GenerationError", AutoSize = true, ForeColor = Color.Firebrick, MaximumSize = new Size(820, 0), Margin = new Padding(3, 5, 3, 5) };
     private readonly Button execute = new() { Name = "ExecuteGeneration", Text = "実行", Width = 100, Height = 30 };
-    private readonly Button cancel = new() { Name = "CancelGeneration", Text = "キャンセル", DialogResult = DialogResult.Cancel, Width = 100, Height = 30 };
+    private readonly Button cancel = new() { Name = "CancelGeneration", Text = "キャンセル", DialogResult = DialogResult.Cancel, CausesValidation = false, Width = 100, Height = 30 };
     private TestDataGenerationPlan? plan;
     private bool updatingTargets;
+    private bool committingNumericInputs;
 
     public TestDataGenerationResult? GeneratedResult { get; private set; }
 
@@ -95,8 +98,13 @@ public sealed class TestDataGenerationForm : Form
         AcceptButton = execute;
         CancelButton = cancel;
 
-        baselineRecord.ValueChanged += (_, _) => RefreshAnalysis();
-        normalCount.ValueChanged += (_, _) => RefreshAnalysis();
+        foreach (var numeric in new[] { baselineRecord, normalCount })
+        {
+            // ValueChanged can precede the spinner's Text update. Read the edit text only
+            // after TextChanged, including direct keyboard input that has not lost focus.
+            numeric.TextChanged += (_, _) => { if (!committingNumericInputs) RefreshAnalysis(); };
+            numeric.Validated += (_, _) => { if (!committingNumericInputs) RefreshAnalysis(); };
+        }
         targetFields.ItemCheck += (_, e) => { if (!updatingTargets) UpdateAnalysis(e.Index, e.NewValue); };
         foreach (var check in requirementChecks.Values) check.CheckedChanged += (_, _) => RefreshAnalysis();
         foreach (var choice in new[] { format, csvEncoding, separator, national, textEncoding })
@@ -250,8 +258,33 @@ public sealed class TestDataGenerationForm : Form
 
     private void RefreshAnalysis() => UpdateAnalysis(-1, CheckState.Unchecked);
 
+    private bool CommitNumericInputs()
+    {
+        foreach (var (control, name) in new[] { (baselineRecord, "基準行"), (normalCount, "通常行数") })
+        {
+            // Empty/partial/out-of-range text remains editable. Do not read Value here:
+            // its getter may commit or clamp the unfinished edit before it is valid.
+            if (!decimal.TryParse(control.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var value)
+                || decimal.Truncate(value) != value || value < control.Minimum || value > control.Maximum)
+            {
+                execute.Enabled = false;
+                generationError.Text = $"{name}は {control.Minimum:0}～{control.Maximum:0} の整数で指定してください。";
+                return false;
+            }
+        }
+        committingNumericInputs = true;
+        try
+        {
+            baselineRecord.CommitEditText();
+            normalCount.CommitEditText();
+        }
+        finally { committingNumericInputs = false; }
+        return true;
+    }
+
     private void UpdateAnalysis(int pendingIndex, CheckState pendingState)
     {
+        if (!CommitNumericInputs()) return;
         generationError.Text = "";
         execute.Enabled = false;
         plan = null;
@@ -294,6 +327,7 @@ public sealed class TestDataGenerationForm : Form
 
     private void ExecuteGeneration()
     {
+        if (!CommitNumericInputs() || !ValidateChildren()) return;
         RefreshAnalysis();
         if (!execute.Enabled) return;
         var settings = BuildSettings();
@@ -322,5 +356,10 @@ public sealed class TestDataGenerationForm : Form
     private sealed record TargetField(int Index, string Text)
     {
         public override string ToString() => Text;
+    }
+
+    private sealed class CommittingNumericUpDown : NumericUpDown
+    {
+        public void CommitEditText() => ValidateEditText();
     }
 }

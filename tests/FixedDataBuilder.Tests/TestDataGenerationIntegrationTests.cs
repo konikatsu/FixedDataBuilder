@@ -71,6 +71,91 @@ internal static partial class Program
             Equal(result.Records.Count, loaded.Count);
             Equal(true, result.Records[0].SequenceEqual(loaded[0]));
         });
+        Test("Fixed numeric display normalization without an edit retains the original generated value", () =>
+        {
+            foreach (var recordRows in new[] { false, true })
+            {
+                using var form = CreateCellDisplayForm(recordRows);
+                var rows = Get<List<List<string>>>(form, "records");
+                rows[0][3] = "7";
+                Invoke(form, "RefreshGrid");
+                Invoke(form, "SetUnsavedChanges", false);
+                var row = recordRows ? (int)Invoke(form, "RecordRowsDataStartIndex")! : 3;
+                var column = recordRows ? 4 : 2;
+                Invoke(form, "UpdateRecordValue", row, column);
+                Equal("7", rows[0][3]);
+                Equal(false, Get<bool>(form, "hasUnsavedChanges"));
+            }
+        });
+        Test("Generation report survives N encoding conversions that keep field and row correspondence", () =>
+        {
+            using var form = new MainForm();
+            var fields = Get<List<FieldDefinition>>(form, "fields");
+            fields.Add(new("N", FieldDataType.FullWidthText, 2));
+            Get<List<List<string>>>(form, "records").Add(["漢字"]);
+            Invoke(form, "RefreshGrid");
+            var source = fields.ToArray();
+            var options = new DataSaveOptions(DataFileFormat.FixedLength, CsvTextEncoding.Utf8,
+                RecordSeparatorMode.None, NationalTextEncoding.Utf32, DataEncodingProfile.ShiftJis);
+            var result = TestDataGenerator.Generate(fields, ["漢字"], new(0, [0], GenerationRequirement.TextMaximum, 1, options));
+            // Saving the baseline from an unsaved-data prompt can change only its selected N width.
+            Invoke(form, "ApplyNationalTextEncoding", NationalTextEncoding.Utf32);
+            Invoke(form, "ApplyGeneratedTestDataCore", result, source);
+            var path = Path.Combine(temporaryDirectory, "generated-n-utf16.dat");
+            Invoke(form, "WriteData", path, options with { NationalEncoding = NationalTextEncoding.Utf16 });
+            Equal(true, (bool)Invoke(form, "HasCurrentGenerationReport")!);
+            using var json = JsonDocument.Parse((string)Invoke(form, "BuildGenerationReportJson")!);
+            Equal("generated_not_processed", json.RootElement.GetProperty("status").GetString());
+            Equal(4L, new FileInfo(path).Length);
+        });
+        Test("Generation supports more than 653 records in the field-rows grid", () =>
+        {
+            using var form = new MainForm();
+            var fields = Get<List<FieldDefinition>>(form, "fields");
+            fields.Add(new("TEXT", FieldDataType.Text, 1));
+            Get<List<List<string>>>(form, "records").Add(["X"]);
+            Invoke(form, "RefreshGrid");
+            var result = TestDataGenerator.Generate(fields, ["X"], new(0, [0], GenerationRequirement.TextMaximum, 660,
+                new(DataFileFormat.Csv, CsvTextEncoding.Utf8, RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis)));
+            Invoke(form, "ApplyGeneratedTestData", result);
+            Equal(662, Get<DataGridView>(form, "grid").ColumnCount);
+            Equal(true, Get<bool>(form, "hasUnsavedChanges"));
+        });
+        Test("Generation rolls back the document and report if grid construction fails", () =>
+        {
+            using var form = CreateCellDisplayForm(recordRows: true);
+            var rows = Get<List<List<string>>>(form, "records");
+            var original = rows.ToArray();
+            var result = GenerationIntegrationResult(form);
+            var failOnce = true;
+            Get<DataGridView>(form, "grid").ColumnAdded += (_, _) =>
+            {
+                if (!failOnce) return;
+                failOnce = false;
+                throw new InvalidOperationException("Simulated column construction failure");
+            };
+            Throws<System.Reflection.TargetInvocationException>(() => Invoke(form, "ApplyGeneratedTestData", result));
+            Equal(original.Length, rows.Count);
+            Equal(true, original.Zip(rows).All(pair => ReferenceEquals(pair.First, pair.Second)));
+            Equal(false, Get<bool>(form, "hasUnsavedChanges"));
+            Equal(false, (bool)Invoke(form, "HasCurrentGenerationReport")!);
+        });
+        Test("Generation report streams valid JSON and refuses to overwrite the saved data", () =>
+        {
+            using var form = CreateCellDisplayForm(recordRows: true);
+            var result = GenerationIntegrationResult(form);
+            Invoke(form, "ApplyGeneratedTestData", result);
+            var dataPath = Path.Combine(temporaryDirectory, "report-protected-data.csv");
+            Invoke(form, "WriteData", dataPath, result.Settings.OutputOptions);
+            var before = File.ReadAllBytes(dataPath);
+            Throws<System.Reflection.TargetInvocationException>(() => Invoke(form, "WriteGenerationReport", dataPath));
+            Equal(true, before.SequenceEqual(File.ReadAllBytes(dataPath)));
+            var path = Path.Combine(temporaryDirectory, "report-streamed.json");
+            Invoke(form, "WriteGenerationReport", path);
+            using var json = JsonDocument.Parse(File.ReadAllBytes(path));
+            Equal(result.Records.Count, json.RootElement.GetProperty("rows").GetArrayLength());
+            Equal("generated_not_processed", json.RootElement.GetProperty("status").GetString());
+        });
         Test("Generation controls require source records and toolbar can wrap at narrow widths", () =>
         {
             using var form = new MainForm();

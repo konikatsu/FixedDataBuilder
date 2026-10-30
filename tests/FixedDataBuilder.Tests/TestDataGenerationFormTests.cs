@@ -113,12 +113,57 @@ internal static partial class Program
             Equal(true, Get<TextBox>(form, "issues").Text.Contains("一桁数値"));
             Equal(true, Get<Dictionary<GenerationRequirement, CheckBox>>(form, "requirementChecks")[GenerationRequirement.NumericLeadingZero].Checked);
         });
+        Test("Direct count text commits immediately and enables execute from an insufficient count", () =>
+        {
+            using var form = NewGenerationForm();
+            Get<Dictionary<GenerationRequirement, CheckBox>>(form, "requirementChecks")[GenerationRequirement.Identifier].Checked = true;
+            var required = Get<TestDataGenerationPlan>(form, "plan").RequiredNormalCount;
+            Equal(true, required > 4);
+            Equal(false, Get<Button>(form, "execute").Enabled);
+            var count = Get<NumericUpDown>(form, "normalCount");
+            count.Text = ""; // A replacement is temporarily empty while typing.
+            Equal(false, Get<Button>(form, "execute").Enabled);
+            Equal(true, Get<Label>(form, "generationError").Text.Contains("通常行数"));
+            count.Text = required.ToString(System.Globalization.CultureInfo.CurrentCulture);
+            Equal((decimal)required, count.Value);
+            Equal(true, Get<Button>(form, "execute").Enabled);
+            Invoke(form, "ExecuteGeneration");
+            Equal(DialogResult.OK, form.DialogResult);
+            Equal(required, form.GeneratedResult!.Settings.NormalRecordCount);
+            Equal(required, form.GeneratedResult.Records.Count);
+        });
+        Test("Direct baseline text uses the latest row and unfinished numbers cannot generate", () =>
+        {
+            using var form = NewGenerationForm();
+            var baseline = Get<NumericUpDown>(form, "baselineRecord");
+            baseline.Text = "";
+            Equal(false, Get<Button>(form, "execute").Enabled);
+            Invoke(form, "ExecuteGeneration");
+            Equal<TestDataGenerationResult?>(null, form.GeneratedResult);
+            Equal(DialogResult.None, form.DialogResult);
+            baseline.Text = "2";
+            var count = Get<NumericUpDown>(form, "normalCount");
+            count.Text = "100001";
+            Equal(false, Get<Button>(form, "execute").Enabled);
+            Equal("100001", count.Text); // Do not clamp a partial edit during analysis.
+            Invoke(form, "ExecuteGeneration");
+            Equal<TestDataGenerationResult?>(null, form.GeneratedResult);
+            count.Text = "4";
+            Equal(true, Get<Button>(form, "execute").Enabled);
+            Invoke(form, "ExecuteGeneration");
+            Equal(1, form.GeneratedResult!.Settings.BaselineRecordIndex);
+            Equal(true, form.GeneratedResult.Records.All(row => row[2] == "beta" && row[3] == "20261002"));
+            Equal(false, Get<Button>(form, "cancel").CausesValidation);
+        });
         Test("Fixed whitespace limitations remain visible and switching to CSV enables the requested space case", () =>
         {
             using var form = NewGenerationForm(initialFieldIndex: 2, options: GenerationCsvOptions() with { Format = DataFileFormat.FixedLength });
             SetGenerationRequirements(form, GenerationRequirement.TextTrailingSpace);
             Equal(true, Get<TestDataGenerationPlan>(form, "plan").Issues.Any(issue => issue.FieldIndex == 2));
             Equal(true, Get<TextBox>(form, "issues").Text.Contains("説明"));
+            Equal(false, Get<Button>(form, "execute").Enabled);
+            Invoke(form, "ExecuteGeneration");
+            Equal<TestDataGenerationResult?>(null, form.GeneratedResult);
             Get<ComboBox>(form, "format").SelectedIndex = 1;
             Equal(true, Get<Button>(form, "execute").Enabled);
             Invoke(form, "ExecuteGeneration");
