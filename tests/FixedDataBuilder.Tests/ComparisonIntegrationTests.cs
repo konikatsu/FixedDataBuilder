@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using FixedDataBuilder;
 
@@ -40,6 +42,37 @@ internal static partial class Program
             var data = ComparisonDataSet.FromRecords([new("x", FieldDataType.Text, 8)], new[] { new[] { "x" } }, dataPath: path);
             Throws<InvalidDataException>(() => ComparisonEvidence.Write(path, data, data, new(0, 0), []));
             Equal("original", File.ReadAllText(path));
+        });
+        Test("Comparison snapshot records the successful definition read mode rather than the next-read menu", () =>
+        {
+            var definition = Path.Combine(temporaryDirectory, "comparison-applied-definition-mode.csv");
+            var data = Path.Combine(temporaryDirectory, "comparison-applied-definition-mode.dat");
+            const string definitionText = "項目名,定義\r\nNAME\u301c,X(4)\r\n";
+            File.WriteAllText(definition, definitionText, DefinitionFileText.ForEncoding(DefinitionTextEncoding.ShiftJis));
+            File.WriteAllText(data, "ABCD", Encoding.ASCII);
+            using var form = new MainForm(["--definition", definition, "--definition-encoding", "sjis",
+                "--data", data, "--separator", "none"]);
+            DefinitionTextEncoding SnapshotMode() => ((ComparisonDataSet)Invoke(form, "CreateComparisonOutputSnapshot")!).DefinitionEncoding;
+            Equal("NAME\u301c", Get<List<FieldDefinition>>(form, "fields")[0].Name);
+            Equal(DefinitionTextEncoding.ShiftJis, SnapshotMode());
+            Invoke(form, "SetDefinitionTextEncoding", DefinitionTextEncoding.Utf8);
+            Equal(DefinitionTextEncoding.ShiftJis, SnapshotMode());
+            Throws<TargetInvocationException>(() => Invoke(form, "ReloadDefinitionCore"));
+            Equal(DefinitionTextEncoding.ShiftJis, SnapshotMode());
+            Equal("ABCD", Get<List<List<string>>>(form, "records")[0][0]);
+
+            File.WriteAllText(definition, definitionText, new UTF8Encoding(false));
+            Equal(true, (bool)Invoke(form, "ReloadDefinitionCore")!);
+            Equal(DefinitionTextEncoding.Utf8, SnapshotMode());
+            Invoke(form, "SetDefinitionTextEncoding", DefinitionTextEncoding.Auto);
+            Equal(DefinitionTextEncoding.Utf8, SnapshotMode());
+            File.WriteAllText(data, "A", Encoding.ASCII);
+            Throws<TargetInvocationException>(() => Invoke(form, "ReloadCurrentFilesCore"));
+            Equal(DefinitionTextEncoding.Utf8, SnapshotMode());
+            Equal("ABCD", Get<List<List<string>>>(form, "records")[0][0]);
+            File.WriteAllText(data, "ABCD", Encoding.ASCII);
+            Invoke(form, "ReloadCurrentFilesCore");
+            Equal(DefinitionTextEncoding.Auto, SnapshotMode()); // Requested Auto, not an asserted detected codec.
         });
         Test("Published comparison samples preserve changed row order and unmatched keys", () =>
         {

@@ -254,7 +254,7 @@ public static class ComparisonSettingsStore
         public override void Write(ReadOnlySpan<byte> buffer)
         {
             if (buffer.Length > MaxFileBytes - written)
-                throw new InvalidDataException($"比較設定のファイルサイズが上限 {MaxFileBytes:N0} バイトを超えます。候補や式を絞り込んでください。");
+                throw new InvalidDataException($"比較設定のファイルサイズが上限 {MaxFileBytes:N0} バイトを超えます。行対応の件数や候補・式を減らしてください。");
             destination.Write(buffer);
             written += buffer.Length;
         }

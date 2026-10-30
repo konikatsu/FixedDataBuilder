@@ -989,7 +989,7 @@ public sealed partial class MainForm : Form
     {
         var definition = ReadDefinition(path, xmlLayoutId);
         if (definition is null) return false;
-        var (loadedFields, xmlLayout) = definition.Value;
+        var (loadedFields, xmlLayout, loadedDefinitionEncoding) = definition.Value;
         // 読み込み・選択が完了してから現在の定義を置き換える。
         currentDataFileFormat = DataFileFormat.FixedLength;
         currentCsvHasHeader = false;
@@ -998,15 +998,16 @@ public sealed partial class MainForm : Form
             : DataEncodingProfile.ShiftJis);
         if (xmlLayout is not null) currentSeparatorMode = xmlLayout.SeparatorMode;
         currentNationalTextEncoding = NationalTextEncoding.ShiftJis;
-        ApplyDefinition(path, loadedFields, xmlLayout);
+        ApplyDefinition(path, loadedFields, xmlLayout, loadedDefinitionEncoding);
         AddRecentFile(recentDefinitionFiles, path);
         UpdateSeparatorModeText();
         return true;
     }
 
-    private (IReadOnlyList<FieldDefinition> Fields, XmlLayoutDefinition? XmlLayout)? ReadDefinition(string path, string? xmlLayoutId)
+    private (IReadOnlyList<FieldDefinition> Fields, XmlLayoutDefinition? XmlLayout, DefinitionTextEncoding DefinitionEncoding)? ReadDefinition(string path, string? xmlLayoutId)
     {
         XmlLayoutDefinition? xmlLayout = null;
+        var loadedDefinitionEncoding = DefinitionTextEncoding.Auto;
         var fromCopybook = IsCopybookPath(path);
         IReadOnlyList<FieldDefinition> loadedFields;
         if (Path.GetExtension(path).Equals(".xml", StringComparison.OrdinalIgnoreCase))
@@ -1038,18 +1039,21 @@ public sealed partial class MainForm : Form
         }
         else
         {
-            loadedFields = fromCopybook ? CopybookDefinitionReader.Read(path, definitionTextEncoding)
-                : DefinitionCsvReader.Read(path, definitionTextEncoding);
+            loadedDefinitionEncoding = definitionTextEncoding;
+            loadedFields = fromCopybook ? CopybookDefinitionReader.Read(path, loadedDefinitionEncoding)
+                : DefinitionCsvReader.Read(path, loadedDefinitionEncoding);
         }
 
-        return (loadedFields, xmlLayout);
+        return (loadedFields, xmlLayout, loadedDefinitionEncoding);
     }
 
-    private void ApplyDefinition(string path, IReadOnlyList<FieldDefinition> loadedFields, XmlLayoutDefinition? xmlLayout)
+    private void ApplyDefinition(string path, IReadOnlyList<FieldDefinition> loadedFields, XmlLayoutDefinition? xmlLayout,
+        DefinitionTextEncoding loadedDefinitionEncoding)
     {
         currentXmlLayout = xmlLayout;
         fields.Clear();
         fields.AddRange(loadedFields);
+        appliedDefinitionTextEncoding = loadedDefinitionEncoding;
         hiddenFieldIndexes.Clear();
         SetPathText(definitionPathTextBox, path);
         xmlLayoutTextBox.Text = xmlLayout is null ? "—" : $"{xmlLayout.Name} [{xmlLayout.Id}] / {xmlLayout.RecordLength} バイト";
@@ -1110,7 +1114,7 @@ public sealed partial class MainForm : Form
             records.Clear();
         }
         var hidden = hasData ? hiddenFieldIndexes.ToArray() : [];
-        ApplyDefinition(path, loadedFields, definition.Value.XmlLayout);
+        ApplyDefinition(path, loadedFields, definition.Value.XmlLayout, definition.Value.DefinitionEncoding);
         hiddenFieldIndexes.UnionWith(hidden);
         NormalizeRecords();
         UpdateSeparatorModeText();
@@ -1177,7 +1181,7 @@ public sealed partial class MainForm : Form
         {
             var hidden = fields.Select(field => field with { Comment = "" })
                 .SequenceEqual(loadedFields.Select(field => field with { Comment = "" })) ? hiddenFieldIndexes.ToArray() : [];
-            ApplyDefinition(definitionPath!, loadedFields, definition.Value.XmlLayout);
+            ApplyDefinition(definitionPath!, loadedFields, definition.Value.XmlLayout, definition.Value.DefinitionEncoding);
             hiddenFieldIndexes.UnionWith(hidden);
         }
         records.Clear();
@@ -2226,6 +2230,7 @@ public sealed partial class MainForm : Form
         }
         fields.Clear();
         fields.AddRange(imported.Fields);
+        appliedDefinitionTextEncoding = DefinitionTextEncoding.Auto;
         hiddenFieldIndexes.Clear();
         records.Clear();
         records.AddRange(imported.Records.Select(record => record.ToList()));

@@ -3,6 +3,8 @@ namespace FixedDataBuilder;
 public sealed partial class MainForm
 {
     private DefinitionTextEncoding definitionTextEncoding = DefinitionTextEncoding.Auto;
+    // The menu selects the next read. This records the request used for the applied fields.
+    private DefinitionTextEncoding appliedDefinitionTextEncoding = DefinitionTextEncoding.Auto;
     private readonly Dictionary<DefinitionTextEncoding, ToolStripMenuItem> definitionEncodingItems = [];
 
     private ToolStripMenuItem BuildDefinitionEncodingMenu()

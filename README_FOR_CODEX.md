@@ -8,6 +8,10 @@
 - 通常GUIから式を組み立て、詳細JSONは補助。条件の元値と中間trace・期待値・出力値をread-only表示。入力参照のない式だけは行対応なしで独立評価する。保存設定のfingerprint不一致時は適用せず既存state保持。選択行の比較記録JSONは条件/trace/source指紋を記録し元data/定義の上書きを拒否。画像はmain一覧機能と区別。
 - 統合static reviewでInvalidDataExceptionのcatch漏れ、参照なし式と曖昧pairのUI/core/Evidence不一致を修正。新規読込の初期codecは既存Detectorの候補、ASCIIは元値保持、手動変更優先・Loadクリックで再推定しない。
 - ComparisonEngine20/RuleForm9/Form16/Integration4を追加。v73の263と合計312件、全件未実行。5つの架空sampleを追加（公開samples計45）。build/publish --no-build/静的検査/パッケージのみ許可。比較機能も版数付き依頼・結果で外部レビューし、指摘は実sourceで個別査定する。
+- reviews/comparison-mode-v0.1.74/review-v001に91ファイル封印の2CLI正式回答と個別査定を保存。pair未確定をOutputOnlyと偽分類しないUnconfirmedを追加し、選択inputと確定pairを別記録、候補/根拠/取得不可のUIとJSONを一致。CSV aliasをRecordsから直接読まずReadSource経由に。手動pair後のInputOnly残留を整理。key設定は変更前にpureValidateし失敗時現state保持。
+- 候補arrayをkey group単位でreadonly共有、候補総参照50万件を要素走査前に制限。Create/Saveは4MB制限付きstreamで割当を抑え、作成結果は子collectionもreadonly化。定義codec要求modeをdatasetへ保持、再読込復元/Overflow等error表示、CSVで不要な固定長offset制約を外し、emptyConcatの無変更再編集を維持。
+- 最終予定はEngine24/Rule10/Form21/Integration4/CSVAlias1=比較60件。v73最終265をmergeし合計325件、全件未実行。追加レビューは有用性で判断し、修正差分の最終確認はClaude highのみ予定。バイナリは利用者起動確認後だけ公開し、確認後は再ビルドしない。
+- review-v002はClaude high単独。92ファイルの封印差分を読ませ主要修正確認済み。残った読込時modeと次回メニュー設定の区別、4MB案内を修正し、内部点検の明示Ambiguous状態差も修正。review-v003は追加CLIなしの静的相互点検・差分/hashであり、Claudeが最終小変更まで確認したとは扱わない。MainFormの成功時appliedDefinitionTextEncodingをsnapshotへ渡し、失敗/メニュー変更だけでは更新しない。最終試験はEngine24/Rule10/Form22/Integration5/CSVAlias1=62＋生成265、合計327件、未実行。
 
 ## v0.1.73：正常な1行を複製するテストデータ生成（2026-10-30、作成中）
 

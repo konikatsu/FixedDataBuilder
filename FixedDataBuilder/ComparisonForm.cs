@@ -247,6 +247,8 @@ public sealed class ComparisonForm : Form
         else if (candidate)
             result = new(suggestion?.IsAmbiguous == true ? ComparisonResultStatus.Ambiguous : ComparisonResultStatus.FieldUnmapped,
                 null, actual, suggestion?.Candidates.Count > 0 ? "入力候補です。対応を編集して確定してください。" : "対応する入力・固定値・式が未設定です。");
+        else if (mapping?.Kind == ComparisonMappingKind.Ambiguous)
+            result = new(ComparisonResultStatus.Ambiguous, null, actual, "項目の対応が曖昧なため、確定するまで評価しません。");
         else if (HasNoInputReferences(mapping) && OutputIndex is int independentOutput)
         {
             result = ComparisonEngine.Compare(input, output, new(null, independentOutput, ComparisonPairKind.Unconfirmed), mapping!);

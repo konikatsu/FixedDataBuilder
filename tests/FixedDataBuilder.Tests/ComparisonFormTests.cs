@@ -453,6 +453,19 @@ internal static partial class Program
             Equal("CannotEvaluate", json.RootElement.GetProperty("results")[1].GetProperty("result").GetProperty("Status").GetString());
             Equal("算出不可", json.RootElement.GetProperty("results")[1].GetProperty("displayState").GetString());
         });
+        Test("Explicit ambiguous mapping stays ambiguous before row pairing in both UI and evidence", () =>
+        {
+            using var form = new ComparisonForm(ComparisonUiData(["A"], ["value"]));
+            Invoke(form, "SetInputDataSet", ComparisonUiData(["A"], ["value"]));
+            Invoke(form, "ApplyMapping", new ComparisonFieldMapping(0, ComparisonMappingKind.Ambiguous, [new(0)]));
+            Equal("曖昧・未確定", ComparisonCell(form, 0, "ComparisonState"));
+            var path = Path.Combine(temporaryDirectory, "comparison-explicit-ambiguous-evidence.json");
+            Invoke(form, "SaveEvidenceToPath", path);
+            using var json = JsonDocument.Parse(File.ReadAllBytes(path));
+            Equal("Ambiguous", json.RootElement.GetProperty("results")[0].GetProperty("result").GetProperty("Status").GetString());
+            Equal("value", json.RootElement.GetProperty("results")[0].GetProperty("result").GetProperty("OutputValue").GetString());
+            Equal("曖昧・未確定", json.RootElement.GetProperty("results")[0].GetProperty("displayState").GetString());
+        });
         Test("Manual comparison pairing removes the stale input-only classification", () =>
         {
             using var form = new ComparisonForm(ComparisonUiData(["ID"], ["X"], ["NEW"]));
