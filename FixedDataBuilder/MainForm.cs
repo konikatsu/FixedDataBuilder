@@ -578,7 +578,13 @@ public sealed partial class MainForm : Form
 
     private void ApplyDisplayWrapOptions(DisplayWrapOptions options)
     {
-        grid.EndEdit();
+        if (options.HeaderMinimumCharacters is < 1 or > 200)
+            throw new ArgumentOutOfRangeException(nameof(options), "列の最小幅は半角1〜200文字で指定してください。");
+        if (!grid.EndEdit())
+        {
+            wrapDisplayButton.Checked = displayWrapOptions.Enabled;
+            return;
+        }
         displayWrapOptions = options;
         wrapDisplayButton.Checked = options.Enabled;
         RefreshGridSizing();

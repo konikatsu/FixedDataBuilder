@@ -10,7 +10,8 @@ public sealed partial class MainForm
             currentSeparatorMode, currentDataEncodingProfile, currentNationalTextEncoding),
         GetCurrentDefinitionPath(), GetCurrentDataPath(), definitionEncoding: appliedDefinitionTextEncoding);
 
-    private VisualComparisonForm CreateVisualComparisonForm() => new(CreateComparisonOutputSnapshot(), displayFont);
+    private VisualComparisonForm CreateVisualComparisonForm() => new(CreateComparisonOutputSnapshot(), displayFont,
+        displayWrapOptions.HeaderMinimumCharacters);
 
     private void OpenComparison()
     {

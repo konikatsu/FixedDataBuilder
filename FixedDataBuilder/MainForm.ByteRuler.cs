@@ -94,7 +94,7 @@ public sealed partial class MainForm
             cell.Value = ByteRulerText.Format(length, slots);
             cell.ToolTipText = $"項目先頭=1 / {(IsCsv ? "読み込んだデータの最大" : "固定長の格納長")} {length} バイト。\r\n"
                 + (IsCsv ? $"文字コード: {JapaneseEncodings.Name(currentCsvEncoding)}。" : "型N・COMP-3は実際の格納バイト数です。")
-                + "文字の画面幅とは別の単位です。…は目盛りの続きがあることを示します。";
+                + "5バイトごとに数字と青い破線を表示します。文字の画面幅とは別の単位です。…は目盛りの続きがあることを示します。";
         }
         grid.Invalidate();
     }
@@ -142,7 +142,7 @@ public sealed partial class MainForm
         if (layout != GridLayout.RecordRows || recordRulerRowIndex < 0 || e.RowIndex < recordRulerRowIndex
             || e.ColumnIndex < 1 || e.Graphics is null || e.CellStyle is null) return;
         var field = FieldIndexFromRecordColumn(e.ColumnIndex);
-        if (!byteRulerLengths.TryGetValue(field, out var length) || length < 10) return;
+        if (!byteRulerLengths.TryGetValue(field, out var length) || length < 5) return;
         if (!e.Handled) { e.Paint(e.ClipBounds, e.PaintParts); e.Handled = true; }
         var width = ByteRulerDigitWidth();
         var left = e.CellBounds.Left + e.CellStyle.Padding.Left + 4;

@@ -8,7 +8,7 @@ public static class ByteRulerText
     {
         if (byteLength < 0) throw new ArgumentOutOfRangeException(nameof(byteLength));
         var end = Math.Min(byteLength, Math.Clamp(visiblePositions, 0, 2048));
-        for (var position = 10; position <= end; position += 10) yield return position;
+        for (var position = 5; position <= end; position += 5) yield return position;
     }
 
     // Bound output by the current column width, even for a huge defined byte length.
@@ -22,7 +22,7 @@ public static class ByteRulerText
         var tens = new string(' ', count).ToCharArray();
         var units = new char[count];
         for (var index = 0; index < count; index++) units[index] = (char)('0' + (index + 1) % 10);
-        for (var position = 10; position <= count; position += 10)
+        for (var position = 5; position <= count; position += 5)
         {
             var label = position.ToString(CultureInfo.InvariantCulture);
             label.CopyTo(0, tens, position - label.Length, label.Length);

@@ -4,7 +4,7 @@ using System.Text;
 namespace FixedDataBuilder;
 
 public sealed record DisplayWrapOptions(bool Enabled = false, int ThresholdBytes = 20, int LineBytes = 20,
-    bool LimitDisplay = false, int MaxCharacters = 100);
+    bool LimitDisplay = false, int MaxCharacters = 100, int HeaderMinimumCharacters = 10);
 
 public sealed class DisplayWrapOptionsForm : Form
 {
@@ -13,29 +13,37 @@ public sealed class DisplayWrapOptionsForm : Form
     private readonly NumericUpDown width = new() { Name = "WrapLineBytes", Minimum = 1, Maximum = 1000000, Location = new Point(330, 100), Width = 120 };
     private readonly CheckBox limit = new() { Name = "LimitDisplay", Text = "表示する文字数に上限を設定", AutoSize = true, Location = new Point(20, 143) };
     private readonly NumericUpDown maxCharacters = new() { Name = "MaxDisplayCharacters", Minimum = 1, Maximum = 1000000, Width = 120, Location = new Point(330, 180) };
-    public DisplayWrapOptions Options => new(enabled.Checked, (int)threshold.Value, (int)width.Value, limit.Checked, (int)maxCharacters.Value);
+    private readonly NumericUpDown headerMinimumCharacters = new() { Name = "HeaderMinimumCharacters", Minimum = 1, Maximum = 200, Width = 120, Location = new Point(330, 228) };
+    public DisplayWrapOptions Options => new(enabled.Checked, (int)threshold.Value, (int)width.Value, limit.Checked, (int)maxCharacters.Value, (int)headerMinimumCharacters.Value);
     public DisplayWrapOptionsForm(DisplayWrapOptions current)
     {
         Text = "折り返し表示設定";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox = MaximizeBox = false;
-        ClientSize = new Size(550, 380);
+        ClientSize = new Size(550, 470);
         enabled.Checked = current.Enabled;
         threshold.Value = Math.Clamp(current.ThresholdBytes, 1, 1000000);
         width.Value = Math.Clamp(current.LineBytes, 1, 1000000);
         limit.Checked = current.LimitDisplay;
         maxCharacters.Value = Math.Clamp(current.MaxCharacters, 1, 1000000);
+        headerMinimumCharacters.Value = Math.Clamp(current.HeaderMinimumCharacters, 1, 200);
         var maxLabel = new Label { Text = "表示する最大文字数", AutoSize = true, Location = new Point(20, 184) };
         var target = new Label { Text = "折り返す対象の長さ（バイト以上）", AutoSize = true, Location = new Point(20, 64) };
         var line = new Label { Text = "1行の長さ（バイト）", AutoSize = true, Location = new Point(20, 104) };
+        var headerMinimumLabel = new Label { Text = "列の最小幅（半角文字数）", AutoSize = true, Location = new Point(20, 232) };
+        var headerHelp = new Label
+        {
+            Text = "項目名の折り返しに使う幅です。10は全角で約5文字分。\r\nデータが長い列は広がります。折り返し表示がオフでも設定できます。\r\n比較画面には、次に開くときに引き継ぎます。",
+            Location = new Point(20, 266), Size = new Size(510, 54)
+        };
         var help = new Label
         {
             Text = "例：20バイト以上を20バイトごとに折り返す。\r\n文字数の上限を超えた部分は画面だけ省略し、末尾に…を表示。\r\n日本語・絵文字などの文字の途中では分割しません。\r\n行高は自動調整します。保存・Excel出力・HEXは元の値です。",
-            Location = new Point(20, 228), Size = new Size(510, 76)
+            Location = new Point(20, 334), Size = new Size(510, 76)
         };
-        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(350, 333), Width = 80 };
-        var cancel = new Button { Text = "キャンセル", DialogResult = DialogResult.Cancel, Location = new Point(445, 333), Width = 85 };
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(350, 423), Width = 80 };
+        var cancel = new Button { Text = "キャンセル", DialogResult = DialogResult.Cancel, Location = new Point(445, 423), Width = 85 };
         void UpdateEnabled()
         {
             threshold.Enabled = width.Enabled = target.Enabled = line.Enabled = limit.Enabled = enabled.Checked;
@@ -43,7 +51,8 @@ public sealed class DisplayWrapOptionsForm : Form
         }
         enabled.CheckedChanged += (_, _) => UpdateEnabled();
         limit.CheckedChanged += (_, _) => UpdateEnabled();
-        Controls.AddRange([enabled, target, threshold, line, width, limit, maxLabel, maxCharacters, help, ok, cancel]);
+        Controls.AddRange([enabled, target, threshold, line, width, limit, maxLabel, maxCharacters,
+            headerMinimumLabel, headerMinimumCharacters, headerHelp, help, ok, cancel]);
         AcceptButton = ok;
         CancelButton = cancel;
         UpdateEnabled();

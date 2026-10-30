@@ -126,12 +126,12 @@ internal static partial class Program
             Equal("error", manifest.RootElement.GetProperty("status").GetString());
             Equal(0, manifest.RootElement.GetProperty("saved_images").GetInt32());
         });
-        Test("Ten-byte guides extend into data cells and ruler text is muted", () =>
+        Test("Five-byte guides extend into data cells and ruler text is muted", () =>
         {
-            Equal("10,20", string.Join(',', ByteRulerText.GuidePositions(22, 100)));
-            Equal("10", string.Join(',', ByteRulerText.GuidePositions(100, 19)));
-            Equal(0, ByteRulerText.GuidePositions(9, 100).Count());
-            Equal(204, ByteRulerText.GuidePositions(int.MaxValue, int.MaxValue).Count());
+            Equal("5,10,15,20", string.Join(',', ByteRulerText.GuidePositions(22, 100)));
+            Equal("5,10,15", string.Join(',', ByteRulerText.GuidePositions(100, 19)));
+            Equal(0, ByteRulerText.GuidePositions(4, 100).Count());
+            Equal(409, ByteRulerText.GuidePositions(int.MaxValue, int.MaxValue).Count());
             using var form = CreateCellDisplayForm(true);
             Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
             var grid = Get<DataGridView>(form, "grid");
@@ -144,7 +144,7 @@ internal static partial class Program
                 graphics.Clear(Color.White);
                 Invoke(form, "PaintGridCaptureCell", graphics, 1, start, new Rectangle(0, 0, 300, 70), new Rectangle(0, 0, 300, 70));
             }
-            var x = 4 + (int)Math.Round(10 * (float)Invoke(form, "ByteRulerDigitWidth")!);
+            var x = 4 + (int)Math.Round(5 * (float)Invoke(form, "ByteRulerDigitWidth")!);
             Equal(true, Enumerable.Range(2, 65).Any(y => { var color = bitmap.GetPixel(x, y); return color.B > color.R + 30 && color.B > color.G + 10; }));
             Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
             using var plain = new Bitmap(300, 70);

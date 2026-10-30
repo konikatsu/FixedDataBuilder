@@ -17,7 +17,8 @@ public sealed partial class MainForm
     private void UpdateRecordColumnMinimumWidths()
     {
         if (layout != GridLayout.RecordRows || isSingleRecordView) return;
-        var minimum = TextRenderer.MeasureText("0123456789", grid.Font, Size.Empty, RecordNameTextFlags).Width + 10;
+        var minimum = TextRenderer.MeasureText(new string('0', displayWrapOptions.HeaderMinimumCharacters),
+            grid.Font, Size.Empty, RecordNameTextFlags).Width + 10;
         for (var column = 1; column < grid.Columns.Count; column++) grid.Columns[column].MinimumWidth = minimum;
     }
 

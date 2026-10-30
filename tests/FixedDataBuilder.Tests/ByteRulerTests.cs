@@ -4,10 +4,12 @@ internal static partial class Program
 {
     private static void RunByteRulerTests(string repo)
     {
-        Test("Byte ruler shows relative byte positions, decimal labels and bounded continuation", () =>
+        Test("Byte ruler shows relative byte positions, five-byte labels and bounded continuation", () =>
         {
             var lines = ByteRulerText.Format(22, 22).Split('\n');
+            Equal('5', lines[0][4]);
             Equal("10", lines[0].Substring(8, 2));
+            Equal("15", lines[0].Substring(13, 2));
             Equal("20", lines[0].Substring(18, 2));
             Equal("1234567890123456789012", lines[1]);
             Equal(true, ByteRulerText.Format(100, 100).Split('\n')[0].EndsWith("100"));

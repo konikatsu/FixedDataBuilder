@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.76：比較画面のバイト目盛りと列最小幅（2026-10-30、起動確認待ち）
+
+- 利用者が比較モードのバイト目盛りを表示/非表示にしたいと依頼。入力/出力の各一覧へ「バイト目盛り」チェックを追加し初期値ON、独立切替、metadata末尾に目盛り行。表示変更でも同じrecord/fieldの選択・scroll・列幅・各record行高・片側の状態を保持し、上下入替で各paneに設定が残る。TableLayoutPanel/PanelのままSplitContainerは使わない。
+- 利用者の追加依頼で通常/比較の共通ByteRulerTextの数字と青い縦破線を5/10/15…へ変更。各項目先頭1、下段は1byteごと。固定長はPhysicalByteLength(N/packedの格納長)、CSVは選択codecの全record論理値最大byte数をfield単位に遅延cacheし、dataset更新で破棄。CSV alias/計測errorは明示し値を書き換えない。淡いgrayの目盛りとdata行までのguides、実glyph幅・折返し位置とbyte単位を同一視しない。
+- さらに見出しの最小折返し幅（従来半角10≒全角5文字）を調整したいと依頼。「表示→折り返し表示設定...」へ独立した「列の最小幅（半角文字数）」1〜200/初期10を追加、datawrapがOFFでも有効。Main横表示のMinimumWidth/項目名行高を再計算し、新しい比較画面へ引き継ぐ。比較の項目名/comment行高は列幅に合わせる。値は今回の起動中の設定、既存wrap設定同様に永続化は追加しない。元データ/保存/Excel/HEXは変更しない。
+- 基点407748f（v75/main）をfetch確認しcodex/comparison-byte-ruler-v0.1.76を新worktreeで実装。製品/test/helperは利用者が実行する方針を継続しassistantはbuild/publish --no-build/静的確認/packageのみ。v75確認済み製品/ZIPは保持し、main/release/GitHub Releaseはv75のまま、v76具体EXEの利用者起動OKを得た同一binaryだけ公開する。新しい画像は未撮影。
+- 新規比較ruler9件、見出し設定5件、既存ruler/画像の期待値を5単位へ変更。計351件、全件未実行。証拠reviews/comparison-byte-ruler-v0.1.76/v001。公開後は最新3版v76/v75/v74を保持しv73 Releaseだけmetadata/実ZIP保管とsize/SHA検証後に整理、tag/history/localは保持。
+- build-v001は--no-incremental/警告0/エラー0、publish --no-build。v76軽量版ZIP374868バイト/50項目、SHA256=F8AE13AB1616CAF381E69F2015A993816EE2AEF60C9C8F8BBE323419EAA1E241、DLL=9AE31BBB50C2A704A6394836F33B5C68617167FD6408BCF8D2C3D929E9F18AA1。製品test内DLL同一、v75確認済みartifact/公開release不変。source manifestはbuild後/package時に採取し全source mtime<=compiled DLLを検証（build前後hash比較とは表現しない）。Test呼出353中2件は外部file引数付きintegration専用のため通常対象351、未実行。通常候補EXEはC:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.76-win-x64-framework-dependent/FixedDataBuilder.exe。利用者のこの版の起動OKを待ち、確認後に再ビルドせず公開する。
+
 ## v0.1.75：上下2つのレコード一覧（2026-10-30、利用者起動確認後の公開）
 
 - 初回候補v001は利用者が起動未確認の後「ブロックされた、再作成して」と報告。製品コード全体にSplitContainer参照なし、上下はTableLayoutPanel/Panel。18:28:49 JSTのCodeIntegrity 3077/Record5496は同梱DLLをVerifiedAndReputableDesktopで拒否し、SHA256 Flat Hashがv001のD041CFC8…と一致する。関連3089は署名0/Unknown。これを特定UI部品・命令が禁止された証拠とは扱わない。

@@ -4,7 +4,7 @@ using System.Text;
 namespace FixedDataBuilder;
 
 /// <summary>Two independent record lists for human inspection. No mapping or verdict is applied.</summary>
-public sealed class VisualComparisonForm : Form
+public sealed partial class VisualComparisonForm : Form
 {
     private readonly TableLayoutPanel lists = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
     private readonly RecordListPane inputPane;
@@ -12,16 +12,17 @@ public sealed class VisualComparisonForm : Form
     private readonly Button swapButton = new() { Name = "SwapRecordLists", Text = "入力・出力の上下を入れ替え", AutoSize = true };
     private bool inputOnTop = true;
 
-    public VisualComparisonForm(ComparisonDataSet output, Font? dataFont = null)
+    public VisualComparisonForm(ComparisonDataSet output, Font? dataFont = null, int minimumHeaderCharacters = 10)
     {
         ArgumentNullException.ThrowIfNull(output);
+        if (minimumHeaderCharacters is < 1 or > 200) throw new ArgumentOutOfRangeException(nameof(minimumHeaderCharacters));
         Text = "入力・出力を並べて表示（目視確認）";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1400, 920);
         MinimumSize = new Size(900, 650);
         AutoScaleMode = AutoScaleMode.Font;
-        inputPane = new RecordListPane("入力", dataFont);
-        outputPane = new RecordListPane("出力", dataFont);
+        inputPane = new RecordListPane("入力", dataFont, minimumHeaderCharacters);
+        outputPane = new RecordListPane("出力", dataFont, minimumHeaderCharacters);
         inputPane.OpenRequested += (_, _) => OpenSide(inputPane);
         outputPane.OpenRequested += (_, _) => OpenSide(outputPane);
         var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(8) };
@@ -71,7 +72,7 @@ public sealed class VisualComparisonForm : Form
     }
 
     /// <summary>The original snapshots, selections, and scroll positions belong to each pane.</summary>
-    private sealed class RecordListPane : UserControl
+    private sealed partial class RecordListPane : UserControl
     {
         private readonly DataGridView grid = new()
         {
@@ -92,6 +93,7 @@ public sealed class VisualComparisonForm : Form
         private readonly TextBox selectedValue = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, WordWrap = false, ScrollBars = ScrollBars.Both };
         private readonly ToolTip hints = new();
         private readonly Font ownedFont;
+        private readonly int minimumHeaderCharacters;
         private int metadataRows;
         private int positionRow = -1;
         private int commentRow = -1;
@@ -100,9 +102,10 @@ public sealed class VisualComparisonForm : Form
         public ComparisonDataSet? DataSet { get; private set; }
         public event EventHandler? OpenRequested;
 
-        public RecordListPane(string side, Font? dataFont)
+        public RecordListPane(string side, Font? dataFont, int minimumHeaderCharacters)
         {
             Side = side;
+            this.minimumHeaderCharacters = minimumHeaderCharacters;
             Name = side == "入力" ? "InputRecordPane" : "OutputRecordPane";
             Dock = DockStyle.Fill;
             Margin = Padding.Empty;
@@ -125,7 +128,7 @@ public sealed class VisualComparisonForm : Form
             var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
             var open = new Button { Name = side == "入力" ? "OpenInputRecords" : "OpenOutputRecords", Text = side + "を開く…", AutoSize = true };
             open.Click += (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty);
-            actions.Controls.AddRange([title, open, new Label { Text = "行", AutoSize = true, Margin = new Padding(12, 8, 3, 0) }, jumpNumber, jumpButton, showSpaces]);
+            actions.Controls.AddRange([title, open, new Label { Text = "行", AutoSize = true, Margin = new Padding(12, 8, 3, 0) }, jumpNumber, jumpButton, showSpaces, showByteRuler]);
             var display = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             display.Controls.Add(grid);
             display.Controls.Add(empty);
@@ -142,6 +145,9 @@ public sealed class VisualComparisonForm : Form
             grid.SizeChanged += (_, _) => { if (!rebuilding) UpdateHeaderPinning(); };
             jumpButton.Click += (_, _) => JumpToRecord();
             showSpaces.CheckedChanged += (_, _) => { grid.Invalidate(); UpdateSelection(); };
+            showByteRuler.CheckedChanged += (_, _) => ChangeByteRulerVisibility();
+            grid.CellPainting += PaintByteRulerAndGuides;
+            grid.ColumnWidthChanged += (_, _) => { if (!rebuilding) { AdjustMetadataRowHeights(); grid.Invalidate(); } };
             RefreshGrid();
         }
 
@@ -162,7 +168,9 @@ public sealed class VisualComparisonForm : Form
                 grid.RowCount = 0;
                 grid.Columns.Clear();
                 metadataRows = 0;
-                positionRow = commentRow = -1;
+                positionRow = commentRow = rulerRow = -1;
+                byteRulerLengths.Clear();
+                byteRulerErrors.Clear();
                 var data = DataSet;
                 title.Text = $"{Side}レコード一覧　{data?.Records.Count ?? 0:N0}件";
                 empty.Text = $"「{Side}を開く…」から、定義ファイルとデータを選んでください。";
@@ -184,8 +192,10 @@ public sealed class VisualComparisonForm : Form
                 metadataRows = 2;
                 if (data.Profile.Format == DataFileFormat.FixedLength) positionRow = metadataRows++;
                 if (data.Fields.Any(field => !string.IsNullOrEmpty(field.Comment))) commentRow = metadataRows++;
-                grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "RecordNumber", HeaderText = "行", Width = 72, Frozen = true, ReadOnly = true, FillWeight = 1, SortMode = DataGridViewColumnSortMode.NotSortable });
-                var minimumWidth = Math.Max(96, TextRenderer.MeasureText("0000000000", ownedFont, Size.Empty, TextFormatFlags.NoPadding).Width + 12);
+                if (showByteRuler.Checked) rulerRow = metadataRows++;
+                var rowLabelWidth = Math.Max(72, TextRenderer.MeasureText("バイト目盛り", ownedFont, Size.Empty, TextFormatFlags.NoPadding).Width + 12);
+                grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "RecordNumber", HeaderText = "行", Width = rowLabelWidth, Frozen = true, ReadOnly = true, FillWeight = 1, SortMode = DataGridViewColumnSortMode.NotSortable });
+                var minimumWidth = TextRenderer.MeasureText(new string('0', minimumHeaderCharacters), ownedFont, Size.Empty, TextFormatFlags.NoPadding).Width + 12;
                 for (var index = 0; index < data.Fields.Count; index++)
                 {
                     var field = data.Fields[index];
@@ -205,6 +215,8 @@ public sealed class VisualComparisonForm : Form
                 {
                     grid.Rows[row].Height = row == 0 || row == commentRow ? Math.Max(38, ownedFont.Height * 2 + 6) : ownedFont.Height + 8;
                 }
+                if (rulerRow >= 0) grid.Rows[rulerRow].Height = ownedFont.Height * 2 + 8;
+                AdjustMetadataRowHeights();
                 UpdateHeaderPinning();
                 if (data.Records.Count > 0 && data.Fields.Count > 0) grid.CurrentCell = grid[1, metadataRows];
             }
@@ -219,6 +231,7 @@ public sealed class VisualComparisonForm : Form
                 || row >= metadataRows + data.Records.Count) return null;
             if (row < metadataRows)
             {
+                if (row == rulerRow) return column == 0 ? "バイト目盛り" : ByteRulerValue(column - 1);
                 if (column == 0) return row == 0 ? "項目名" : row == 1 ? "型" : row == positionRow ? "位置" : "コメント";
                 var field = data.Fields[column - 1];
                 if (row == 0) return field.Name;
@@ -269,6 +282,13 @@ public sealed class VisualComparisonForm : Form
             if (e.RowIndex < 0) return;
             if (e.CellStyle is not { } style) return;
             style.Alignment = DataGridViewContentAlignment.TopLeft;
+            if (e.RowIndex == rulerRow)
+            {
+                style.BackColor = style.SelectionBackColor = Color.FromArgb(242, 245, 248);
+                style.ForeColor = style.SelectionForeColor = Color.FromArgb(125, 132, 142);
+                style.WrapMode = DataGridViewTriState.False;
+                return;
+            }
             if (e.RowIndex < metadataRows)
             {
                 style.BackColor = e.RowIndex == commentRow ? Color.FromArgb(226, 242, 252) : Color.FromArgb(226, 242, 226);
@@ -282,6 +302,7 @@ public sealed class VisualComparisonForm : Form
             if (DataSet is not { } data || column < 1 || column > data.Fields.Count || row < 0
                 || row >= metadataRows + data.Records.Count) return "";
             var field = data.Fields[column - 1];
+            if (row == rulerRow) return ByteRulerToolTip(column - 1);
             if (row < metadataRows) return $"{field.Name} / {field.DisplayDefinition}\r\n{field.Comment}";
             return data.Records[row - metadataRows][column - 1];
         }
