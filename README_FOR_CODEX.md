@@ -2,6 +2,8 @@
 
 ## v0.1.75：上下2つのレコード一覧（2026-10-30、起動確認待ち）
 
+- 初回候補v001は利用者が起動未確認の後「ブロックされた、再作成して」と報告。製品コード全体にSplitContainer参照なし、上下はTableLayoutPanel/Panel。18:28:49 JSTのCodeIntegrity 3077/Record5496は同梱DLLをVerifiedAndReputableDesktopで拒否し、SHA256 Flat Hashがv001のD041CFC8…と一致する。関連3089は署名0/Unknown。これを特定UI部品・命令が禁止された証拠とは扱わない。
+- 利用者依頼で同一製品ソースをv002の独立artifactsへ--no-incrementalビルド、警告0/エラー0、publish --no-build。旧v001と公開v74は保全。再作成候補はC:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.75-rebuild-v002-win-x64-framework-dependent、ZIP370167バイト/50項目、SHA256=AE675143DD02AB4E18837EA8080F92BCA0DCA6EF7EDF33E19850690120848E0F。EXEはv001と同一、DLLはC0A4FBFCF401C0EE2B8C5E75969C35A8B4101AC12A5F70CCDD4C9F7100B6F53Aへ変化。ソース変更なし、ブロック解消とは未確認。製品・テスト337件はassistant未実行、利用者がこのv002を確認するまでmain/Releaseはv74を維持。証拠reviews/visual-comparison-v0.1.75/v002。
 - 利用者が「比較は目視。入力と出力を並べたい」「上段が入力レコード一覧、下段が出力レコード一覧、それぞれスクロールと上下入替」「マッピング不要」と明確化。以前のルール画面へ進ませる仕様を改め、MainFormの入口をVisualComparisonFormへ変更する。ボタン/ツールメニューは「入力・出力を並べて表示...」。
 - 基点3fa1924（v74/main）をfetchで確認しcodex/visual-comparison-v0.1.75で実装。入力/出力は独立したreadonly VirtualMode DataGridView。全件の行を保持し各定義の項目をカラムへ表示、metadata行固定、各側で縦横scroll・行ジャンプ・選択内容/空白数。上下入替は同じpaneを移しviewportを復元、データの役割を交換しない。SplitContainerは使わない。
 - 既存の独立dataset/読込dialogを再利用、候補/マッピング/行対応/期待値/一致判定のUIを新画面に出さない。元fileとMainFormのdirty/recordを変更しない。固定長は原本保持時の文字格納空白を可視化、snapshotは従来の論理値と補完表示。CSV aliasは物理列なしを明示。UTF8定義をMS932指定した画像のエラーは公開sampleでも先頭byte E9 A0 85 E7からindex2の85 E7と確認、読込errorへ定義/data/filename/指定codecを付記する。
