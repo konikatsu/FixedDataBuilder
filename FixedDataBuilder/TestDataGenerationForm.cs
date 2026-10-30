@@ -264,10 +264,12 @@ public sealed class TestDataGenerationForm : Form
         {
             // Empty/partial/out-of-range text remains editable. Do not read Value here:
             // its getter may commit or clamp the unfinished edit before it is valid.
-            if (!decimal.TryParse(control.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var value)
-                || decimal.Truncate(value) != value || value < control.Minimum || value > control.Maximum)
+            if (!control.HasValidIntegerText())
             {
                 execute.Enabled = false;
+                plan = null;
+                countSummary.Text = "条件入力中：必要な行数・合計は未計算です。";
+                issues.Text = "数値を入力し終えると、現在の条件で再計算します。";
                 generationError.Text = $"{name}は {control.Minimum:0}～{control.Maximum:0} の整数で指定してください。";
                 return false;
             }
@@ -360,6 +362,32 @@ public sealed class TestDataGenerationForm : Form
 
     private sealed class CommittingNumericUpDown : NumericUpDown
     {
+        public bool HasValidIntegerText() =>
+            decimal.TryParse(Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var value)
+            && decimal.Truncate(value) == value && value >= Minimum && value <= Maximum;
+
+        protected override void ValidateEditText()
+        {
+            if (HasValidIntegerText()) base.ValidateEditText();
+        }
+
+        protected override void UpdateEditText()
+        {
+            // NumericUpDown.OnLostFocus calls this directly, bypassing ValidateEditText.
+            if (UserEdit && !HasValidIntegerText()) return;
+            base.UpdateEditText();
+        }
+
+        public override void UpButton()
+        {
+            if (HasValidIntegerText()) base.UpButton();
+        }
+
+        public override void DownButton()
+        {
+            if (HasValidIntegerText()) base.DownButton();
+        }
+
         public void CommitEditText() => ValidateEditText();
     }
 }

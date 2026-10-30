@@ -61,8 +61,7 @@ public sealed partial class MainForm
             currentCsvHasHeader = options.Format == DataFileFormat.Csv && options.CsvHasHeader;
             currentSeparatorMode = options.SeparatorMode;
             currentDataEncodingProfile = options.TextEncoding ?? currentDataEncodingProfile;
-            if (options.Format == DataFileFormat.FixedLength) ApplyNationalTextEncoding(options.NationalEncoding);
-            else currentNationalTextEncoding = options.NationalEncoding;
+            ApplyNationalTextEncoding(options.NationalEncoding);
             records.Clear();
             records.AddRange(newRecords);
             // Generated data is a new document. Saving must never overwrite its baseline file implicitly.
@@ -173,7 +172,8 @@ public sealed partial class MainForm
     {
         try
         {
-            if (!grid.EndEdit() || !HasCurrentGenerationReport()) return;
+            if (!grid.EndEdit()) return;
+            if (!HasCurrentGenerationReport()) throw new InvalidDataException("現在のデータに対応する生成条件がありません。再生成してください。");
             using var dialog = new SaveFileDialog
             {
                 Title = "生成条件・行と項目の対応表を保存", Filter = "生成条件 JSON (*.json)|*.json",

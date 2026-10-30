@@ -108,6 +108,22 @@ internal static partial class Program
             Equal("generated_not_processed", json.RootElement.GetProperty("status").GetString());
             Equal(4L, new FileInfo(path).Length);
         });
+        Test("CSV generation keeps the selected N width consistent for definition-only reload", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "generation-n-reload-definition.csv");
+            DefinitionCsvWriter.Write(path, [new("N", "N(2)")]);
+            using var form = new MainForm(["--definition", path]);
+            Invoke(form, "ApplyNationalTextEncoding", NationalTextEncoding.Utf32);
+            var fields = Get<List<FieldDefinition>>(form, "fields");
+            var options = new DataSaveOptions(DataFileFormat.Csv, CsvTextEncoding.Utf8,
+                RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis, DataEncodingProfile.ShiftJis);
+            var result = TestDataGenerator.Generate(fields, ["漢字"], new(0, [0], GenerationRequirement.TextMaximum, 1, options));
+            Invoke(form, "ApplyGeneratedTestData", result);
+            Equal(2, fields[0].NationalByteWidth);
+            Equal(true, (bool)Invoke(form, "ReloadDefinitionCore")!);
+            Equal(true, (bool)Invoke(form, "HasCurrentGenerationReport")!);
+            Equal("漢漢", Get<List<List<string>>>(form, "records")[0][0]);
+        });
         Test("Generation supports more than 653 records in the field-rows grid", () =>
         {
             using var form = new MainForm();
