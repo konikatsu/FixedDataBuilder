@@ -155,6 +155,45 @@ internal static partial class Program
             Equal(true, form.GeneratedResult.Records.All(row => row[2] == "beta" && row[3] == "20261002"));
             Equal(false, Get<Button>(form, "cancel").CausesValidation);
         });
+        Test("Pending numeric text survives base validation paths without clamping or generating", () =>
+        {
+            using var form = NewGenerationForm();
+            var count = Get<NumericUpDown>(form, "normalCount");
+            var baseline = Get<NumericUpDown>(form, "baselineRecord");
+            foreach (var (control, text, previousValue) in new[]
+            {
+                (count, "100001", 4m), (count, "0", 4m),
+                (baseline, "3", 1m), (baseline, "", 1m)
+            })
+            {
+                control.Text = text;
+                Equal(text, control.Text); // UpDownBase.Text setter must not clamp after TextChanged.
+                Invoke(control, "OnTextBoxLostFocus", null, EventArgs.Empty);
+                Invoke(control, "OnLostFocus", EventArgs.Empty); // NumericUpDown calls UpdateEditText directly.
+                form.ValidateChildren();
+                Equal(previousValue, control.Value); // Value getter must leave the pending text intact too.
+                control.UpButton();
+                control.DownButton();
+                Equal(text, control.Text);
+                Equal(false, Get<Button>(form, "execute").Enabled);
+                Equal<TestDataGenerationPlan?>(null, Get<TestDataGenerationPlan?>(form, "plan"));
+                Equal(true, Get<Label>(form, "countSummary").Text.Contains("未計算"));
+                Invoke(form, "ExecuteGeneration");
+                Equal<TestDataGenerationResult?>(null, form.GeneratedResult);
+                Equal(DialogResult.None, form.DialogResult);
+                control.Text = previousValue.ToString(System.Globalization.CultureInfo.CurrentCulture);
+                Equal(true, Get<Button>(form, "execute").Enabled);
+            }
+            count.UpButton();
+            Equal(5m, count.Value);
+            count.DownButton();
+            Equal(4m, count.Value);
+            baseline.UpButton();
+            Equal(2m, baseline.Value);
+            Invoke(form, "ExecuteGeneration");
+            Equal(1, form.GeneratedResult!.Settings.BaselineRecordIndex);
+            Equal(4, form.GeneratedResult.Settings.NormalRecordCount);
+        });
         Test("Fixed whitespace limitations remain visible and switching to CSV enables the requested space case", () =>
         {
             using var form = NewGenerationForm(initialFieldIndex: 2, options: GenerationCsvOptions() with { Format = DataFileFormat.FixedLength });
