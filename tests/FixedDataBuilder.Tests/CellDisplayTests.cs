@@ -36,7 +36,8 @@ internal static partial class Program
                     Equal(DataGridViewContentAlignment.MiddleLeft, column.HeaderCell.InheritedStyle.Alignment);
                 foreach (DataGridViewRow row in grid.Rows)
                 foreach (DataGridViewCell cell in row.Cells)
-                    Equal(DataGridViewContentAlignment.MiddleLeft, cell.InheritedStyle.Alignment);
+                    Equal(recordRows && row.Index == 0 ? DataGridViewContentAlignment.TopLeft : DataGridViewContentAlignment.MiddleLeft,
+                        cell.InheritedStyle.Alignment);
                 if (recordRows)
                 {
                     Equal("カラム番号", grid.Columns[0].HeaderText);
@@ -57,7 +58,7 @@ internal static partial class Program
                 }
             }
         });
-        Test("Columns fit loaded data and complete headings in both layouts", () =>
+        Test("Columns fit loaded data and metadata while horizontal names may wrap", () =>
         {
             foreach (var recordRows in new[] { false, true })
             {
@@ -65,7 +66,11 @@ internal static partial class Program
                 if (recordRows) Get<ToolStripMenuItem>(form, "recordRowsButton").PerformClick();
                 var grid = Get<DataGridView>(form, "grid");
                 foreach (DataGridViewColumn column in grid.Columns)
-                    Equal(true, column.Width >= column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false));
+                {
+                    if (!recordRows) Equal(true, column.Width >= column.GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, false));
+                    else foreach (DataGridViewRow row in grid.Rows)
+                        if (row.Index > 0) Equal(true, column.Width >= row.Cells[column.Index].PreferredSize.Width);
+                }
                 if (recordRows)
                 {
                     var headerWidth = TextRenderer.MeasureText(grid.Columns[0].HeaderText, grid.ColumnHeadersDefaultCellStyle.Font,

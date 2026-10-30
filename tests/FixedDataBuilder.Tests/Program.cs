@@ -319,6 +319,8 @@ internal static partial class Program
             RunExcelHorizontalExportTests(repo);
             RunByteRulerTests(repo);
             RunGridCaptureTests(repo);
+            RunImageClipboardTests(repo);
+            RunRecordNameWrappingTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

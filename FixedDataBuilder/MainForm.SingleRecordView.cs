@@ -31,7 +31,8 @@ public sealed partial class MainForm
             Name = "ViewModePanel", Dock = DockStyle.Top, AutoSize = true,
             WrapContents = false, Padding = new Padding(8, 2, 8, 2)
         };
-        panel.Controls.AddRange([listViewButton, singleViewButton, singleRecordNavigator]);
+        panel.Controls.AddRange([listViewButton, singleViewButton, singleRecordNavigator, copyAllGridImageButton]);
+        copyAllGridImageButton.Click += (_, _) => CopyAllGridImage();
         singleRecordNavigator.Controls.AddRange([previousRecordButton,
             new Label { Text = "行", AutoSize = true, Margin = new Padding(5, 7, 3, 0) },
             singleRecordNumber, singleRecordCountLabel, nextRecordButton]);

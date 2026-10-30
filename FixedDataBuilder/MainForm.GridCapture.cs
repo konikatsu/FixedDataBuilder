@@ -15,7 +15,7 @@ public sealed partial class MainForm
         public int Count => checked(Columns.Count * Rows.Count);
     }
 
-    private GridCapturePlan BuildGridCapturePlan()
+    private (IReadOnlyList<GridCaptureBand> Columns, IReadOnlyList<GridCaptureBand> Rows) BuildGridCaptureBands()
     {
         if (isSingleRecordView || records.Count == 0 || grid.Columns.Count == 0 || VisibleFieldIndexes().Count == 0)
             throw new InvalidOperationException("データの一覧を表示してから実行してください。");
@@ -28,6 +28,12 @@ public sealed partial class MainForm
         rows.AddRange(grid.Rows.Cast<DataGridViewRow>().Where(row => row.Visible && !row.IsNewRow)
             .Select(row => new GridCaptureBand(row.Index, row.Height,
                 row.Frozen || (layout == GridLayout.RecordRows && row.Index < RecordRowsDataStartIndex()))));
+        return (columns, rows);
+    }
+
+    private GridCapturePlan BuildGridCapturePlan()
+    {
+        var (columns, rows) = BuildGridCaptureBands();
         var result = new GridCapturePlan(
             GridCapturePagination.Paginate(columns, Math.Clamp(grid.ClientSize.Width - SystemInformation.VerticalScrollBarWidth, 64, 4096)),
             GridCapturePagination.Paginate(rows, Math.Clamp(grid.ClientSize.Height - SystemInformation.HorizontalScrollBarHeight, 64, 4096)));

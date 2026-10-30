@@ -443,6 +443,7 @@ public sealed partial class MainForm : Form
     private void BuildMenuStrip()
     {
         captureAllImagesButton.Click += (_, _) => ExportGridImages();
+        copyAllGridImageMenu.Click += (_, _) => CopyAllGridImage();
         menuStrip.Dock = DockStyle.Top;
         menuStrip.Items.Add(CreateMenu("ファイル",
             CreateMenuItem("定義を開く...", (_, _) => OpenDefinition()),
@@ -458,6 +459,7 @@ public sealed partial class MainForm : Form
             CreateMenuItem("Excel出力...", (_, _) => ExportExcel()),
             CreateMenuItem("Excel取込...", (_, _) => ImportExcel()),
             captureAllImagesButton,
+            copyAllGridImageMenu,
             new ToolStripSeparator(),
             CreateMenuItem("終了", (_, _) => Close())));
         menuStrip.Items.Add(CreateMenu("編集",
@@ -554,6 +556,7 @@ public sealed partial class MainForm : Form
         grid.ColumnWidthChanged += (_, e) =>
         {
             if (isSingleRecordView && !isRefreshingGrid) AdjustSingleRecordRowHeights();
+            if (!isRefreshingGrid) AdjustRecordItemNameHeight();
             if (!isRefreshingGrid) AdjustRecordCommentHeight();
             if (!isRefreshingGrid) UpdateByteRulerDisplay(e.Column.Index);
         };
@@ -612,7 +615,7 @@ public sealed partial class MainForm : Form
 
     private void AdjustWrappedRowHeights()
     {
-        if (!displayWrapOptions.Enabled) { AdjustSingleRecordRowHeights(); AdjustRecordCommentHeight(); UpdateByteRulerDisplay(); return; }
+        if (!displayWrapOptions.Enabled) { AdjustSingleRecordRowHeights(); AdjustRecordItemNameHeight(); AdjustRecordCommentHeight(); UpdateByteRulerDisplay(); return; }
         foreach (DataGridViewRow row in grid.Rows)
         {
             var height = grid.RowTemplate.Height;
@@ -625,6 +628,7 @@ public sealed partial class MainForm : Form
             row.Height = Math.Clamp(height, row.MinimumHeight, 65536);
         }
         AdjustSingleRecordRowHeights();
+        AdjustRecordItemNameHeight();
         AdjustRecordCommentHeight();
         UpdateByteRulerDisplay();
     }
@@ -640,7 +644,7 @@ public sealed partial class MainForm : Form
                 width = Math.Max(width, TextRenderer.MeasureText("バイト目盛り", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
-                if (layout == GridLayout.RecordRows && (row.Index == recordCommentRowIndex || row.Index == recordRulerRowIndex)) continue;
+                if (IsRecordAuxiliaryWidthRow(row.Index, column.Index)) continue;
                 var cell = row.Cells[column.Index];
                 var lines = WrappedDisplayLines(row.Index, column.Index);
                 if (lines is null)
@@ -863,6 +867,7 @@ public sealed partial class MainForm : Form
         }
 
         grid.ColumnHeadersHeight = Math.Max(28, grid.Font.Height + 12);
+        UpdateRecordColumnMinimumWidths();
         grid.RowTemplate.Height = Math.Max(22, grid.Font.Height + 8);
         foreach (DataGridViewRow row in grid.Rows)
         {
@@ -2603,6 +2608,7 @@ public sealed partial class MainForm : Form
             grid.Rows.Clear();
             fieldGridRows.Clear();
             recordGridColumnFieldIndexes.Clear();
+            recordNameLayouts.Clear();
             recordRowsDataStartIndex = 3;
             recordCommentRowIndex = recordOccursRowIndex = -1;
             recordRulerRowIndex = -1;
@@ -2636,10 +2642,10 @@ public sealed partial class MainForm : Form
     private void SizeColumnsToFitData()
     {
         if (isSingleRecordView) { SizeSingleRecordColumns(); return; }
-        if (displayWrapOptions.Enabled) { SizeWrappedColumns(); AdjustRecordCommentHeight(); UpdateByteRulerDisplay(); return; }
+        if (displayWrapOptions.Enabled) { SizeWrappedColumns(); AdjustRecordItemNameHeight(); AdjustRecordCommentHeight(); UpdateByteRulerDisplay(); return; }
         foreach (DataGridViewColumn column in grid.Columns)
         {
-            var auxiliaryRows = recordCommentRowIndex >= 0 || recordRulerRowIndex >= 0;
+            var auxiliaryRows = layout == GridLayout.RecordRows || recordCommentRowIndex >= 0 || recordRulerRowIndex >= 0;
             var width = column.GetPreferredWidth(auxiliaryRows
                 ? DataGridViewAutoSizeColumnMode.ColumnHeader : DataGridViewAutoSizeColumnMode.AllCells, fixedHeight: false);
             width = Math.Max(width, TextRenderer.MeasureText(column.HeaderText, column.HeaderCell.InheritedStyle.Font ?? grid.Font).Width + 20);
@@ -2649,7 +2655,7 @@ public sealed partial class MainForm : Form
                 width = Math.Max(width, TextRenderer.MeasureText("バイト目盛り", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
-                if (layout == GridLayout.RecordRows && (row.Index == recordCommentRowIndex || row.Index == recordRulerRowIndex)) continue;
+                if (IsRecordAuxiliaryWidthRow(row.Index, column.Index)) continue;
                 if (auxiliaryRows) width = Math.Max(width, row.Cells[column.Index].PreferredSize.Width);
                 if (layout == GridLayout.RecordRows && RecordIndexFromGridRow(row.Index) < 0) continue;
                 if (!TryGetCellField(row.Index, column.Index, out var field)
@@ -2665,6 +2671,7 @@ public sealed partial class MainForm : Form
             }
             column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
         }
+        AdjustRecordItemNameHeight();
         AdjustRecordCommentHeight();
         UpdateByteRulerDisplay();
     }
@@ -2815,6 +2822,7 @@ public sealed partial class MainForm : Form
         }
 
         AddRecordDefinitionRow(names);
+        ConfigureRecordNameRow();
         for (var column = 1; column < grid.Columns.Count; column++)
             grid[column, 0].ToolTipText = FieldDefinitionToolTip(fields[FieldIndexFromRecordColumn(column)]);
         AddRecordDefinitionRow(definitions);
@@ -2947,6 +2955,7 @@ public sealed partial class MainForm : Form
 
     private void PaintTextPaddingArea(DataGridViewCellPaintingEventArgs e)
     {
+        if (TryPaintRecordItemName(e)) return;
         if (TryPaintByteRulerCell(e)) return;
         if (TryPaintWrappedCell(e)) return;
         if (TryPaintOccursRecordHeaderArea(e))
@@ -3272,6 +3281,7 @@ public sealed partial class MainForm : Form
     private void UpdateLayoutButtons()
     {
         captureAllImagesButton.Enabled = !isSingleRecordView && records.Count > 0 && VisibleFieldIndexes().Count > 0;
+        copyAllGridImageButton.Enabled = copyAllGridImageMenu.Enabled = captureAllImagesButton.Enabled;
         byteRulerButton.Enabled = layout == GridLayout.RecordRows && !isSingleRecordView && fields.Count > 0;
         fieldRowsButton.Checked = !isSingleRecordView && layout == GridLayout.FieldRows;
         recordRowsButton.Checked = !isSingleRecordView && layout == GridLayout.RecordRows;
