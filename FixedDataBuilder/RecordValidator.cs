@@ -20,7 +20,9 @@ public static class RecordValidator
             for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
             {
                 var field = fields[fieldIndex];
-                var value = record[fieldIndex].Trim();
+                var value = record[fieldIndex];
+                if (field.Type is FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned)
+                    value = value.Trim();
                 var location = $"Rec {recordIndex + 1} / {field.Name}";
 
                 try

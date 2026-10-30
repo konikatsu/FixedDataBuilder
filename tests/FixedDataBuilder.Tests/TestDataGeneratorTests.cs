@@ -123,25 +123,38 @@ internal static partial class Program
             var regression = TestDataGenerator.Analyze([new("INTERNAL_AND_TRAILING", FieldDataType.Text, 4)], ["base"], Settings(SpaceRequirements(6)));
             Equal("X X ", Values(regression).Single());
         });
-        Test("Generation fixed whitespace subsets preserve only true internal spaces and explain excluded edges", () =>
+        Test("Generation fixed whitespace subsets cover selected leading internal and trailing positions at lengths one through five", () =>
         {
-            foreach (var type in new[] { FieldDataType.Text, FieldDataType.FullWidthText })
+            foreach (var type in new[] { FieldDataType.Text, FieldDataType.HalfWidthText, FieldDataType.FullWidthText })
                 for (var length = 1; length <= 5; length++)
                     for (var mask = 1; mask <= 7; mask++)
                     {
                         var marker = type == FieldDataType.FullWidthText ? '漢' : 'X';
                         var space = type == FieldDataType.FullWidthText ? '\u3000' : ' ';
-                        var plan = TestDataGenerator.Analyze([new("FIXED", type, length)], [marker.ToString()], Settings(SpaceRequirements(mask), options: fixedOptions));
-                        var expectedMask = length >= 3 ? mask & 2 : 0;
+                        var field = new FieldDefinition("FIXED", type, length);
+                        var plan = TestDataGenerator.Analyze([field], [marker.ToString()], Settings(SpaceRequirements(mask), 3, options: fixedOptions));
+                        var expectedMask = mask & (length < 2 ? 0 : length < 3 ? 5 : 7);
                         Equal(expectedMask == 0, plan.HasBlockingIssues);
-                        Equal(expectedMask == 0 ? 0 : 1, plan.CasesByField[0].Count);
+                        Equal(plan.CasesByField[0].Count, plan.RequiredNormalCount);
+                        var covered = 0;
                         foreach (var item in plan.CasesByField[0])
                         {
-                            Equal(2, ActualSpaceMask(item.Value, space, marker));
-                            Equal(marker, item.Value[0]); Equal(marker, item.Value[^1]);
+                            var declaredMask = int.Parse(item.CaseId[(item.CaseId.LastIndexOf('-') + 1)..]);
+                            var actualMask = ActualSpaceMask(item.Value, space, marker);
+                            Equal(declaredMask, actualMask);
+                            Equal(0, actualMask & ~mask);
+                            Equal(length, item.Value.Length);
+                            Equal(System.Numerics.BitOperations.PopCount((uint)declaredMask), item.Value.Count(character => character == space));
+                            var encoded = FixedLengthDataWriter.EncodeField(field, item.Value);
+                            var encoding = type == FieldDataType.FullWidthText ? NationalTextEncodingHelper.GetEncoding(NationalTextEncoding.ShiftJis)
+                                : JapaneseEncodings.ForData(DataEncodingProfile.ShiftJis);
+                            Equal(item.Value, encoding.GetString(encoded));
+                            covered |= actualMask;
                         }
-                        if ((mask & 1) != 0) Equal(true, plan.Issues.Any(issue => issue.Requirement == nameof(GenerationRequirement.TextLeadingSpace)));
-                        if ((mask & 4) != 0) Equal(true, plan.Issues.Any(issue => issue.Requirement == nameof(GenerationRequirement.TextTrailingSpace)));
+                        Equal(expectedMask, covered);
+                        foreach (var (bit, requirement) in new[] { (1, GenerationRequirement.TextLeadingSpace), (2, GenerationRequirement.TextInternalSpace), (4, GenerationRequirement.TextTrailingSpace) })
+                            if ((mask & bit) != 0 && (expectedMask & bit) == 0)
+                                Equal(true, plan.Issues.Any(issue => issue.Requirement == requirement.ToString()));
                     }
         });
         Test("Generation distinguishes CSV empty, half-space-only and full-space-only values", () =>
@@ -169,14 +182,14 @@ internal static partial class Program
                 Settings(GenerationRequirement.TextFullSpaces, options: csv with { CsvEncoding = CsvTextEncoding.StrictShiftJis }));
             Equal("　　　", Values(sjis).Single());
         });
-        Test("Generation reports unavailable fixed whitespace cases and retains serializable internal spaces", () =>
+        Test("Generation keeps fixed whitespace positions while explaining cases that require distinct CSV empty values", () =>
         {
             var plan = TestDataGenerator.Analyze([new("X", FieldDataType.Text, 5)], ["base"],
                 Settings(spacePositions | GenerationRequirement.TextEmpty | GenerationRequirement.TextHalfSpaces | GenerationRequirement.TextFullSpaces,
                     options: fixedOptions));
             Equal(false, plan.HasBlockingIssues);
-            Equal("XX XX", Values(plan).Single());
-            Equal(5, plan.Issues.Count);
+            Equal(" X X ", Values(plan).Single());
+            Equal(3, plan.Issues.Count);
             Equal(true, plan.Issues.All(issue => issue.Message.Contains("固定長保存", StringComparison.Ordinal)));
         });
         Test("Generation clones only selected fields, excludes REDEFINES and keeps expanded OCCURS physical indices", () =>

@@ -4,12 +4,12 @@ namespace FixedDataBuilder;
 
 public sealed class TestDataGenerationForm : Form
 {
-    private const GenerationRequirement DefaultRequirements = GenerationRequirement.NumericLeadingZero
-        | GenerationRequirement.NumericAllZero | GenerationRequirement.NumericFullLength
-        | GenerationRequirement.NumericMaximum | GenerationRequirement.TextMaximum;
+    private static readonly GenerationRequirement DefaultRequirements = Enum.GetValues<GenerationRequirement>()
+        .Aggregate(GenerationRequirement.None, (all, value) => all | value);
 
     private readonly IReadOnlyList<FieldDefinition> fields;
     private readonly IReadOnlyList<List<string>> records;
+    private readonly GenerationRequirement initialRequirements;
     private readonly CommittingNumericUpDown baselineRecord = new() { Name = "BaselineRecord", Minimum = 1, Maximum = 1, Width = 90 };
     private readonly CheckedListBox targetFields = new() { Name = "TargetFields", CheckOnClick = true, IntegralHeight = false, Height = 126, Dock = DockStyle.Fill };
     private readonly CommittingNumericUpDown normalCount = new() { Name = "NormalRecordCount", Minimum = 1, Maximum = 10000, Value = 4, Width = 92 };
@@ -22,6 +22,8 @@ public sealed class TestDataGenerationForm : Form
     private readonly Label countSummary = new() { Name = "GenerationCounts", AutoSize = true, Margin = new Padding(3, 8, 3, 5) };
     private readonly TextBox issues = new() { Name = "GenerationIssues", Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, Height = 94, BackColor = SystemColors.Window };
     private readonly Label generationError = new() { Name = "GenerationError", AutoSize = true, ForeColor = Color.Firebrick, MaximumSize = new Size(820, 0), Margin = new Padding(3, 5, 3, 5) };
+    private readonly Label executionStatus = new() { Name = "GenerationExecutionStatus", Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly ToolTip executionHints = new();
     private readonly Button execute = new() { Name = "ExecuteGeneration", Text = "実行", Width = 100, Height = 30 };
     private readonly Button cancel = new() { Name = "CancelGeneration", Text = "キャンセル", DialogResult = DialogResult.Cancel, CausesValidation = false, Width = 100, Height = 30 };
     private TestDataGenerationPlan? plan;
@@ -31,13 +33,19 @@ public sealed class TestDataGenerationForm : Form
     public TestDataGenerationResult? GeneratedResult { get; private set; }
 
     public TestDataGenerationForm(IReadOnlyList<FieldDefinition> fields, IReadOnlyList<List<string>> records,
-        int initialRecordIndex, int initialFieldIndex, DataSaveOptions initialOptions)
+        int initialRecordIndex, int initialFieldIndex, DataSaveOptions initialOptions, TestDataGenerationSettings? previousSettings = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(records);
         ArgumentNullException.ThrowIfNull(initialOptions);
         this.fields = fields.ToArray();
         this.records = records.Select(record => record.ToList()).ToArray();
+        var remembered = TestDataGenerationSettingsStore.IsValid(previousSettings)
+            && previousSettings!.TargetFieldIndexes.All(index => index < this.fields.Count && !this.fields[index].IsRedefines)
+            ? previousSettings : null;
+        initialRequirements = remembered?.Requirements ?? DefaultRequirements;
+        var output = remembered?.OutputOptions ?? initialOptions;
+        var selected = remembered?.TargetFieldIndexes.ToHashSet();
         Text = "テストデータ作成条件";
         Name = "TestDataGenerationForm";
         StartPosition = FormStartPosition.CenterParent;
@@ -47,32 +55,33 @@ public sealed class TestDataGenerationForm : Form
         AutoScaleMode = AutoScaleMode.Font;
 
         baselineRecord.Maximum = Math.Max(1, this.records.Count);
-        baselineRecord.Value = this.records.Count == 0 ? 1 : Math.Clamp(initialRecordIndex, 0, this.records.Count - 1) + 1;
+        baselineRecord.Value = this.records.Count == 0 ? 1 : Math.Clamp(remembered?.BaselineRecordIndex ?? initialRecordIndex, 0, this.records.Count - 1) + 1;
         baselineRecord.Enabled = this.records.Count > 0;
+        normalCount.Value = remembered?.NormalRecordCount ?? 4;
         for (var index = 0; index < this.fields.Count; index++)
             if (!this.fields[index].IsRedefines)
-                targetFields.Items.Add(new TargetField(index, $"{index + 1}. {this.fields[index].Name}  [{this.fields[index].DisplayDefinition}]"), index == initialFieldIndex);
+                targetFields.Items.Add(new TargetField(index, $"{index + 1}. {this.fields[index].Name}  [{this.fields[index].DisplayDefinition}]"), selected is null || selected.Contains(index));
 
         format.Items.AddRange(["固定長", "CSV（ヘッダーなし）", "CSV（ヘッダーあり）"]);
         csvEncoding.Items.AddRange(JapaneseEncodings.CsvNames);
         separator.Items.AddRange(["改行あり (CRLF)", "改行なし"]);
         national.Items.AddRange(["MS932 (CP932)", "UTF-16LE", "UTF-32LE", "SJIS (JIS X 0208)"]);
         textEncoding.Items.AddRange(JapaneseEncodings.TextNames);
-        format.SelectedIndex = initialOptions.Format == DataFileFormat.Csv ? (initialOptions.CsvHasHeader ? 2 : 1) : 0;
-        csvEncoding.SelectedIndex = (int)initialOptions.CsvEncoding;
-        separator.SelectedIndex = initialOptions.SeparatorMode == RecordSeparatorMode.None ? 1 : 0;
-        national.SelectedIndex = (int)initialOptions.NationalEncoding;
-        textEncoding.SelectedIndex = (int)(initialOptions.TextEncoding ?? DataEncodingProfile.ShiftJis);
+        format.SelectedIndex = output.Format == DataFileFormat.Csv ? (output.CsvHasHeader ? 2 : 1) : 0;
+        csvEncoding.SelectedIndex = (int)output.CsvEncoding;
+        separator.SelectedIndex = output.SeparatorMode == RecordSeparatorMode.None ? 1 : 0;
+        national.SelectedIndex = (int)output.NationalEncoding;
+        textEncoding.SelectedIndex = (int)(output.TextEncoding ?? DataEncodingProfile.ShiftJis);
 
         var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
         var scroll = new Panel { Name = "GenerationBody", Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(12) };
         var body = Stack();
         body.Dock = DockStyle.Top;
         body.MinimumSize = new Size(730, 0);
-        body.Controls.Add(Note("基準行をコピーし、チェックした対象項目だけに選択した値を入れます。対象外の項目は基準行の値を保持します。\r\n日付・業務コードの妥当性は判断しません。変更したくない項目は対象から外してください。"));
+        body.Controls.Add(Note("基準行をコピーし、チェックした対象項目だけに選択した値を入れます。対象外の項目は基準行の値を保持します。\r\n日付・業務コードの妥当性は判断しません。変更したくない項目は対象から外してください。\r\n初回はすべて選択します。実行して開いた条件は、同じ定義で次回復元します。"));
         var columns = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = 2, Margin = new Padding(0, 6, 0, 0) };
         columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
         columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
@@ -85,13 +94,17 @@ public sealed class TestDataGenerationForm : Form
         body.Controls.Add(Note("実行すると、新しい編集用の一覧に作成結果を表示します。確認・編集後に「名前を付けて保存」で保存してください。"));
         scroll.Controls.Add(body);
 
-        var footer = new TableLayoutPanel { Name = "GenerationFooter", Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(12, 8, 12, 8) };
+        var footer = new TableLayoutPanel { Name = "GenerationFooter", Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 2, Padding = new Padding(12, 8, 12, 8) };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
-        footer.Controls.Add(new Label { Text = "ファイルへの自動保存は行いません。", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        footer.Controls.Add(execute, 1, 0);
-        footer.Controls.Add(cancel, 2, 0);
+        footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        footer.Controls.Add(executionStatus, 0, 0);
+        footer.SetColumnSpan(executionStatus, 3);
+        footer.Controls.Add(new Label { Text = "ファイルへの自動保存は行いません。", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
+        footer.Controls.Add(execute, 1, 1);
+        footer.Controls.Add(cancel, 2, 1);
         shell.Controls.Add(scroll, 0, 0);
         shell.Controls.Add(footer, 0, 1);
         Controls.Add(shell);
@@ -113,6 +126,14 @@ public sealed class TestDataGenerationForm : Form
         FormClosing += (_, _) => { if (DialogResult != DialogResult.OK) GeneratedResult = null; };
         UpdateOptionControls();
         RefreshAnalysis();
+        if (remembered is null && plan is { } initialPlan)
+        {
+            // Only initialize a first-use value. Later requirement changes never alter the user's row count.
+            committingNumericInputs = true;
+            try { normalCount.Value = Math.Clamp(Math.Max(4, initialPlan.RequiredNormalCount), 1, TestDataGenerator.MaximumRecordCount); }
+            finally { committingNumericInputs = false; }
+            RefreshAnalysis();
+        }
     }
 
     private Control BuildSourceAndOptions()
@@ -187,7 +208,7 @@ public sealed class TestDataGenerationForm : Form
         checks.Controls.Add(Requirement(GenerationRequirement.InvalidNumeric, "CSV不正値：数値に文字"), 0, 8);
         checks.Controls.Add(Requirement(GenerationRequirement.Overlength, "CSV不正値：長さ超過"), 1, 8);
         right.Controls.Add(Group("作成する値（項目の型・桁数に応じて判定）", checks));
-        right.Controls.Add(Note("9(8) の例：先頭ゼロ 01234567 ／ 全ゼロ 00000000\r\n定義桁いっぱい 12345678 ／ 最大値 99999999\r\n固定長で保持できない空白・不正値は、CSVを選んでください。"));
+        right.Controls.Add(Note("9(8) の例：先頭ゼロ 01234567 ／ 全ゼロ 00000000\r\n定義桁いっぱい 12345678 ／ 最大値 99999999\r\n固定長でも先頭・末尾の空白を作成できます。空文字と空白だけの区別・不正値はCSV専用です。"));
         var countRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0, 8, 0, 0) };
         countRow.Controls.Add(new Label { Text = "通常行数（1～10000）", AutoSize = true, Margin = new Padding(3, 6, 3, 3) });
         countRow.Controls.Add(normalCount);
@@ -199,7 +220,7 @@ public sealed class TestDataGenerationForm : Form
     private CheckBox Requirement(GenerationRequirement requirement, string text)
     {
         var check = new CheckBox { Name = $"Requirement{requirement}", Text = text, AutoSize = true,
-            Checked = DefaultRequirements.HasFlag(requirement), Margin = new Padding(3, 5, 3, 5) };
+            Checked = initialRequirements.HasFlag(requirement), Margin = new Padding(3, 5, 3, 5) };
         requirementChecks.Add(requirement, check);
         return check;
     }
@@ -271,6 +292,7 @@ public sealed class TestDataGenerationForm : Form
                 countSummary.Text = "条件入力中：必要な行数・合計は未計算です。";
                 issues.Text = "数値を入力し終えると、現在の条件で再計算します。";
                 generationError.Text = $"{name}は {control.Minimum:0}～{control.Maximum:0} の整数で指定してください。";
+                UpdateExecutionStatus(false, generationError.Text, generationError.Text);
                 return false;
             }
         }
@@ -299,6 +321,7 @@ public sealed class TestDataGenerationForm : Form
         {
             countSummary.Text = "必要な通常行数：未計算\r\n不正値の追加・合計：未計算";
             issues.Text = string.Join(Environment.NewLine, messages);
+            UpdateExecutionStatus(false, messages[0], issues.Text);
             return;
         }
         try
@@ -318,13 +341,38 @@ public sealed class TestDataGenerationForm : Form
                 && settings.NormalRecordCount >= plan.RequiredNormalCount && !plan.HasBlockingIssues;
             if (messages.Count == 0) messages.Add("選択した条件は、対象項目の型・桁数で作成できます。");
             issues.Text = string.Join(Environment.NewLine, messages.Distinct());
+            var caution = execute.Enabled && plan.Issues.Count > 0;
+            var blockingIssue = plan.Issues.FirstOrDefault(issue => issue.IsBlocking);
+            var disabledReason = settings.TargetFieldIndexes.Count == 0 ? "変更する対象項目を選択してください。"
+                : settings.Requirements == GenerationRequirement.None ? "作成する値を1つ以上チェックしてください。"
+                : settings.NormalRecordCount < plan.RequiredNormalCount
+                    ? $"通常行数が不足しています。必要：{plan.RequiredNormalCount}行 ／ 指定：{settings.NormalRecordCount}行。"
+                : blockingIssue is not null ? (blockingIssue.FieldIndex >= 0 && blockingIssue.FieldIndex < fields.Count
+                    ? $"{blockingIssue.FieldIndex + 1}. {fields[blockingIssue.FieldIndex].Name}：" : "") + blockingIssue.Message
+                : "条件を確認してください。";
+            var status = execute.Enabled ? caution
+                ? "実行できます。対象外の条件など、確認事項があります。詳細は「条件の確認」へ。"
+                : "実行できます。内容を確認して「実行」を押してください。"
+                : disabledReason;
+            UpdateExecutionStatus(execute.Enabled, status, issues.Text, caution);
         }
         catch (Exception error)
         {
             countSummary.Text = "必要な通常行数：確認できません\r\n不正値の追加・合計：確認できません";
             issues.Text = string.Join(Environment.NewLine, messages);
             generationError.Text = $"条件を確認できませんでした。{error.Message}";
+            UpdateExecutionStatus(false, generationError.Text, generationError.Text);
         }
+    }
+
+    private void UpdateExecutionStatus(bool ready, string message, string details, bool caution = false)
+    {
+        var color = !ready ? Color.Firebrick : caution ? Color.DarkGoldenrod : SystemColors.ControlText;
+        executionStatus.ForeColor = color;
+        executionStatus.Text = message;
+        countSummary.ForeColor = ready ? SystemColors.ControlText : Color.Firebrick;
+        issues.ForeColor = color;
+        executionHints.SetToolTip(executionStatus, details);
     }
 
     private void ExecuteGeneration()
@@ -350,9 +398,16 @@ public sealed class TestDataGenerationForm : Form
         catch (Exception error)
         {
             generationError.Text = $"作成できませんでした。条件を確認してから、もう一度実行してください。\r\n{error.Message}";
+            UpdateExecutionStatus(false, $"作成できませんでした：{error.Message}", generationError.Text);
             return false;
         }
         finally { UseWaitCursor = false; }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) executionHints.Dispose();
+        base.Dispose(disposing);
     }
 
     private sealed record TargetField(int Index, string Text)

@@ -11,19 +11,26 @@ public sealed partial class MainForm
     private List<string>[] generatedRecordBindings = [];
     private string? generationSourceDefinition;
     private string? generationSourceData;
+    private TestDataGenerationSettingsStore generationSettingsStore = new(TestDataGenerationSettingsStore.DefaultPath);
 
     private void GenerateTestData()
     {
         if (!grid.EndEdit() || records.Count == 0 || !fields.Any(field => !field.IsRedefines)) return;
         var originalFields = fields.ToArray();
+        var settingsKey = GenerationDefinitionKey(originalFields);
         var initialRecord = isSingleRecordView ? singleRecordIndex
             : layout == GridLayout.FieldRows && (grid.CurrentCell?.ColumnIndex ?? -1) < 2 ? 0 : CurrentRecordIndex();
         using var dialog = new TestDataGenerationForm(fields, records,
-            Math.Clamp(initialRecord, 0, records.Count - 1), CurrentFieldIndex(), CurrentSaveOptions());
+            Math.Clamp(initialRecord, 0, records.Count - 1), CurrentFieldIndex(), CurrentSaveOptions(), generationSettingsStore.Find(settingsKey));
         if (dialog.ShowDialog(this) != DialogResult.OK || dialog.GeneratedResult is not { } result) return;
         // Replacement is deferred until both generation and the user's unsaved-data choice succeed.
         if (!ConfirmDiscardChanges("生成データを開く")) return;
-        try { ApplyGeneratedTestDataCore(result, originalFields); }
+        try
+        {
+            ApplyGeneratedTestDataCore(result, originalFields);
+            if (!generationSettingsStore.Remember(settingsKey, result.Settings))
+                SetStatus($"{records.Count}行を生成しました。作成条件を記憶できませんでした。内容を確認し、名前を付けて保存してください。");
+        }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "テストデータ作成", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     }
 

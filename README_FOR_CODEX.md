@@ -1,5 +1,15 @@
 # README_FOR_CODEX
 
+## v0.1.77：固定長の先頭空白・生成条件記憶・行操作（2026-10-31、起動確認待ち）
+
+- 利用者が固定長でも先頭空白は有効と指摘し、初回全チェック・次回条件記憶を依頼。全型TrimだったWriter/RecordValidator/Mainの検証を数値型だけTrimへ変更し、文字X/半角/Nは値を保持する。Nのwhitespace-only→empty変換もやめ通常の右paddingを適用。Generatorの固定長先頭/末尾除外と予測件数のCSV制限を外し、固定長でも先頭/内部/末尾条件を作る。Readerの末尾padding除去と数値/COMP-3の正規化は維持する。
+- 初回は全実体項目(REDEFINES除外)と全17条件をチェック、初回のみ通常行数を必要件数以上/最低4へ初期化。成功してMainへ適用した条件を定義fingerprint単位にLocalAppData/FixedDataBuilder/test-data-generation-settings.jsonへ記憶し、次回基準行(範囲調整)/対象/要件/件数/出力形式/codecを復元。レコード値を保存しない。キャンセル/生成失敗/適用失敗で記憶は更新せず、記憶I/O失敗でも生成データを失わない。Form自身はfile IOしない任意previousSettings引数で試験可能にする。
+- 追加要望により実行不可理由を赤字の常時表示footerへ、行不足は必要/指定件数を示し、詳細tooltipと条件確認欄を用意。実行可能だが適用外等の確認事項がある場合は黄褐色、正常readyは通常色。スクロールで実行不可理由が隠れないようにする。
+- さらに行削除をCtrl+Deleteで分かりやすく、行追加も欲しいとの依頼。今回の行操作UIは一覧上部/右クリックに追加・複製・削除をそろえ、削除は行番号付き確認。Ctrl+DeleteはMainのdata grid非編集中に限定し、セル/パス/HEXの文字編集と比較readonlyでは削除しない。Ctrl+Z・検索・必要行数合わせボタン・表示状態復元は提案のみで今回の実装対象に含めない。
+- 続けて利用者が「にこっと笑う猫にFB文字を重ねたアイコン」を依頼。imagegenスキルのbuiltin image_genで透明PNGを新規生成し内容無変更でassetsへコピー、ICOの16/24/32/48/64/128/256pxを技術的形式変換で用意。ApplicationIconと埋込resource(FixedDataBuilder.AppIcon.ico)、AppIcon.Load()のresource streamからcloneしたIconをMainへ設定。原画/縮小を視認確認し実フォームは実行しない。prompt/出所/サイズ/shaはreviews/fixed-space-generation-v0.1.77/v001/cat-icon-provenance.mdとmetadataに保存。PNG c66f9aa1…/ICO54a45fb9…、既存READMEスクリーンショットは変更しない。
+- 基点63a7b64823981a957436f025eb815bfe5902011f(v76/main)をfetch確認しcodex/fixed-space-generation-v0.1.77、新worktree C:/Users/konishi-k/.codex/worktrees/fixed-space-generation-v77/FixedDataBuilder。証拠reviews/fixed-space-generation-v0.1.77/v001。製品/test/GUIhelperは利用者が実行する指定を継続。assistantはbuild/publish --no-build/静的確認/packageのみ。main/publicrelease/GitHubReleaseは起動確認済みv76を維持し、v77具体EXEの利用者起動OK後だけ同一binaryを再ビルドせず公開する。新画面画像は捏造しない。公開後は最新3版v77/v76/v75を保持、v74Releaseのみmetadata/実ZIPのsize・serverdigest確認保管後に整理、tags/history/localは保持。
+- 新規FixedTextSpace7/条件記憶・赤字表示10/行操作8、従来351と合計376件(呼出378中2は外部file引数integration専用)、全件未実行。build-v001のテストnullable警告4を直し、最終build-v002は--no-incremental/警告0/エラー0。source/asset/sampleをsource-before-v002とbuild後・package時にhash比較して不変、test内製品DLL同一、publish --no-build。ZIP800964バイト/50項目、SHA256=ECCE371A707C2BE6400D9D0DCF711964FC459447B5CEFFE70C2F0275B4837309、DLL=CE6D1C870C343AD98A46C0CF75D3F7599FF69B9B0CAB522989401DFE7C68CFD9。v76確認済み製品/ZIP/公開releaseは不変。候補EXE C:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.77-win-x64-framework-dependent/FixedDataBuilder.exeを利用者が確認するまでmain/Releaseはv76のまま、確認後も再ビルドしない。公開検証には新しいproduct_asset_sha256(PNG/ICOのraw hash)も確認する。
+
 ## v0.1.76：比較画面のバイト目盛りと列最小幅（2026-10-30、利用者起動確認後の公開）
 
 - 利用者が比較モードのバイト目盛りを表示/非表示にしたいと依頼。入力/出力の各一覧へ「バイト目盛り」チェックを追加し初期値ON、独立切替、metadata末尾に目盛り行。表示変更でも同じrecord/fieldの選択・scroll・列幅・各record行高・片側の状態を保持し、上下入替で各paneに設定が残る。TableLayoutPanel/PanelのままSplitContainerは使わない。

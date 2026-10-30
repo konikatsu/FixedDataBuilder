@@ -70,7 +70,10 @@ public static class FixedLengthDataWriter
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var encoding = JapaneseEncodings.ForData(encodingProfile);
-        value = value.Trim();
+        // Spaces are data in character fields, including at the beginning of a fixed record.
+        // Keep the established normalization only for numeric input.
+        if (field.Type is FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned)
+            value = value.Trim();
 
         return field.Type switch
         {
@@ -142,9 +145,7 @@ public static class FixedLengthDataWriter
     {
         var length = field.Length;
         var encoding = NationalTextEncodingHelper.GetEncoding(nationalTextEncoding);
-        var normalized = string.IsNullOrWhiteSpace(value)
-            ? string.Empty
-            : value;
+        var normalized = value;
 
         if (normalized.Length > length)
         {

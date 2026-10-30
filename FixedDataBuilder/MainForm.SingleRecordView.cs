@@ -31,7 +31,9 @@ public sealed partial class MainForm
             Name = "ViewModePanel", Dock = DockStyle.Top, AutoSize = true,
             WrapContents = true, Padding = new Padding(8, 2, 8, 2)
         };
-        panel.Controls.AddRange([listViewButton, singleViewButton, singleRecordNavigator, copyAllGridImageButton, generateTestDataButton, comparisonButton]);
+        panel.Controls.AddRange([listViewButton, singleViewButton, singleRecordNavigator,
+            addDataRowButton, duplicateDataRowButton, deleteDataRowButton,
+            copyAllGridImageButton, generateTestDataButton, comparisonButton]);
         generateTestDataButton.Click += (_, _) => GenerateTestData();
         comparisonButton.Click += (_, _) => OpenComparison();
         copyAllGridImageButton.Click += (_, _) => CopyAllGridImage();

@@ -94,6 +94,7 @@ public sealed partial class MainForm : Form
     {
         this.loadSettingsStore = loadSettingsStore ?? new DataLoadSettingsStore(DataLoadSettingsStore.DefaultPath);
         Text = WindowTitle;
+        Icon = AppIcon.Load();
         StartPosition = FormStartPosition.CenterScreen;
         Width = 1100;
         Height = 740;
@@ -463,9 +464,9 @@ public sealed partial class MainForm : Form
             new ToolStripSeparator(),
             CreateMenuItem("終了", (_, _) => Close())));
         menuStrip.Items.Add(CreateMenu("編集",
-            CreateMenuItem("レコード追加", (_, _) => AddRecord()),
-            CreateMenuItem("レコード複製", (_, _) => DuplicateRecord()),
-            CreateMenuItem("レコード削除", (_, _) => DeleteRecord())));
+            addDataRowMenu,
+            duplicateDataRowMenu,
+            deleteDataRowMenu));
         menuStrip.Items.Add(CreateMenu("定義",
             CreateMenuItem("定義作成...", (_, _) => CreateDefinition(editCurrent: false)),
             CreateMenuItem("定義修正...", (_, _) => CreateDefinition(editCurrent: true)),
@@ -555,6 +556,7 @@ public sealed partial class MainForm : Form
             if (!isRefreshingGrid)
             {
                 UpdateHexView();
+                UpdateRowActionControls();
             }
         };
         grid.CellPainting += (_, e) => { PaintTextPaddingArea(e); PaintByteGuideLines(e); };
@@ -568,6 +570,7 @@ public sealed partial class MainForm : Form
             if (!isRefreshingGrid) UpdateByteRulerDisplay(e.Column.Index);
         };
         grid.SizeChanged += (_, _) => { if (!isRefreshingGrid) AdjustRecordCommentHeight(); };
+        InitializeRowActions();
     }
 
     private void ChooseDisplayWrapOptions()
@@ -2661,6 +2664,8 @@ public sealed partial class MainForm : Form
             isRefreshingGrid = false;
         }
         UpdateHexView();
+        rowActionSelectionSuppressed = false;
+        UpdateRowActionControls();
     }
 
     private void SizeColumnsToFitData()
@@ -3263,10 +3268,15 @@ public sealed partial class MainForm : Form
     private string? GetValidationError(FieldDefinition field, string value)
     {
         if (IsCsv) return null; // CSVには固定長領域の補完・桁数検証を適用しない。
-        value = value.Trim();
+        if (field.Type is FieldDataType.PlainNumber or FieldDataType.SignedNumber or FieldDataType.PackedUnsigned or FieldDataType.PackedSigned)
+            value = value.Trim();
         try { FixedLengthDataWriter.EncodeField(field, value, currentDataEncodingProfile, currentNationalTextEncoding); }
         catch (EncoderFallbackException ex) { return ex.Message; }
-        catch (InvalidDataException) { /* Existing type/length messages below. */ }
+        catch (InvalidDataException ex)
+        {
+            if (field.Type is FieldDataType.Text or FieldDataType.HalfWidthText or FieldDataType.FullWidthText) return ex.Message;
+            // Keep existing numeric type/length messages below.
+        }
         switch (field.Type)
         {
             case FieldDataType.PlainNumber:
@@ -3304,6 +3314,7 @@ public sealed partial class MainForm : Form
 
     private void UpdateLayoutButtons()
     {
+        UpdateRowActionControls();
         UpdateGenerationControls();
         UpdateComparisonControls();
         captureAllImagesButton.Enabled = !isSingleRecordView && records.Count > 0 && VisibleFieldIndexes().Count > 0;

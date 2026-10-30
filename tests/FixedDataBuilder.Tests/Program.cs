@@ -323,6 +323,9 @@ internal static partial class Program
             RunRecordNameWrappingTests(repo);
             RunTestDataGeneratorTests(repo);
             RunTestDataGenerationFormTests(repo);
+            RunTestDataGenerationPreferencesTests(repo);
+            RunRowDeletionTests(repo);
+            RunFixedTextSpaceTests(repo);
             RunTestDataGenerationIntegrationTests(repo);
             RunComparisonEngineTests(repo);
             RunComparisonRuleFormTests(repo);

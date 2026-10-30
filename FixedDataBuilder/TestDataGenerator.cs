@@ -142,8 +142,7 @@ public static class TestDataGenerator
                 foreach (var (requirement, mask) in new[] { (GenerationRequirement.TextLeadingSpace, 1), (GenerationRequirement.TextInternalSpace, 2), (GenerationRequirement.TextTrailingSpace, 4) })
                 {
                     if (!Has(settings, requirement)) continue;
-                    if (!csv && mask != 2) Unavailable(requirement, "固定長保存では前後の空白が除かれるため、この空白位置を保持できません。CSVを選択してください。");
-                    else if (field.Length < (mask == 2 ? 3 : 2)) Unavailable(requirement, mask == 2
+                    if (field.Length < (mask == 2 ? 3 : 2)) Unavailable(requirement, mask == 2
                         ? "内部空白には空白の前後に文字が必要です（最低3文字）。" : "端の空白と文字を区別するには最低2文字必要です。");
                     else positions |= mask;
                 }
@@ -166,7 +165,7 @@ public static class TestDataGenerator
                 foreach (var requirement in new[] { GenerationRequirement.TextEmpty, GenerationRequirement.TextHalfSpaces, GenerationRequirement.TextFullSpaces })
                 {
                     if (!Has(settings, requirement)) continue;
-                    if (!csv) { Unavailable(requirement, "固定長保存では空白の除去と埋め文字により、空文字・空白だけの値の区別を保持できません。CSVを選択してください。"); continue; }
+                    if (!csv) { Unavailable(requirement, "固定長保存では空き領域を空白で埋めるため、空文字・空白だけの値を別のケースとして区別できません。CSVを選択してください。"); continue; }
                     if (requirement == GenerationRequirement.TextEmpty) Add("text.empty", "空文字", "");
                     else if (requirement == GenerationRequirement.TextHalfSpaces)
                     {
@@ -320,10 +319,9 @@ public static class TestDataGenerator
     private static int ApplicableSpaceMask(FieldDefinition field, TestDataGenerationSettings settings)
     {
         var mask = 0;
-        var csv = settings.OutputOptions.Format == DataFileFormat.Csv;
-        if (csv && field.Length >= 2 && Has(settings, GenerationRequirement.TextLeadingSpace)) mask |= 1;
+        if (field.Length >= 2 && Has(settings, GenerationRequirement.TextLeadingSpace)) mask |= 1;
         if (field.Length >= 3 && Has(settings, GenerationRequirement.TextInternalSpace)) mask |= 2;
-        if (csv && field.Length >= 2 && Has(settings, GenerationRequirement.TextTrailingSpace)) mask |= 4;
+        if (field.Length >= 2 && Has(settings, GenerationRequirement.TextTrailingSpace)) mask |= 4;
         return mask;
     }
     private static int NormalPatternCount(FieldDefinition field, TestDataGenerationSettings settings)

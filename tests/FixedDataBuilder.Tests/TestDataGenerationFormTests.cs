@@ -5,7 +5,7 @@ internal static partial class Program
     private static void RunTestDataGenerationFormTests(string repo)
     {
         _ = repo; // All fixtures in these tests are synthetic and stay in memory.
-        Test("Generation dialog starts with only the selected physical field and five independent defaults", () =>
+        Test("Generation dialog restores a remembered physical target and its independent requirements and row count", () =>
         {
             using var form = NewGenerationForm(initialFieldIndex: 0);
             var settings = (TestDataGenerationSettings)Invoke(form, "BuildSettings")!;
@@ -21,7 +21,7 @@ internal static partial class Program
             Equal(true, Get<Button>(form, "execute").Enabled);
             Equal<TestDataGenerationResult?>(null, form.GeneratedResult);
         });
-        Test("Generation dialog never substitutes another target for REDEFINES or an absent initial field", () =>
+        Test("Clearing generation targets never substitutes a hidden REDEFINES or an absent selected field", () =>
         {
             foreach (var selected in new[] { -1, 1, 100 })
             {
@@ -194,19 +194,20 @@ internal static partial class Program
             Equal(1, form.GeneratedResult!.Settings.BaselineRecordIndex);
             Equal(4, form.GeneratedResult.Settings.NormalRecordCount);
         });
-        Test("Fixed whitespace limitations remain visible and switching to CSV enables the requested space case", () =>
+        Test("Leading and trailing whitespace generate in fixed format and remain selected when switching to CSV", () =>
         {
             using var form = NewGenerationForm(initialFieldIndex: 2, options: GenerationCsvOptions() with { Format = DataFileFormat.FixedLength });
-            SetGenerationRequirements(form, GenerationRequirement.TextTrailingSpace);
-            Equal(true, Get<TestDataGenerationPlan>(form, "plan").Issues.Any(issue => issue.FieldIndex == 2));
-            Equal(true, Get<TextBox>(form, "issues").Text.Contains("説明"));
-            Equal(false, Get<Button>(form, "execute").Enabled);
+            SetGenerationRequirements(form, GenerationRequirement.TextLeadingSpace | GenerationRequirement.TextTrailingSpace);
+            Equal(false, Get<TestDataGenerationPlan>(form, "plan").HasBlockingIssues);
+            Equal(true, Get<Button>(form, "execute").Enabled);
             Invoke(form, "ExecuteGeneration");
-            Equal<TestDataGenerationResult?>(null, form.GeneratedResult);
+            Equal(DataFileFormat.FixedLength, form.GeneratedResult!.Settings.OutputOptions.Format);
+            Equal(true, form.GeneratedResult.Records.Any(record => record[2].StartsWith(' ') && record[2].EndsWith(' ')));
             Get<ComboBox>(form, "format").SelectedIndex = 1;
             Equal(true, Get<Button>(form, "execute").Enabled);
             Invoke(form, "ExecuteGeneration");
-            Equal(true, form.GeneratedResult!.Records.Any(record => record[2].EndsWith(' ')));
+            Equal(DataFileFormat.Csv, form.GeneratedResult!.Settings.OutputOptions.Format);
+            Equal(true, form.GeneratedResult.Records.Any(record => record[2].StartsWith(' ') && record[2].EndsWith(' ')));
         });
         Test("Format and encoding switches preserve inherited fixed options and CSV header choices", () =>
         {
@@ -319,8 +320,21 @@ internal static partial class Program
         });
     }
 
-    private static TestDataGenerationForm NewGenerationForm(int initialFieldIndex = 0, int initialRecordIndex = 0, DataSaveOptions? options = null) =>
-        new(GenerationFields(), GenerationRows(), initialRecordIndex, initialFieldIndex, options ?? GenerationCsvOptions());
+    private static TestDataGenerationForm NewGenerationForm(int initialFieldIndex = 0, int initialRecordIndex = 0, DataSaveOptions? options = null)
+    {
+        // Most dialog behavior tests intentionally use an explicit remembered subset.
+        // Fresh all-checked defaults and persistence are covered separately.
+        var fields = GenerationFields();
+        var rows = GenerationRows();
+        var selected = initialFieldIndex >= 0 && initialFieldIndex < fields.Count && !fields[initialFieldIndex].IsRedefines;
+        var previous = new TestDataGenerationSettings(Math.Clamp(initialRecordIndex, 0, rows.Count - 1),
+            [selected ? initialFieldIndex : 0], GenerationRequirement.NumericLeadingZero | GenerationRequirement.NumericAllZero
+                | GenerationRequirement.NumericFullLength | GenerationRequirement.NumericMaximum | GenerationRequirement.TextMaximum,
+            4, options ?? GenerationCsvOptions());
+        var form = new TestDataGenerationForm(fields, rows, initialRecordIndex, initialFieldIndex, options ?? GenerationCsvOptions(), previous);
+        if (!selected) Invoke(form, "SetAllTargets", false);
+        return form;
+    }
 
     private static IReadOnlyList<FieldDefinition> GenerationFields() =>
     [
