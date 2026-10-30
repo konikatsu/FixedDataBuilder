@@ -29,9 +29,10 @@ public sealed partial class MainForm
         var panel = new FlowLayoutPanel
         {
             Name = "ViewModePanel", Dock = DockStyle.Top, AutoSize = true,
-            WrapContents = false, Padding = new Padding(8, 2, 8, 2)
+            WrapContents = true, Padding = new Padding(8, 2, 8, 2)
         };
-        panel.Controls.AddRange([listViewButton, singleViewButton, singleRecordNavigator, copyAllGridImageButton]);
+        panel.Controls.AddRange([listViewButton, singleViewButton, singleRecordNavigator, copyAllGridImageButton, generateTestDataButton]);
+        generateTestDataButton.Click += (_, _) => GenerateTestData();
         copyAllGridImageButton.Click += (_, _) => CopyAllGridImage();
         singleRecordNavigator.Controls.AddRange([previousRecordButton,
             new Label { Text = "行", AutoSize = true, Margin = new Padding(5, 7, 3, 0) },
