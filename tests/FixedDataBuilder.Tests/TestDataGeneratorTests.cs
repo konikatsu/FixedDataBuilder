@@ -14,6 +14,16 @@ internal static partial class Program
         TestDataGenerationSettings Settings(GenerationRequirement requirements, int count = 1, int[]? targets = null, DataSaveOptions? options = null)
             => new(0, targets ?? [0], requirements, count, options ?? csv);
         static string[] Values(TestDataGenerationPlan plan, int field = 0) => plan.CasesByField[field].Select(item => item.Value).ToArray();
+        static GenerationRequirement SpaceRequirements(int mask) => ((mask & 1) != 0 ? GenerationRequirement.TextLeadingSpace : GenerationRequirement.None)
+            | ((mask & 2) != 0 ? GenerationRequirement.TextInternalSpace : GenerationRequirement.None)
+            | ((mask & 4) != 0 ? GenerationRequirement.TextTrailingSpace : GenerationRequirement.None);
+        static int ActualSpaceMask(string value, char space, char marker)
+        {
+            var mask = value.Length >= 2 && value[0] == space && value[1] == marker ? 1 : 0;
+            if (value.Length >= 3 && Enumerable.Range(1, value.Length - 2).Any(index => value[index] == space && value[index - 1] == marker && value[index + 1] == marker)) mask |= 2;
+            if (value.Length >= 2 && value[^1] == space && value[^2] == marker) mask |= 4;
+            return mask;
+        }
 
         Test("Generation keeps four numeric requirements independent and preserves literal zeros", () =>
         {
@@ -58,9 +68,9 @@ internal static partial class Program
         {
             var plan = TestDataGenerator.Analyze([new("N", FieldDataType.PackedUnsigned, 4)], ["12"],
                 Settings(GenerationRequirement.NumericNegativeMaximum | GenerationRequirement.NumericMinimumUnit));
-            Equal(false, plan.HasBlockingIssues);
+            Equal(true, plan.HasBlockingIssues);
             Equal(0, plan.RequiredNormalCount);
-            Equal(2, plan.Issues.Count);
+            Equal(2, plan.Issues.Count(issue => issue.FieldIndex == 0));
         });
         Test("Generation combines or splits selected space positions at lengths one through five", () =>
         {
@@ -68,7 +78,7 @@ internal static partial class Program
             for (var length = 1; length <= 5; length++)
             {
                 var plan = TestDataGenerator.Analyze([new("X", FieldDataType.Text, length)], ["X"], Settings(spacePositions, 2));
-                Equal(false, plan.HasBlockingIssues);
+                Equal(length == 1, plan.HasBlockingIssues);
                 Equal(expected[length - 1], string.Join("|", Values(plan)));
                 Equal(true, plan.Issues.Any(issue => issue.Requirement == nameof(GenerationRequirement.TextInternalSpace)) == (length < 3));
                 foreach (var value in Values(plan)) Equal(length, value.Length);
@@ -81,6 +91,58 @@ internal static partial class Program
             Equal(false, plan.HasBlockingIssues);
             Equal("漢漢漢漢漢|　漢　漢　", string.Join("|", Values(plan)));
             Equal(false, Values(plan).Any(value => value.Any(char.IsSurrogate)));
+        });
+        Test("Generation every selected CSV space subset has exact leading, interior and trailing positions at lengths one through five", () =>
+        {
+            foreach (var type in new[] { FieldDataType.Text, FieldDataType.HalfWidthText, FieldDataType.FullWidthText })
+                for (var length = 1; length <= 5; length++)
+                    for (var mask = 1; mask <= 7; mask++)
+                    {
+                        var field = new FieldDefinition("SPACES", type, length);
+                        var marker = type == FieldDataType.FullWidthText ? '漢' : 'X';
+                        var space = type == FieldDataType.FullWidthText ? '\u3000' : ' ';
+                        var settings = Settings(SpaceRequirements(mask), 3);
+                        var plan = TestDataGenerator.Analyze([field], [marker.ToString()], settings);
+                        var expectedMask = mask & (length < 2 ? 0 : length < 3 ? 5 : 7);
+                        Equal(expectedMask == 0, plan.HasBlockingIssues);
+                        var covered = 0;
+                        foreach (var item in plan.CasesByField[0])
+                        {
+                            var declaredMask = int.Parse(item.CaseId[(item.CaseId.LastIndexOf('-') + 1)..]);
+                            var actualMask = ActualSpaceMask(item.Value, space, marker);
+                            Equal(declaredMask, actualMask);
+                            Equal(0, actualMask & ~mask);
+                            Equal(length, item.Value.Length);
+                            Equal(System.Numerics.BitOperations.PopCount((uint)declaredMask), item.Value.Count(character => character == space));
+                            covered |= actualMask;
+                        }
+                        Equal(expectedMask, covered);
+                        foreach (var (bit, requirement) in new[] { (1, GenerationRequirement.TextLeadingSpace), (2, GenerationRequirement.TextInternalSpace), (4, GenerationRequirement.TextTrailingSpace) })
+                            if ((mask & bit) != 0 && (expectedMask & bit) == 0) Equal(true, plan.Issues.Any(issue => issue.Requirement == requirement.ToString()));
+                    }
+            var regression = TestDataGenerator.Analyze([new("INTERNAL_AND_TRAILING", FieldDataType.Text, 4)], ["base"], Settings(SpaceRequirements(6)));
+            Equal("X X ", Values(regression).Single());
+        });
+        Test("Generation fixed whitespace subsets preserve only true internal spaces and explain excluded edges", () =>
+        {
+            foreach (var type in new[] { FieldDataType.Text, FieldDataType.FullWidthText })
+                for (var length = 1; length <= 5; length++)
+                    for (var mask = 1; mask <= 7; mask++)
+                    {
+                        var marker = type == FieldDataType.FullWidthText ? '漢' : 'X';
+                        var space = type == FieldDataType.FullWidthText ? '\u3000' : ' ';
+                        var plan = TestDataGenerator.Analyze([new("FIXED", type, length)], [marker.ToString()], Settings(SpaceRequirements(mask), options: fixedOptions));
+                        var expectedMask = length >= 3 ? mask & 2 : 0;
+                        Equal(expectedMask == 0, plan.HasBlockingIssues);
+                        Equal(expectedMask == 0 ? 0 : 1, plan.CasesByField[0].Count);
+                        foreach (var item in plan.CasesByField[0])
+                        {
+                            Equal(2, ActualSpaceMask(item.Value, space, marker));
+                            Equal(marker, item.Value[0]); Equal(marker, item.Value[^1]);
+                        }
+                        if ((mask & 1) != 0) Equal(true, plan.Issues.Any(issue => issue.Requirement == nameof(GenerationRequirement.TextLeadingSpace)));
+                        if ((mask & 4) != 0) Equal(true, plan.Issues.Any(issue => issue.Requirement == nameof(GenerationRequirement.TextTrailingSpace)));
+                    }
         });
         Test("Generation distinguishes CSV empty, half-space-only and full-space-only values", () =>
         {
@@ -205,6 +267,13 @@ internal static partial class Program
             Equal(true, TestDataGenerator.Analyze([new("BIG", FieldDataType.Text, 100_000)], ["x"], Settings(GenerationRequirement.TextMaximum, 201)).HasBlockingIssues);
             var manyFields = Enumerable.Range(0, 101).Select(index => new FieldDefinition($"F{index}", FieldDataType.Text, 1)).ToArray();
             Equal(true, TestDataGenerator.Analyze(manyFields, manyFields.Select(_ => "").ToArray(), Settings(GenerationRequirement.TextMaximum, 10_000)).HasBlockingIssues);
+            var paddingRequirements = fourNumbers | GenerationRequirement.NumericShort | GenerationRequirement.NumericNegativeMaximum
+                | GenerationRequirement.NumericMinimumUnit | GenerationRequirement.TextMaximum | GenerationRequirement.Identifier;
+            var paddingGuard = TestDataGenerator.Analyze([new("DECIMAL", FieldDataType.SignedNumber, 8, DecimalScale: 2), new("TEXT", FieldDataType.Text, 5)],
+                ["1.00", new string('x', 2_500_000)], Settings(paddingRequirements, targets: [0, 1]));
+            Equal(true, paddingGuard.HasBlockingIssues);
+            Equal(9, paddingGuard.RequiredNormalCount);
+            Equal(0, paddingGuard.CasesByField.Count); // Common padding + two identifier rows were budgeted before case strings.
         });
         Test("Generation bounds the combined normal and invalid row count", () =>
         {
@@ -306,6 +375,56 @@ internal static partial class Program
             Equal("Ｃ０００３|Ｒ０００２", string.Join("|", Values(plan, 2)));
             Equal(true, plan.CasesByField.Values.All(values => values.Count == 2 && values.All(item => !item.IntentionalInvalid)));
         });
+        Test("Generation aligns identifiers after all normal patterns across mixed physical and OCCURS fields", () =>
+        {
+            FieldDefinition[] fields = [new("NUMBER", FieldDataType.PlainNumber, 4), new("ALIAS", FieldDataType.Text, 4, RedefinesName: "NUMBER"),
+                new("ITEM(1)", FieldDataType.Text, 5), new("ITEM(2)", FieldDataType.FullWidthText, 5), new("KEEP", FieldDataType.Text, 4)];
+            string[] baseline = ["0042", "alias baseline", "first", "元", "keep"];
+            var requirements = fourNumbers | GenerationRequirement.TextMaximum | GenerationRequirement.Identifier;
+            var settings = Settings(requirements, 7, [0, 1, 2, 3]);
+            var plan = TestDataGenerator.Analyze(fields, baseline, settings);
+            Equal(false, plan.HasBlockingIssues);
+            Equal(6, plan.RequiredNormalCount);
+            Equal(false, plan.CasesByField.ContainsKey(1));
+            Equal("0123|0000|1234|9999", string.Join("|", Values(plan).Take(4)));
+            foreach (var index in new[] { 0, 2, 3 })
+            {
+                Equal(6, plan.CasesByField[index].Count);
+                Equal(true, plan.CasesByField[index][4].CaseId.EndsWith(".identifier.column", StringComparison.Ordinal));
+                Equal(true, plan.CasesByField[index][5].CaseId.EndsWith(".identifier.row", StringComparison.Ordinal));
+            }
+            Equal("XXXXX|first|first|first|C0003|R0006", string.Join("|", Values(plan, 2)));
+            Equal("漢漢漢漢漢|元|元|元|Ｃ０００４|Ｒ０００６", string.Join("|", Values(plan, 3)));
+            Equal(true, plan.CasesByField[2][1].Goal.StartsWith("基準値保持", StringComparison.Ordinal));
+            var generated = TestDataGenerator.Generate(fields, baseline, settings);
+            Equal("0001|alias baseline|C0003|Ｃ０００４|keep", string.Join("|", generated.Records[4]));
+            Equal("0006|alias baseline|R0006|Ｒ０００６|keep", string.Join("|", generated.Records[5]));
+            Equal("基準値のみ（追加行）", generated.Cases[6].Goal);
+            Equal(true, generated.Records[6].SequenceEqual(baseline));
+            Equal(true, generated.Cases[1].Cells[2].Goal.StartsWith("基準値保持", StringComparison.Ordinal));
+            Equal(TestDataGenerator.DefinitionFingerprint(fields), generated.DefinitionFingerprint);
+            var tooFew = settings with { NormalRecordCount = 5 };
+            Equal(6, TestDataGenerator.Analyze(fields, baseline, tooFew).RequiredNormalCount);
+            Throws<InvalidDataException>(() => TestDataGenerator.Generate(fields, baseline, tooFew));
+            var sameNumeric = TestDataGenerator.Analyze([new("KEEP", FieldDataType.Text, 2), new("SECOND", FieldDataType.PlainNumber, 2)], ["ok", "1"],
+                Settings(GenerationRequirement.Identifier, 2, [1]));
+            Equal("02|02", string.Join("|", Values(sameNumeric, 1)));
+            Equal(true, sameNumeric.Issues.Any(issue => issue.FieldIndex == 1 && issue.Requirement == "Identifier" && issue.Message.Contains("同じ値", StringComparison.Ordinal)));
+        });
+        Test("Generation keeps short numeric seven while documenting fixed serializer zero padding", () =>
+        {
+            FieldDefinition[] fields = [new("SHORT", FieldDataType.PlainNumber, 4)];
+            var settings = Settings(GenerationRequirement.NumericShort, options: fixedOptions);
+            var plan = TestDataGenerator.Analyze(fields, ["1"], settings);
+            Equal(false, plan.HasBlockingIssues);
+            Equal("7", Values(plan).Single());
+            Equal(true, plan.Issues.Any(issue => issue.Requirement == nameof(GenerationRequirement.NumericShort) && !issue.IsBlocking && issue.Message.Contains("ゼロ埋め", StringComparison.Ordinal)));
+            var generated = TestDataGenerator.Generate(fields, ["1"], settings);
+            Equal("7", generated.Records[0][0]);
+            Equal("0007", Encoding.ASCII.GetString(FixedLengthDataWriter.EncodeRecord(fields, generated.Records[0])));
+            var csvPlan = TestDataGenerator.Analyze(fields, ["1"], settings with { OutputOptions = csv });
+            Equal(false, csvPlan.Issues.Any(issue => issue.Requirement == nameof(GenerationRequirement.NumericShort)));
+        });
         Test("Generation reports unavoidable short column identifier collisions", () =>
         {
             var fields = Enumerable.Range(1, 11).Select(index => new FieldDefinition($"N{index}", FieldDataType.PlainNumber, 1)).ToArray();
@@ -322,6 +441,15 @@ internal static partial class Program
             Equal("C0002", Values(roomy, 1)[0]);
             Equal("C0020", Values(roomy, 19)[0]);
             Equal(false, roomy.Issues.Any(issue => issue.FieldIndex >= 0 && issue.Requirement == "Identifier"));
+        });
+        Test("Generation blocks when all selected requirements are unavailable instead of cloning only the baseline", () =>
+        {
+            var fields = new[] { new FieldDefinition("one digit", FieldDataType.PlainNumber, 1) };
+            var settings = Settings(GenerationRequirement.NumericLeadingZero, 4);
+            var plan = TestDataGenerator.Analyze(fields, ["7"], settings);
+            Equal(0, plan.RequiredNormalCount);
+            Equal(true, plan.HasBlockingIssues);
+            Throws<InvalidDataException>(() => TestDataGenerator.Generate(fields, ["7"], settings));
         });
         Test("Generation case IDs and structure fingerprints are stable and field-order-sensitive", () =>
         {

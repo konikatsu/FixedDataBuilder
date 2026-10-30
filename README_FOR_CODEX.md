@@ -7,6 +7,8 @@
 - 新しいデータとして保存先をクリアし、未保存編集の確認を経て結果を反映。JSONの生成条件・行項目対応表を別途保存し、編集値を記録。行参照・定義fingerprintが変われば対応表を無効化。実行結果や業務上の合格を自動で主張しない。
 - ユーザーが製品EXE・テストEXEを実行する方針を継続。こちらはbuild/publish --no-build/静的検査/パッケージだけ。起動OK以前のmain/Release/公開release/はv72を維持。起動OKを得た同一バイナリを再ビルドせず公開し、最新3版を残す。旧Releaseはメタデータと実ZIPの保管・SHA確認後にReleaseだけ整理、タグ・履歴・ローカルは保持。
 - 迷う点はantigravity CLI gemini-4-argon-medium（effort medium）とClaude Code claude-opus-5-5（effort high）へ、版数付き依頼を読ませて版数付き結果ファイルに出力させる。レビューでも製品/テストの実行や設定変更を禁止し、秘密情報・無関係な業務資料は含めない。レビュー待ち/実施済みと実テスト合格を混同しない。
+- reviews/test-data-generation-v0.1.73/review-v001に依頼・封印75ファイル・2回答・検証記録を保存。Claudeのreport WriteはCLI権限で拒否されたため、権限を緩めずWrite提案の正式本文だけ回収し由来を記録。Claude実modelIDはclaude-opus-5-5をmetadataで確認、Geminiは指定引数と申告のみでサーバーIDは未検証。effort実効値を独立に保証しない。
+- 指摘を個別査定し、内部＋末尾の空白/共通識別行/N幅変更とreport保持/無編集数値の再整形/FillWeight合計制約/生成適用rollback/有効ケース0/条件件数の手入力を修正。固定長shortは注記して従来ゼロ埋め維持。小数の整数桁あふれ生成・0.1先頭ゼロ・非ASCIIの既存validatorに関する誤読は追加制限を入れず、理由をローカル査定資料へ残す。reportはstream serialize＋一時file置換で大きなJSON文字列を作らず、元data/定義上書きを拒否。試験数263件は未実行。
 
 ## v0.1.72：データの上寄せ（2026-10-30、利用者起動確認後の公開）
 

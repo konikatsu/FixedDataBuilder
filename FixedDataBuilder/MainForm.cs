@@ -2504,8 +2504,11 @@ public sealed partial class MainForm : Form
             }
 
             var formattedValue = FormatValueForDisplay(field, grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty, IsCsv);
-            if (records[recordIndex][fieldRowsFieldIndex] != formattedValue) SetUnsavedChanges(true);
-            records[recordIndex][fieldRowsFieldIndex] = formattedValue;
+            if (FormatValueForDisplay(field, records[recordIndex][fieldRowsFieldIndex], IsCsv) != formattedValue)
+            {
+                SetUnsavedChanges(true);
+                records[recordIndex][fieldRowsFieldIndex] = formattedValue;
+            }
             grid[columnIndex, rowIndex].Value = formattedValue;
             ApplyCellValidationStyle(grid[columnIndex, rowIndex], field, formattedValue);
             UpdateSingleRecordDetails(rowIndex);
@@ -2532,8 +2535,11 @@ public sealed partial class MainForm : Form
         }
 
         var recordRowsFormattedValue = FormatValueForDisplay(recordRowsField, grid[columnIndex, rowIndex].Value?.ToString() ?? string.Empty, IsCsv);
-        if (records[recordRowsRecordIndex][fieldIndex] != recordRowsFormattedValue) SetUnsavedChanges(true);
-        records[recordRowsRecordIndex][fieldIndex] = recordRowsFormattedValue;
+        if (FormatValueForDisplay(recordRowsField, records[recordRowsRecordIndex][fieldIndex], IsCsv) != recordRowsFormattedValue)
+        {
+            SetUnsavedChanges(true);
+            records[recordRowsRecordIndex][fieldIndex] = recordRowsFormattedValue;
+        }
         grid[columnIndex, rowIndex].Value = recordRowsFormattedValue;
         ApplyCellValidationStyle(grid[columnIndex, rowIndex], recordRowsField, recordRowsFormattedValue);
         RefreshByteRulers(fieldIndex);
@@ -3466,6 +3472,7 @@ public sealed partial class MainForm : Form
     {
         return new DataGridViewTextBoxColumn
         {
+            FillWeight = 1,
             Name = name,
             HeaderText = header,
             Width = width,
@@ -3479,6 +3486,7 @@ public sealed partial class MainForm : Form
     {
         return new DataGridViewTextBoxColumn
         {
+            FillWeight = 1,
             Name = name,
             HeaderText = header,
             Width = width,
