@@ -23,6 +23,9 @@ internal static partial class Program
             Equal("0 / 0", grid[5, 0].Value);
             Equal(false, Get<Panel>(form, "hexArea").Visible);
             Equal(false, grid[3, 0].ReadOnly);
+            foreach (DataGridViewRow row in grid.Rows)
+            foreach (DataGridViewCell cell in row.Cells)
+                Equal(DataGridViewContentAlignment.TopLeft, cell.InheritedStyle.Alignment);
             foreach (var column in new[] { 0, 1, 2, 4, 5 }) Equal(true, grid[column, 0].ReadOnly);
             Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 1, 10, true, 12));
             Equal("1234567890|12…", string.Join("|", (IReadOnlyList<string>)Invoke(form, "WrappedDisplayLines", 0, 3)!));

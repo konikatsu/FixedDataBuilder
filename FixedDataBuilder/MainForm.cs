@@ -514,14 +514,14 @@ public sealed partial class MainForm : Form
         grid.AllowUserToAddRows = false;
         grid.AllowUserToDeleteRows = false;
         grid.RowHeadersVisible = false;
-        grid.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        grid.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
         grid.RowHeadersDefaultCellStyle.BackColor = DefinitionBackColor;
         grid.RowHeadersDefaultCellStyle.SelectionBackColor = DefinitionBackColor;
         grid.RowHeadersDefaultCellStyle.SelectionForeColor = grid.DefaultCellStyle.ForeColor;
         grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
         grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-        grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
         grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
         grid.EnableHeadersVisualStyles = false;
         grid.CellEndEdit += (_, e) =>
@@ -681,7 +681,7 @@ public sealed partial class MainForm : Form
             if (!selected) PaintVisibleSpaceHighlights(e.Graphics, font, bounds, line);
             TextRenderer.DrawText(e.Graphics, line, font, bounds,
                 selected ? e.CellStyle.SelectionForeColor : e.CellStyle.ForeColor,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix
+                TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix
                     | TextFormatFlags.SingleLine | TextFormatFlags.PreserveGraphicsClipping);
             bounds.Y += font.Height + 2;
         }
@@ -3004,7 +3004,7 @@ public sealed partial class MainForm : Form
             font,
             textBounds,
             selected ? e.CellStyle.SelectionForeColor : e.CellStyle.ForeColor,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix
+            TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix
                 | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.PreserveGraphicsClipping);
         e.Handled = true;
     }

@@ -4,7 +4,7 @@ internal static partial class Program
 {
     private static void RunCellDisplayTests(string repo)
     {
-        Test("Space markers and plain text start at the same pixel in both layouts and font sizes", () =>
+        Test("Space markers and plain text start at the same top position even when rows grow taller", () =>
         {
             foreach (var recordRows in new[] { false, true })
             foreach (var size in new[] { 12f, 18f })
@@ -24,9 +24,13 @@ internal static partial class Program
                 var plainStart = FirstTextPixel(bitmap, plain, white: false);
                 var spacesStart = FirstTextPixel(bitmap, spaces, white: false);
                 Equal(plainStart, spacesStart);
+                foreach (DataGridViewRow row in grid.Rows) row.Height += 20;
+                using var taller = RenderGrid(form);
+                Equal(plainStart, FirstTextPixel(taller, grid.GetCellDisplayRectangle(recordRows ? 1 : 2, start, false), white: false));
+                Equal(spacesStart, FirstTextPixel(taller, grid.GetCellDisplayRectangle(recordRows ? 1 : 6, recordRows ? start + 4 : 0, false), white: false));
             }
         });
-        Test("Text, numbers and column headings all use left alignment", () =>
+        Test("Grid body and row numbers use top-left alignment while column headings stay left-aligned", () =>
         {
             foreach (var recordRows in new[] { false, true })
             {
@@ -34,10 +38,10 @@ internal static partial class Program
                 var grid = Get<DataGridView>(form, "grid");
                 foreach (DataGridViewColumn column in grid.Columns)
                     Equal(DataGridViewContentAlignment.MiddleLeft, column.HeaderCell.InheritedStyle.Alignment);
+                Equal(DataGridViewContentAlignment.TopLeft, grid.RowHeadersDefaultCellStyle.Alignment);
                 foreach (DataGridViewRow row in grid.Rows)
                 foreach (DataGridViewCell cell in row.Cells)
-                    Equal(recordRows && row.Index == 0 ? DataGridViewContentAlignment.TopLeft : DataGridViewContentAlignment.MiddleLeft,
-                        cell.InheritedStyle.Alignment);
+                    Equal(DataGridViewContentAlignment.TopLeft, cell.InheritedStyle.Alignment);
                 if (recordRows)
                 {
                     Equal("カラム番号", grid.Columns[0].HeaderText);
