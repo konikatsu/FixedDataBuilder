@@ -7,6 +7,7 @@
 - 既存の独立dataset/読込dialogを再利用、候補/マッピング/行対応/期待値/一致判定のUIを新画面に出さない。元fileとMainFormのdirty/recordを変更しない。固定長は原本保持時の文字格納空白を可視化、snapshotは従来の論理値と補完表示。CSV aliasは物理列なしを明示。UTF8定義をMS932指定した画像のエラーは公開sampleでも先頭byte E9 A0 85 E7からindex2の85 E7と確認、読込errorへ定義/data/filename/指定codecを付記する。
 - VisualComparisonTests10件を追加し全337件、未実行。利用者が製品・テスト・撮影helperを起動する指示を継続、assistantはbuild/publish --no-build/package/static確認のみ。旧製品・既公開ZIPは変更しない。起動OKの同一artifactのみmain/Releaseへ反映。新画面画像を捏造しない。レビューは迷う点がある場合に版数付きrequest/resultsへ、Argonの有用性を判断し必要時Claude単独。
 - 証拠reviews/visual-comparison-v0.1.75/v001。確認前の公開main/Releaseはv74を維持し、source branchのみpushする。公開後は最新3版v75/v74/v73を残し、v72 Releaseだけmetadata・実ZIPの保管/sha確認後整理、tag/history/localは保持。
+- 最終build-v003は--no-incremental、警告0/エラー0、source前後hash不変、test内製品DLLと一致。publish --no-build、ZIP370173バイト/50項目、SHA256=E322687E0405A406D72294E53791EE3A64EF674CDABD5115C8DD61D4A599E25C。DLL SHA256=D041CFC8D171CC72FF5BBED6593BAD33D2F8DC2F5B0958A915E2979660F63C07。v74の製品/ZIPは不変。利用者のv75具体EXEパスの起動報告を待ち、確認後も再ビルドしない。337件は未実行、実画面確認は利用者担当。
 
 ## v0.1.74：読み取り専用の入力・出力比較（2026-10-30、利用者起動確認後の公開）
 
