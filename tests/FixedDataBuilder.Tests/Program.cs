@@ -324,6 +324,10 @@ internal static partial class Program
             RunTestDataGeneratorTests(repo);
             RunTestDataGenerationFormTests(repo);
             RunTestDataGenerationIntegrationTests(repo);
+            RunComparisonEngineTests(repo);
+            RunComparisonRuleFormTests(repo);
+            RunComparisonFormTests(repo);
+            RunComparisonIntegrationTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

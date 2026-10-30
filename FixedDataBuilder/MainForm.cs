@@ -491,9 +491,11 @@ public sealed partial class MainForm : Form
             CreateMenuItem("折り返し表示設定...", (_, _) => ChooseDisplayWrapOptions())));
         generateTestDataMenu.Click += (_, _) => GenerateTestData();
         generationReportMenu.Click += (_, _) => SaveGenerationReport();
+        comparisonMenu.Click += (_, _) => OpenComparison();
         menuStrip.Items.Add(CreateMenu("ツール",
             generateTestDataMenu,
             generationReportMenu,
+            comparisonMenu,
             new ToolStripSeparator(),
             CreateMenuItem("検証", (_, _) => ValidateRecords(showSuccess: true))));
         RefreshRecentFileItems();
@@ -3286,6 +3288,7 @@ public sealed partial class MainForm : Form
     private void UpdateLayoutButtons()
     {
         UpdateGenerationControls();
+        UpdateComparisonControls();
         captureAllImagesButton.Enabled = !isSingleRecordView && records.Count > 0 && VisibleFieldIndexes().Count > 0;
         copyAllGridImageButton.Enabled = copyAllGridImageMenu.Enabled = captureAllImagesButton.Enabled;
         byteRulerButton.Enabled = layout == GridLayout.RecordRows && !isSingleRecordView && fields.Count > 0;
