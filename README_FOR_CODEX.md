@@ -1,5 +1,14 @@
 # README_FOR_CODEX
 
+## v0.1.74：読み取り専用の入力・出力比較（2026-10-30、作成中）
+
+- v73の生成機能と並行してcodex/comparison-v0.1.74で開発。v73レビュー修正46f0fa5をmergeし、生成も含めて提供する。main/Release/公開releaseは起動確認済みv72を維持し、製品/テストは利用者が起動する。ユーザーが起動OKを報告した同一バイナリだけ公開する。
+- 独立した不変dataset・各profile/指紋とraw sourceを保持。MainFormからは現在編集値のコピーでrawなし、比較画面からCSV/COPYと固定長/CSVを読み直すとsource bytesを取得。定義/データのread-only handleを解析中保持しlogicalとrawの出所を混ぜない。XML入口は公開しない。
+- 明示No/正式名/完全一致の候補を自動確定しない。手動の独立行番号と複合キーを分離、重複・片側のみは状態を保持。式は閉じたtyped treeで入力/固定/文字orbyte切取/ordered concat/pad/simpleif、未知は未算出。参照metadata一致・深さ/長さ/件数/JSON schemaとsemantics版を検証。原文コメントは編集しない。
+- 通常GUIから式を組み立て、詳細JSONは補助。条件の元値と中間trace・期待値・出力値をread-only表示。入力参照のない式だけは行対応なしで独立評価する。保存設定のfingerprint不一致時は適用せず既存state保持。選択行の比較記録JSONは条件/trace/source指紋を記録し元data/定義の上書きを拒否。画像はmain一覧機能と区別。
+- 統合static reviewでInvalidDataExceptionのcatch漏れ、参照なし式と曖昧pairのUI/core/Evidence不一致を修正。新規読込の初期codecは既存Detectorの候補、ASCIIは元値保持、手動変更優先・Loadクリックで再推定しない。
+- ComparisonEngine20/RuleForm9/Form16/Integration4を追加。v73の263と合計312件、全件未実行。5つの架空sampleを追加（公開samples計45）。build/publish --no-build/静的検査/パッケージのみ許可。比較機能も版数付き依頼・結果で外部レビューし、指摘は実sourceで個別査定する。
+
 ## v0.1.73：正常な1行を複製するテストデータ生成（2026-10-30、作成中）
 
 - ユーザーが生成と比較機能の提案を承認。生成は既存正常行を複製し選択条件だけ変える方式。C7_04相談とローカル検討をreviews/test-data-generationおよびcomparison-modeの版数付き資料に保持。v73を生成、v74を独立した読み取り専用比較として並行実装する。

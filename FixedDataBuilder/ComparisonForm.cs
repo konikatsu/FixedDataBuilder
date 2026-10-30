@@ -198,7 +198,7 @@ public sealed class ComparisonForm : Form
         && pair.InputRecordIndex == InputIndex ? pair : null;
     private ComparisonRecordPair? EvidencePair => CurrentPair
         ?? (StoredCurrentPair is { Kind: ComparisonPairKind.Ambiguous or ComparisonPairKind.OutputOnly } stored ? stored
-            : OutputIndex is int index ? new ComparisonRecordPair(null, index, ComparisonPairKind.OutputOnly) : null);
+            : OutputIndex is int index ? new ComparisonRecordPair(null, index, ComparisonPairKind.Unconfirmed) : null);
     private static bool HasNoInputReferences(ComparisonFieldMapping? mapping) => mapping?.Kind is ComparisonMappingKind.Fixed or ComparisonMappingKind.Expression
         && mapping.Expression is not null && ComparisonEngine.GetInputReferences(mapping.Expression).Count == 0;
 
@@ -239,15 +239,17 @@ public sealed class ComparisonForm : Form
         var referenceText = candidate && suggestion?.Candidates.Count > 0
             ? "候補: " + string.Join(", ", suggestion.Candidates.Select(item => $"No.{item.InputFieldOrdinal + 1}"))
             : string.Join(", ", references.Select(item => $"No.{item.FieldOrdinal + 1}"));
-        var actual = OutputIndex is int outputIndex ? output.ReadSource(outputIndex, ordinal, mapping?.OutputSourceKind ?? ComparisonSourceKind.LogicalValue).Value : null;
+        var actualSource = OutputIndex is int outputIndex ? output.ReadSource(outputIndex, ordinal, mapping?.OutputSourceKind ?? ComparisonSourceKind.LogicalValue) : null;
+        var actual = actualSource?.Value;
         ComparisonResult result;
-        if (input is null) result = new(ComparisonResultStatus.InputUnmapped, null, actual, "入力ファイルを読み込んでください。");
+        if (actualSource is { Success: false }) result = new(ComparisonResultStatus.CannotEvaluate, null, null, actualSource.Reason);
+        else if (input is null) result = new(ComparisonResultStatus.InputUnmapped, null, actual, "入力ファイルを読み込んでください。");
         else if (candidate)
             result = new(suggestion?.IsAmbiguous == true ? ComparisonResultStatus.Ambiguous : ComparisonResultStatus.FieldUnmapped,
                 null, actual, suggestion?.Candidates.Count > 0 ? "入力候補です。対応を編集して確定してください。" : "対応する入力・固定値・式が未設定です。");
         else if (HasNoInputReferences(mapping) && OutputIndex is int independentOutput)
         {
-            result = ComparisonEngine.Compare(input, output, new(null, independentOutput, ComparisonPairKind.OutputOnly), mapping!);
+            result = ComparisonEngine.Compare(input, output, new(null, independentOutput, ComparisonPairKind.Unconfirmed), mapping!);
             result = result with { Reason = result.Reason + "／入力参照なし（入力行の対応は不要）" };
         }
         else if (StoredCurrentPair?.Kind == ComparisonPairKind.Ambiguous)
@@ -259,13 +261,18 @@ public sealed class ComparisonForm : Form
         else result = ComparisonEngine.Compare(input, output, pair, mapping!);
         displayedResults[ordinal] = result;
         var inputValue = input is null || InputIndex is not int inputIndex ? "" : candidate
-            ? string.Join(" / ", (suggestion?.Candidates ?? []).Select(item => $"候補No.{item.InputFieldOrdinal + 1}=[{input.Records[inputIndex][item.InputFieldOrdinal]}]"))
+            ? string.Join(" / ", (suggestion?.Candidates ?? []).Select(item =>
+            {
+                var source = input.ReadSource(inputIndex, item.InputFieldOrdinal);
+                return $"候補No.{item.InputFieldOrdinal + 1}=[{(source.Success ? source.Value : "取得不可: " + source.Reason)}]";
+            }))
             : string.Join(" / ", references.Select(item =>
             {
                 var source = input.ReadSource(inputIndex, item.FieldOrdinal, item.SourceKind);
                 return $"No.{item.FieldOrdinal + 1}=[{(source.Success ? source.Value : "取得不可")}]";
             }));
-        var state = candidate && suggestion?.Candidates.Count > 0 ? "候補（未確定）" : StateText(result.Status);
+        var state = candidate && result.Status == ComparisonResultStatus.FieldUnmapped && suggestion?.Candidates.Count > 0
+            ? "候補（未確定）" : StateText(result.Status);
         var row = comparisonGrid.Rows[comparisonGrid.Rows.Add(ordinal + 1, field.Name, field.DisplayDefinition, referenceText,
             inputValue, mapping is null ? "未設定" : ExpressionText(mapping), result.ExpectedValue, result.OutputValue, state, result.Reason)];
         row.Tag = ordinal;
@@ -295,14 +302,7 @@ public sealed class ComparisonForm : Form
         return "現在の行の組は未確定。入力・出力の行番号を別々に選び、組を確定してください。";
     }
 
-    private static string StateText(ComparisonResultStatus status) => status switch
-    {
-        ComparisonResultStatus.DirectValueEqual => "元値一致", ComparisonResultStatus.DirectValueDifferent => "元値不一致",
-        ComparisonResultStatus.CalculatedExpectedEqual => "期待値一致", ComparisonResultStatus.CalculatedExpectedDifferent => "期待値不一致",
-        ComparisonResultStatus.FieldUnmapped => "項目未対応", ComparisonResultStatus.InputUnmapped => "入力・行未対応",
-        ComparisonResultStatus.OutputUnmapped => "出力未対応", ComparisonResultStatus.Ambiguous => "曖昧・未確定",
-        ComparisonResultStatus.Unsupported => "未対応の式", _ => "算出不可"
-    };
+    private static string StateText(ComparisonResultStatus status) => ComparisonEvidence.StateText(status);
 
     private static string ExpressionText(ComparisonFieldMapping mapping) => mapping.Kind switch
     {
@@ -386,7 +386,7 @@ public sealed class ComparisonForm : Form
     {
         if (input is null) throw new InvalidOperationException("入力を先に読み込んでください。");
         var proposed = mappings.Values.Where(item => item.OutputFieldOrdinal != mapping.OutputFieldOrdinal).Append(mapping).ToArray();
-        _ = ComparisonSettingsStore.Create(input, output, proposed, recordPairs);
+        ComparisonSettingsStore.Validate(input, output, proposed, recordPairs);
         mappings[mapping.OutputFieldOrdinal] = mapping;
         statusText.Text = $"出力No.{mapping.OutputFieldOrdinal + 1}の対応を確定しました。";
         RefreshComparison();
@@ -403,7 +403,8 @@ public sealed class ComparisonForm : Form
     private void ConfirmCurrentPair()
     {
         if (input is null || InputIndex is not int inputIndex || OutputIndex is not int outputIndex) return;
-        recordPairs.RemoveAll(pair => pair.OutputRecordIndex == outputIndex);
+        recordPairs.RemoveAll(pair => pair.OutputRecordIndex == outputIndex
+            || pair.Kind == ComparisonPairKind.InputOnly && pair.InputRecordIndex == inputIndex);
         recordPairs.Add(new(inputIndex, outputIndex, ComparisonPairKind.Manual));
         statusText.Text = $"入力{inputIndex + 1}行と出力{outputIndex + 1}行の組を手動で確定しました。";
         RefreshComparison();
@@ -433,6 +434,7 @@ public sealed class ComparisonForm : Form
     {
         if (input is null) throw new InvalidOperationException("入力を先に読み込んでください。");
         var pairs = ComparisonEngine.PairByKeys(input, output, inputKeys, outputKeys);
+        ComparisonSettingsStore.Validate(input, output, mappings.Values.ToArray(), pairs);
         recordPairs.Clear(); recordPairs.AddRange(pairs);
         statusText.Text = $"キーの行対応: 一意{pairs.Count(pair => pair.Kind == ComparisonPairKind.KeyUnique)}件 / 曖昧{pairs.Count(pair => pair.Kind == ComparisonPairKind.Ambiguous)}件 / 入力のみ{pairs.Count(pair => pair.Kind == ComparisonPairKind.InputOnly)}件 / 出力のみ{pairs.Count(pair => pair.Kind == ComparisonPairKind.OutputOnly)}件。重複は手動確認してください。";
         RefreshComparison();
@@ -490,7 +492,8 @@ public sealed class ComparisonForm : Form
         EnsureSeparateDestination(path);
         var allMappings = Enumerable.Range(0, output.Fields.Count).Select(ordinal => mappings.TryGetValue(ordinal, out var mapping)
             ? mapping : new ComparisonFieldMapping(ordinal, ComparisonMappingKind.Unmapped, [])).ToArray();
-        ComparisonEvidence.Write(path, input, output, pair, allMappings);
+        ComparisonEvidence.Write(path, input, output, pair, allMappings,
+            new ComparisonEvidenceContext(InputIndex, CurrentPair is not null, StoredCurrentPair, suggestions));
         statusText.Text = "現在の行対応・式・期待値・出力値・算出過程の記録を保存しました。";
     }
 
@@ -498,7 +501,7 @@ public sealed class ComparisonForm : Form
     {
         var target = Path.GetFullPath(path);
         foreach (var source in new[] { input?.DefinitionPath, input?.DataPath, output.DefinitionPath, output.DataPath }
-            .Where(item => !string.IsNullOrWhiteSpace(item) && !item.StartsWith("excel://", StringComparison.OrdinalIgnoreCase)))
+            .Where(item => !string.IsNullOrWhiteSpace(item) && File.Exists(item)))
             if (string.Equals(target, Path.GetFullPath(source!), StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("元の定義・データファイルには保存できません。別のファイル名を指定してください。");
     }
@@ -570,7 +573,7 @@ public sealed class ComparisonForm : Form
             Controls.Add(layout); AcceptButton = load; CancelButton = cancel;
             var profile = current?.Profile ?? new ComparisonDataProfile();
             definitionPath.Text = current?.DefinitionPath ?? ""; dataPath.Text = current?.DataPath ?? "";
-            definitionEncoding.SelectedIndex = 0;
+            definitionEncoding.SelectedIndex = (int)(current?.DefinitionEncoding ?? DefinitionTextEncoding.Auto);
             format.SelectedIndex = profile.Format == DataFileFormat.Csv ? profile.CsvHasHeader ? 2 : 1 : 0;
             csvEncoding.SelectedIndex = (int)profile.CsvEncoding; separator.SelectedIndex = profile.SeparatorMode == RecordSeparatorMode.None ? 1 : 0;
             national.SelectedIndex = (int)profile.NationalEncoding; textEncoding.SelectedIndex = (int)profile.DataEncoding;
@@ -642,12 +645,14 @@ public sealed class ComparisonForm : Form
                     ? "ASCIIのみ（UTF-8・SJIS・MS932共通。現在の指定を保持）" : detection.Description;
                 detectionLabel.Text = description + (manual && !force ? "／手動指定を保持" : "") + "\r\n型N・改行・定義の文字コードは変更しません。";
             }
-            catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException)
+            catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException or OverflowException or FormatException)
             { detectionLabel.Text = "判別できません：" + exception.Message; }
         }
 
         private void LoadData()
         {
+            DataSet = null;
+            DialogResult = DialogResult.None;
             try
             {
                 if (string.IsNullOrWhiteSpace(definitionPath.Text) || string.IsNullOrWhiteSpace(dataPath.Text)) throw new InvalidDataException("定義とデータを選択してください。");
@@ -655,10 +660,11 @@ public sealed class ComparisonForm : Form
                     (CsvTextEncoding)csvEncoding.SelectedIndex, format.SelectedIndex == 2,
                     separator.SelectedIndex == 1 ? RecordSeparatorMode.None : RecordSeparatorMode.CrLfOrLf,
                     (DataEncodingProfile)textEncoding.SelectedIndex, (NationalTextEncoding)national.SelectedIndex);
-                DataSet = ComparisonDataSet.Load(definitionPath.Text, dataPath.Text, profile, (DefinitionTextEncoding)definitionEncoding.SelectedIndex);
+                var loaded = ComparisonDataSet.Load(definitionPath.Text, dataPath.Text, profile, (DefinitionTextEncoding)definitionEncoding.SelectedIndex);
+                DataSet = loaded;
                 DialogResult = DialogResult.OK;
             }
-            catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException)
+            catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException or OverflowException or FormatException)
             { error.Text = exception.Message; }
         }
     }

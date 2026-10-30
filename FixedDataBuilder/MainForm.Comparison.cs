@@ -8,7 +8,7 @@ public sealed partial class MainForm
     private ComparisonDataSet CreateComparisonOutputSnapshot() => ComparisonDataSet.FromRecords(fields,
         records, new ComparisonDataProfile(currentDataFileFormat, currentCsvEncoding, currentCsvHasHeader,
             currentSeparatorMode, currentDataEncodingProfile, currentNationalTextEncoding),
-        GetCurrentDefinitionPath(), GetCurrentDataPath());
+        GetCurrentDefinitionPath(), GetCurrentDataPath(), definitionEncoding: definitionTextEncoding);
 
     private void OpenComparison()
     {

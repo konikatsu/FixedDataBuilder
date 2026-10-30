@@ -175,5 +175,29 @@ internal static partial class Program
             Get<TextBox>(form, "jsonText").Text = "{\"$op\":\"unsupported\",\"Description\":\"未対応の原式\"}";
             Equal(false, (bool)Invoke(form, "TryBuildAndPreview", false)!);
         });
+
+        Test("Comparison rule empty concatenation round-trips in the normal GUI as an input-independent expression", () =>
+        {
+            var input = ComparisonFixture(["source"], Array.Empty<string[]>());
+            var output = ComparisonFixture(["result"], [new[] { "" }]);
+            var existing = new ComparisonFieldMapping(0, ComparisonMappingKind.Expression, [],
+                new ComparisonConcatExpression([]), Note: "空文字を結合規則として保持");
+            using var form = new ComparisonRuleForm(input, output, 0, existing);
+            Equal(3, Get<ComboBox>(form, "operationCombo").SelectedIndex);
+            Equal(0, Get<ListBox>(form, "concatParts").Items.Count);
+            Equal(true, Descendants(form).OfType<Label>().Any(label => label.Text.Contains("0個") && label.Text.Contains("空文字")));
+            Equal(true, (bool)Invoke(form, "TryBuildAndPreview", false)!);
+            var preview = Get<TextBox>(form, "previewText").Text;
+            Equal(true, preview.Contains("期待値: []"));
+            Equal(true, preview.Contains("結合: []"));
+            Equal(true, (bool)Invoke(form, "TryBuildAndPreview", true)!);
+            var restored = form.Mapping!;
+            Equal(ComparisonMappingKind.Expression, restored.Kind);
+            Equal(0, restored.Inputs.Count);
+            Equal("空文字を結合規則として保持", restored.Note);
+            Equal(true, restored.Expression is ComparisonConcatExpression { Parts.Count: 0 });
+            Equal(ComparisonResultStatus.CalculatedExpectedEqual, ComparisonEngine.Compare(input, output,
+                new(null, 0, ComparisonPairKind.OutputOnly), restored).Status);
+        });
     }
 }

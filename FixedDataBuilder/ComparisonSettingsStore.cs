@@ -29,6 +29,7 @@ public static class ComparisonSettingsStore
     public const int MaxFileBytes = 4_000_000;
     public const int MaxMappings = 10_000;
     public const int MaxRecordPairs = 100_000;
+    public const long MaxTotalCandidateReferences = 500_000;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -41,12 +42,12 @@ public static class ComparisonSettingsStore
     public static ComparisonSettings Create(ComparisonDataSet input, ComparisonDataSet output,
         IReadOnlyList<ComparisonFieldMapping> mappings, IReadOnlyList<ComparisonRecordPair> recordPairs)
     {
-        var settings = new ComparisonSettings(CurrentSchemaVersion, CurrentSemanticsVersion,
-            input.DefinitionFingerprint, output.DefinitionFingerprint, input.RecordFingerprint, output.RecordFingerprint,
-            mappings, recordPairs);
+        var settings = CurrentSettings(input, output, mappings, recordPairs);
         Validate(settings, input, output);
-        // Clone using the same serialization contract to detach mutable caller-owned arrays/lists.
-        return JsonSerializer.Deserialize<ComparisonSettings>(JsonSerializer.Serialize(settings, JsonOptions), JsonOptions)!;
+        // The same bounded JSON contract is used for cloning and saving. No intermediate JSON
+        // string or unlimited byte array is created, even when callers reuse a large candidate list.
+        using var serialized = SerializeBounded(settings);
+        return Freeze(JsonSerializer.Deserialize<ComparisonSettings>(serialized, JsonOptions)!);
     }
 
     public static void Save(string path, ComparisonSettings settings, ComparisonDataSet input, ComparisonDataSet output)
@@ -54,13 +55,13 @@ public static class ComparisonSettingsStore
         Validate(settings, input, output);
         if (!FingerprintsMatch(settings, input, output))
             throw new InvalidDataException("比較設定の定義・レコードが現在のデータと一致しません。再確認してください。");
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(settings, JsonOptions);
-        if (bytes.Length > MaxFileBytes) throw new InvalidDataException("比較設定のファイルサイズが上限を超えます。");
+        using var serialized = SerializeBounded(settings);
         var target = Path.GetFullPath(path);
         var temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllBytes(temporary, bytes);
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                serialized.CopyTo(stream);
             File.Move(temporary, target, overwrite: true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
@@ -121,6 +122,16 @@ public static class ComparisonSettingsStore
         }
     }
 
+    /// <summary>Validate proposed UI state without serializing, cloning or modifying either dataset.</summary>
+    public static void Validate(ComparisonDataSet input, ComparisonDataSet output,
+        IReadOnlyList<ComparisonFieldMapping> mappings, IReadOnlyList<ComparisonRecordPair> recordPairs)
+        => Validate(CurrentSettings(input, output, mappings, recordPairs), input, output);
+
+    private static ComparisonSettings CurrentSettings(ComparisonDataSet input, ComparisonDataSet output,
+        IReadOnlyList<ComparisonFieldMapping> mappings, IReadOnlyList<ComparisonRecordPair> recordPairs) =>
+        new(CurrentSchemaVersion, CurrentSemanticsVersion, input.DefinitionFingerprint, output.DefinitionFingerprint,
+            input.RecordFingerprint, output.RecordFingerprint, mappings, recordPairs);
+
     private static void ValidateShape(ComparisonSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -133,6 +144,16 @@ public static class ComparisonSettingsStore
         if (settings.Mappings is null || settings.Mappings.Count > MaxMappings
             || settings.RecordPairs is null || settings.RecordPairs.Count > MaxRecordPairs)
             throw new InvalidDataException("比較設定の件数が不正、または上限を超えます。");
+        // Check counts before visiting any candidate value. Shared/virtual candidate collections
+        // can describe a huge expanded document without themselves occupying much memory.
+        long candidateReferences = 0;
+        foreach (var pair in settings.RecordPairs)
+        {
+            if (pair is null) throw new InvalidDataException("レコード対応の形式が不正です。");
+            candidateReferences += (long)(pair.InputCandidates?.Count ?? 0) + (pair.OutputCandidates?.Count ?? 0);
+            if (candidateReferences > MaxTotalCandidateReferences)
+                throw new InvalidDataException($"対応候補が多すぎます（合計上限 {MaxTotalCandidateReferences:N0} 件）。キー項目を追加して候補を絞り込んでください。");
+        }
         foreach (var mapping in settings.Mappings)
         {
             if (mapping is null || !Enum.IsDefined(mapping.Kind) || !Enum.IsDefined(mapping.OutputSourceKind)
@@ -162,7 +183,8 @@ public static class ComparisonSettingsStore
             if (pair.Kind is ComparisonPairKind.Manual or ComparisonPairKind.KeyUnique
                 && (pair.InputRecordIndex is null || pair.OutputRecordIndex is null)
                 || pair.Kind == ComparisonPairKind.InputOnly && (pair.InputRecordIndex is null || pair.OutputRecordIndex is not null)
-                || pair.Kind == ComparisonPairKind.OutputOnly && (pair.OutputRecordIndex is null || pair.InputRecordIndex is not null))
+                || (pair.Kind is ComparisonPairKind.OutputOnly or ComparisonPairKind.Unconfirmed)
+                    && (pair.OutputRecordIndex is null || pair.InputRecordIndex is not null))
                 throw new InvalidDataException("レコード対応の状態と行番号が一致しません。");
         }
     }
@@ -176,4 +198,70 @@ public static class ComparisonSettingsStore
     private static bool FingerprintsMatch(ComparisonSettings settings, ComparisonDataSet input, ComparisonDataSet output) =>
         settings.InputDefinitionFingerprint == input.DefinitionFingerprint && settings.OutputDefinitionFingerprint == output.DefinitionFingerprint
         && settings.InputRecordFingerprint == input.RecordFingerprint && settings.OutputRecordFingerprint == output.RecordFingerprint;
+
+    private static MemoryStream SerializeBounded(ComparisonSettings settings)
+    {
+        // Fixed capacity avoids MemoryStream growth overshooting the document limit.
+        var buffer = new MemoryStream(capacity: MaxFileBytes);
+        try
+        {
+            using (var bounded = new BoundedWriteStream(buffer)) JsonSerializer.Serialize(bounded, settings, JsonOptions);
+            buffer.Position = 0;
+            return buffer;
+        }
+        catch { buffer.Dispose(); throw; }
+    }
+
+    private static ComparisonSettings Freeze(ComparisonSettings settings) => settings with
+    {
+        Mappings = Array.AsReadOnly(settings.Mappings.Select(mapping => mapping with
+        {
+            Inputs = Array.AsReadOnly(mapping.Inputs.ToArray()), Expression = FreezeExpression(mapping.Expression)
+        }).ToArray()),
+        RecordPairs = Array.AsReadOnly(settings.RecordPairs.Select(pair => pair with
+        {
+            InputCandidates = pair.InputCandidates is null ? null : Array.AsReadOnly(pair.InputCandidates.ToArray()),
+            OutputCandidates = pair.OutputCandidates is null ? null : Array.AsReadOnly(pair.OutputCandidates.ToArray())
+        }).ToArray())
+    };
+
+    private static ComparisonExpression? FreezeExpression(ComparisonExpression? expression) => expression switch
+    {
+        ComparisonSliceExpression slice => slice with { Source = FreezeExpression(slice.Source)! },
+        ComparisonConcatExpression concat => concat with { Parts = Array.AsReadOnly(concat.Parts.Select(part => FreezeExpression(part)!).ToArray()) },
+        ComparisonPadExpression pad => pad with { Source = FreezeExpression(pad.Source)! },
+        ComparisonConditionalExpression conditional => conditional with
+        {
+            Left = FreezeExpression(conditional.Left)!, Right = FreezeExpression(conditional.Right)!,
+            WhenEqual = FreezeExpression(conditional.WhenEqual)!, WhenNotEqual = FreezeExpression(conditional.WhenNotEqual)!
+        },
+        _ => expression
+    };
+
+    private sealed class BoundedWriteStream(Stream destination) : Stream
+    {
+        private long written;
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => written;
+        public override long Position { get => written; set => throw new NotSupportedException(); }
+        public override void Flush() => destination.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            if (buffer.Length > MaxFileBytes - written)
+                throw new InvalidDataException($"比較設定のファイルサイズが上限 {MaxFileBytes:N0} バイトを超えます。候補や式を絞り込んでください。");
+            destination.Write(buffer);
+            written += buffer.Length;
+        }
+        public override void WriteByte(byte value)
+        {
+            Span<byte> buffer = stackalloc byte[1]; buffer[0] = value; Write(buffer);
+        }
+        // Disposing this wrapper intentionally leaves its bounded in-memory destination open.
+    }
 }

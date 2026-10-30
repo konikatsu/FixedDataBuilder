@@ -394,6 +394,112 @@ internal static partial class Program
             Equal(ComparisonResultStatus.CannotEvaluate, ComparisonEngine.Compare(input, output, ambiguous,
                 new(0, ComparisonMappingKind.Expression, [], deep)).Status);
         });
+        Test("Comparison ten thousand duplicate keys share complete read-only candidates without selecting a first match", () =>
+        {
+            const int count = 10_000;
+            var input = ComparisonFixture(["key"], Enumerable.Repeat(new[] { "DUP" }, count));
+            var output = ComparisonFixture(["key"], Enumerable.Repeat(new[] { "DUP" }, count));
+            var pairs = ComparisonEngine.PairByKeys(input, output, [0], [0]);
+            Equal(count, pairs.Count);
+            Equal(true, pairs.All(pair => pair.Kind == ComparisonPairKind.Ambiguous && pair.InputRecordIndex is null));
+            Equal(true, pairs.Select((pair, index) => pair.OutputRecordIndex == index).All(value => value));
+            Equal(count, pairs[0].InputCandidates!.Count); Equal(count, pairs[0].OutputCandidates!.Count);
+            Equal(0, pairs[0].InputCandidates![0]); Equal(count - 1, pairs[0].InputCandidates![^1]);
+            foreach (var pair in pairs)
+            {
+                Equal(true, ReferenceEquals(pairs[0].InputCandidates, pair.InputCandidates));
+                Equal(true, ReferenceEquals(pairs[0].OutputCandidates, pair.OutputCandidates));
+            }
+            Throws<NotSupportedException>(() => ((IList<int>)pairs[0].InputCandidates!)[0] = 99);
+        });
+        Test("Comparison candidate totals are rejected before any huge virtual candidate collection is inspected", () =>
+        {
+            var input = ComparisonFixture(["key"], [new[] { "A" }, new[] { "A" }, new[] { "A" }]);
+            var output = ComparisonFixture(["key"], [new[] { "A" }, new[] { "A" }, new[] { "A" }]);
+            var candidates = new ComparisonCountOnlyCandidates(ComparisonSettingsStore.MaxRecordPairs);
+            var pairs = Enumerable.Range(0, 3).Select(index => new ComparisonRecordPair(null, index, ComparisonPairKind.Ambiguous, candidates, candidates)).ToArray();
+            Equal(true, 6L * candidates.Count > ComparisonSettingsStore.MaxTotalCandidateReferences);
+            try
+            {
+                ComparisonSettingsStore.Validate(input, output, [], pairs);
+                throw new Exception("Expected excessive candidates to be rejected");
+            }
+            catch (InvalidDataException exception)
+            {
+                Equal(true, exception.Message.Contains("キー項目を追加", StringComparison.Ordinal));
+            }
+            Throws<InvalidDataException>(() => ComparisonSettingsStore.Create(input, output, [], pairs));
+        });
+        Test("Comparison settings clone and save enforce the UTF8 byte limit while preserving prior output and leaving no temporary files", () =>
+        {
+            var input = ComparisonFixture(["source"], [new[] { "A" }]);
+            var output = ComparisonFixture(["result"], [new[] { "A" }]);
+            static ComparisonFieldMapping Mapping(int characters)
+            {
+                // The settings encoder escapes each BMP marker as six ASCII bytes. Two literals
+                // give a near-limit document without exceeding the per-literal character bound.
+                var value = new string('漢', characters);
+                return new(0, ComparisonMappingKind.Fixed, [],
+                    new ComparisonConcatExpression([new ComparisonLiteralExpression(value), new ComparisonLiteralExpression(value)]));
+            }
+            var near = ComparisonSettingsStore.Create(input, output, [Mapping(333_000)], []);
+            Throws<NotSupportedException>(() => ((IList<ComparisonFieldMapping>)near.Mappings).Clear());
+            Throws<NotSupportedException>(() => ((IList<ComparisonExpression>)((ComparisonConcatExpression)near.Mappings[0].Expression!).Parts).Clear());
+            var path = Path.Combine(temporaryDirectory, "comparison-bounded-settings.json");
+            ComparisonSettingsStore.Save(path, near, input, output);
+            var before = File.ReadAllBytes(path);
+            Equal(true, before.Length > ComparisonSettingsStore.MaxFileBytes - 10_000);
+            Equal(true, before.Length <= ComparisonSettingsStore.MaxFileBytes);
+            var overMappings = new[] { Mapping(334_000) };
+            ComparisonSettingsStore.Validate(input, output, overMappings, []); // Pure validation does not clone or serialize.
+            Throws<InvalidDataException>(() => ComparisonSettingsStore.Create(input, output, overMappings, []));
+            var over = near with { Mappings = overMappings };
+            Throws<InvalidDataException>(() => ComparisonSettingsStore.Save(path, over, input, output));
+            Equal(true, before.SequenceEqual(File.ReadAllBytes(path)));
+            Equal(0, Directory.GetFiles(temporaryDirectory, Path.GetFileName(path) + ".*.tmp").Length);
+            var rejectedPath = Path.Combine(temporaryDirectory, "comparison-bounded-rejected.json");
+            Throws<InvalidDataException>(() => ComparisonSettingsStore.Save(rejectedPath, over, input, output));
+            Equal(false, File.Exists(rejectedPath));
+            Equal(0, Directory.GetFiles(temporaryDirectory, Path.GetFileName(rejectedPath) + ".*.tmp").Length);
+        });
+        Test("Comparison unconfirmed row pairs never evaluate input references and ambiguous mappings retain obtainable output", () =>
+        {
+            var input = ComparisonFixture(["source"], [new[] { "OUT" }]);
+            var output = ComparisonFixture(["result"], [new[] { "OUT" }]);
+            var pair = new ComparisonRecordPair(null, 0, ComparisonPairKind.Unconfirmed);
+            var direct = new ComparisonFieldMapping(0, ComparisonMappingKind.Input, [new(0)]);
+            ComparisonSettingsStore.Validate(input, output, [direct], [pair]);
+            var unconfirmed = ComparisonEngine.Compare(input, output, pair, direct);
+            Equal(ComparisonResultStatus.InputUnmapped, unconfirmed.Status);
+            Equal<string?>(null, unconfirmed.ExpectedValue);
+            Equal<ComparisonEvaluation?>(null, unconfirmed.Evaluation);
+            Equal("OUT", unconfirmed.OutputValue);
+            Equal(true, unconfirmed.Reason!.Contains("組が未確定", StringComparison.Ordinal));
+            var independent = ComparisonEngine.Compare(input, output, pair,
+                new(0, ComparisonMappingKind.Fixed, [], new ComparisonLiteralExpression("OUT")));
+            Equal(ComparisonResultStatus.CalculatedExpectedEqual, independent.Status);
+            Equal("OUT", independent.ExpectedValue);
+            var ambiguous = direct with { Kind = ComparisonMappingKind.Ambiguous };
+            var ambiguousResult = ComparisonEngine.Compare(input, output, pair, ambiguous);
+            Equal(ComparisonResultStatus.Ambiguous, ambiguousResult.Status);
+            Equal("OUT", ambiguousResult.OutputValue);
+            Equal<ComparisonEvaluation?>(null, ambiguousResult.Evaluation);
+            var unavailable = ComparisonEngine.Compare(input, output, pair, ambiguous with { OutputSourceKind = ComparisonSourceKind.RawFixedBytes });
+            Equal(ComparisonResultStatus.CannotEvaluate, unavailable.Status);
+            Equal<string?>(null, unavailable.OutputValue);
+            Equal(ComparisonResultStatus.CannotEvaluate, ComparisonEngine.Compare(input, output, pair,
+                ambiguous with { OutputFieldOrdinal = 9 }).Status);
+            Throws<InvalidDataException>(() => ComparisonSettingsStore.Validate(input, output, [direct], [new(0, 0, ComparisonPairKind.Unconfirmed)]));
+            Throws<InvalidDataException>(() => ComparisonSettingsStore.Validate(input, output, [direct], [new(0, null, ComparisonPairKind.Unconfirmed)]));
+        });
+    }
+
+    private sealed class ComparisonCountOnlyCandidates(int count) : IReadOnlyList<int>
+    {
+        public int Count => count;
+        public int this[int index] => throw new InvalidOperationException("Candidate budget must be checked before indexing");
+        public IEnumerator<int> GetEnumerator() => throw new InvalidOperationException("Candidate budget must be checked before enumeration");
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     private static ComparisonDataSet ComparisonFixture(string[] names, IEnumerable<IEnumerable<string>> rows) =>

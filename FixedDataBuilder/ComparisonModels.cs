@@ -18,7 +18,7 @@ public sealed record ComparisonMappingSuggestion(int OutputFieldOrdinal,
     public bool IsAmbiguous => Candidates.Count > 1;
 }
 
-public enum ComparisonPairKind { Manual, KeyUnique, InputOnly, OutputOnly, Ambiguous }
+public enum ComparisonPairKind { Manual, KeyUnique, InputOnly, OutputOnly, Ambiguous, Unconfirmed }
 public sealed record ComparisonRecordPair(int? InputRecordIndex, int? OutputRecordIndex,
     ComparisonPairKind Kind = ComparisonPairKind.Manual,
     IReadOnlyList<int>? InputCandidates = null, IReadOnlyList<int>? OutputCandidates = null);
@@ -105,8 +105,7 @@ public static partial class ComparisonEngine
                 pairs.Add(new(null, index, ComparisonPairKind.OutputOnly));
             else if (inputs.Count == 1 && outputs.Count == 1)
                 pairs.Add(new(inputs[0], index, ComparisonPairKind.KeyUnique));
-            else pairs.Add(new(null, index, ComparisonPairKind.Ambiguous,
-                Array.AsReadOnly(inputs.ToArray()), Array.AsReadOnly(outputs.ToArray())));
+            else pairs.Add(new(null, index, ComparisonPairKind.Ambiguous, inputs, outputs));
         }
         for (var index = 0; index < input.Records.Count; index++)
             if (!outputGroups.ContainsKey(Key(input.Records[index], inputKeyOrdinals)))
@@ -115,7 +114,7 @@ public static partial class ComparisonEngine
 
         static string Key(IReadOnlyList<string> row, IReadOnlyList<int> ordinals) =>
             JsonSerializer.Serialize(ordinals.Select(ordinal => row[ordinal]).ToArray());
-        static Dictionary<string, List<int>> Group(ComparisonDataSet data, IReadOnlyList<int> ordinals)
+        static Dictionary<string, IReadOnlyList<int>> Group(ComparisonDataSet data, IReadOnlyList<int> ordinals)
         {
             var groups = new Dictionary<string, List<int>>(StringComparer.Ordinal);
             for (var index = 0; index < data.Records.Count; index++)
@@ -124,7 +123,10 @@ public static partial class ComparisonEngine
                 if (!groups.TryGetValue(key, out var rows)) groups[key] = rows = [];
                 rows.Add(index);
             }
-            return groups;
+            // Freeze once per key. Thousands of repeated rows share these immutable candidates
+            // instead of each pair allocating another copy of the entire duplicate group.
+            return groups.ToDictionary(group => group.Key,
+                group => (IReadOnlyList<int>)Array.AsReadOnly(group.Value.ToArray()), StringComparer.Ordinal);
         }
     }
 
@@ -164,12 +166,12 @@ public static partial class ComparisonEngine
     {
         if (!Enum.IsDefined(pair.Kind) || !Enum.IsDefined(mapping.Kind))
             return new(ComparisonResultStatus.Unsupported, null, null, "未対応のレコード対応・項目対応の種類です。");
-        if (mapping.Kind == ComparisonMappingKind.Ambiguous)
-            return new(ComparisonResultStatus.Ambiguous, null, null, "対応候補が複数あり、確定していません。");
         if (pair.OutputRecordIndex is null)
             return new(ComparisonResultStatus.OutputUnmapped, null, null, "対応出力なし（フィルター除外・読込異常などの理由は未確認）");
         var actual = output.ReadSource(pair.OutputRecordIndex.Value, mapping.OutputFieldOrdinal, mapping.OutputSourceKind);
         if (!actual.Success) return new(ComparisonResultStatus.CannotEvaluate, null, null, actual.Reason);
+        if (mapping.Kind == ComparisonMappingKind.Ambiguous)
+            return new(ComparisonResultStatus.Ambiguous, null, actual.Value, "対応候補が複数あり、確定していません。");
         if (mapping.Kind == ComparisonMappingKind.Unmapped)
             return new(ComparisonResultStatus.FieldUnmapped, null, actual.Value, "入力項目・加工式が未対応です。");
         ComparisonExpression? expression = mapping.Expression;
@@ -198,6 +200,8 @@ public static partial class ComparisonEngine
             return new(ComparisonResultStatus.CannotEvaluate, null, actual.Value, "固定値の対応に入力参照が含まれています。");
         if (pair.Kind == ComparisonPairKind.Ambiguous && needsInput)
             return new(ComparisonResultStatus.Ambiguous, null, actual.Value, "入力行の対応候補が複数あり、確定していません。");
+        if (pair.Kind == ComparisonPairKind.Unconfirmed && needsInput)
+            return new(ComparisonResultStatus.InputUnmapped, null, actual.Value, "入力行と出力行の組が未確定です。");
         if (pair.InputRecordIndex is null && needsInput)
             return new(ComparisonResultStatus.InputUnmapped, null, actual.Value, "対応する入力レコードがありません。");
         var evaluation = Evaluate(input, pair.InputRecordIndex, expression);

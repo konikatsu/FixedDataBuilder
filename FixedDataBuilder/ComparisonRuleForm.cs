@@ -96,7 +96,8 @@ public sealed class ComparisonRuleForm : Form
         upPart.Click += (_, _) => MovePart(-1);
         downPart.Click += (_, _) => MovePart(1);
         concatPanel = Rows(("結合の追加方法", Flow(concatSliceCheck, addPart)),
-            ("結合順（上から）", concatParts), ("順序の変更", Flow(upPart, downPart, removePart)));
+            ("結合順（上から）", concatParts), ("順序の変更", Flow(upPart, downPart, removePart)),
+            ("空の結合", new Label { AutoSize = true, Text = "結合要素が0個なら、期待値は空文字になります。\r\n空の固定値へは置き換えず、結合ルールとして保存します。" }));
         padPanel = Rows(("埋める方向", padSideCombo), ("目標の文字数", targetNumber), ("埋め文字（1文字）", fillText));
         conditionPanel = Rows(("条件の比較方法", equalityCombo), ("比較する値", compareText),
             ("条件が一致した時", trueBranch.Panel), ("一致しなかった時", falseBranch.Panel));
@@ -163,8 +164,7 @@ public sealed class ComparisonRuleForm : Form
             RuleOperation.Input => BuildInput(),
             RuleOperation.Literal => new ComparisonLiteralExpression(literalText.Text),
             RuleOperation.Slice => BuildSlice(BuildInput()),
-            RuleOperation.Concat => concatParts.Items.Count == 0 ? throw new InvalidDataException("結合する入力を1個以上追加してください。")
-                : new ComparisonConcatExpression(concatParts.Items.Cast<PartItem>().Select(item => item.Expression).ToArray()),
+            RuleOperation.Concat => new ComparisonConcatExpression(concatParts.Items.Cast<PartItem>().Select(item => item.Expression).ToArray()),
             RuleOperation.Pad => new ComparisonPadExpression(BuildInput(), (int)targetNumber.Value, fillText.Text, Selected<ComparisonPadSide>(padSideCombo)),
             RuleOperation.Conditional => new ComparisonConditionalExpression(BuildInput(), new ComparisonLiteralExpression(compareText.Text),
                 Selected<ComparisonEqualityMode>(equalityCombo), BuildBranch(trueBranch), BuildBranch(falseBranch)),

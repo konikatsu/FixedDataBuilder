@@ -238,6 +238,70 @@ internal static partial class Program
             Throws<TargetInvocationException>(() => Invoke(form, "SaveSettingsToPath", sourcePath));
             Equal("original synthetic source", File.ReadAllText(sourcePath));
         });
+        Test("Comparison definition codec survives loading and reopening independently on each side", () =>
+        {
+            var definition = Path.Combine(temporaryDirectory, "comparison-ui-explicit-definition-codec.csv");
+            var data = Path.Combine(temporaryDirectory, "comparison-ui-explicit-definition-data.csv");
+            File.WriteAllText(definition, "項目名,定義\r\nNAME\u301c,X(4)\r\n", DefinitionFileText.ForEncoding(DefinitionTextEncoding.ShiftJis));
+            File.WriteAllText(data, "ABCD\r\n", new UTF8Encoding(false));
+            using var loader = ComparisonUiLoader();
+            Get<ComboBox>(loader, "format").SelectedIndex = 1;
+            Get<ComboBox>(loader, "definitionEncoding").SelectedIndex = (int)DefinitionTextEncoding.ShiftJis;
+            Get<TextBox>(loader, "definitionPath").Text = definition;
+            Get<TextBox>(loader, "dataPath").Text = data;
+            Invoke(loader, "LoadData");
+            var loaded = (ComparisonDataSet)loader.GetType().GetProperty("DataSet")!.GetValue(loader)!;
+            Equal(DefinitionTextEncoding.ShiftJis, loaded.DefinitionEncoding);
+            Equal("NAME\u301c", loaded.Fields[0].Name);
+            var output = ComparisonDataSet.FromRecords([new("OUT", FieldDataType.Text, 4)], [new[] { "ABCD" }],
+                new(DataFileFormat.Csv), definitionEncoding: DefinitionTextEncoding.Utf8);
+            using var inputReopened = ComparisonUiLoader("入力", loaded);
+            using var outputReopened = ComparisonUiLoader("出力", output);
+            Equal((int)DefinitionTextEncoding.ShiftJis, Get<ComboBox>(inputReopened, "definitionEncoding").SelectedIndex);
+            Equal((int)DefinitionTextEncoding.Utf8, Get<ComboBox>(outputReopened, "definitionEncoding").SelectedIndex);
+            Invoke(inputReopened, "DetectInitialEncoding", false);
+            Invoke(inputReopened, "LoadData");
+            var reread = (ComparisonDataSet)inputReopened.GetType().GetProperty("DataSet")!.GetValue(inputReopened)!;
+            Equal(DefinitionTextEncoding.ShiftJis, reread.DefinitionEncoding);
+            Equal(loaded.DefinitionFingerprint, reread.DefinitionFingerprint);
+            Get<ComboBox>(inputReopened, "definitionEncoding").SelectedIndex = (int)DefinitionTextEncoding.Ms932;
+            Equal((int)DefinitionTextEncoding.Utf8, Get<ComboBox>(outputReopened, "definitionEncoding").SelectedIndex);
+            Equal(DefinitionTextEncoding.ShiftJis, loaded.DefinitionEncoding);
+            Equal(DefinitionTextEncoding.Auto, ComparisonUiData(["AUTO"], ["A"]).DefinitionEncoding);
+        });
+        Test("Comparison oversized PIC length stays an inline load error and leaves both current sides and correspondence intact", () =>
+        {
+            var input = ComparisonUiData(["IN"], ["A"]);
+            var output = ComparisonUiData(["OUT"], ["A"]);
+            using var comparison = new ComparisonForm(output);
+            Invoke(comparison, "SetInputDataSet", input);
+            Invoke(comparison, "ApplyMapping", new ComparisonFieldMapping(0, ComparisonMappingKind.Input, [new(0)], Note: "preserve"));
+            Invoke(comparison, "ConfirmCurrentPair");
+            var mappings = Get<Dictionary<int, ComparisonFieldMapping>>(comparison, "mappings").ToArray();
+            var pairs = Get<List<ComparisonRecordPair>>(comparison, "recordPairs").ToArray();
+            var definition = Path.Combine(temporaryDirectory, "comparison-ui-overflow-definition.cpy");
+            var data = Path.Combine(temporaryDirectory, "comparison-ui-overflow-data.dat");
+            File.WriteAllText(definition, "       01 TEST-RECORD.\r\n          05 TOO-LONG PIC X(99999999999).\r\n", new UTF8Encoding(false));
+            File.WriteAllText(data, "A", new UTF8Encoding(false));
+            foreach (var (side, current) in new[] { ("入力", input), ("出力", output) })
+            {
+                using var loader = ComparisonUiLoader(side, current);
+                Get<ComboBox>(loader, "format").SelectedIndex = 0;
+                Get<TextBox>(loader, "definitionPath").Text = definition;
+                Get<TextBox>(loader, "dataPath").Text = data;
+                Invoke(loader, "DetectInitialEncoding", false);
+                Equal(true, Get<Label>(loader, "detectionLabel").Text.StartsWith("判別できません", StringComparison.Ordinal));
+                Invoke(loader, "LoadData");
+                Equal(null, loader.GetType().GetProperty("DataSet")!.GetValue(loader));
+                Equal(DialogResult.None, loader.DialogResult);
+                Equal(true, Get<Label>(loader, "error").Text.Length > 0);
+                Equal(true, ReferenceEquals(input, Get<ComparisonDataSet?>(comparison, "input")));
+                Equal(true, ReferenceEquals(output, Get<ComparisonDataSet>(comparison, "output")));
+                Equal(true, mappings.SequenceEqual(Get<Dictionary<int, ComparisonFieldMapping>>(comparison, "mappings")));
+                Equal(true, pairs.SequenceEqual(Get<List<ComparisonRecordPair>>(comparison, "recordPairs")));
+                Equal("元値一致", ComparisonCell(comparison, 0, "ComparisonState"));
+            }
+        });
         Test("Comparison CSV loading presets the detected codec but loading preserves a later manual override", () =>
         {
             var definition = Path.Combine(temporaryDirectory, "comparison-ui-detect-csv-definition.csv");
@@ -350,11 +414,63 @@ internal static partial class Program
             using var differentSelection = JsonDocument.Parse(File.ReadAllText(differentSelectionPath));
             Equal(JsonValueKind.Null, differentSelection.RootElement.GetProperty("inputRecordNumber").ValueKind);
             Equal("InputUnmapped", differentSelection.RootElement.GetProperty("results")[1].GetProperty("result").GetProperty("Status").GetString());
+            Equal("Unconfirmed", differentSelection.RootElement.GetProperty("evaluationPair").GetProperty("Kind").GetString());
+            Equal(0, differentSelection.RootElement.GetProperty("configuredPair").GetProperty("InputRecordIndex").GetInt32());
+            Equal(2, differentSelection.RootElement.GetProperty("inspectedInputRecordNumber").GetInt32());
+            Equal(false, differentSelection.RootElement.GetProperty("currentPairConfirmed").GetBoolean());
+        });
+        Test("Comparison evidence retains ambiguous field candidates and their unconfirmed previews", () =>
+        {
+            using var form = new ComparisonForm(ComparisonUiData(["A"], ["one"]));
+            Invoke(form, "SetInputDataSet", ComparisonUiData(["A", "A"], ["one", "two"]));
+            Equal("曖昧・未確定", ComparisonCell(form, 0, "ComparisonState"));
+            var path = Path.Combine(temporaryDirectory, "comparison-candidate-evidence.json");
+            Invoke(form, "SaveEvidenceToPath", path);
+            using var json = JsonDocument.Parse(File.ReadAllBytes(path));
+            var result = json.RootElement.GetProperty("results")[0];
+            Equal("Ambiguous", result.GetProperty("result").GetProperty("Status").GetString());
+            Equal("曖昧・未確定", result.GetProperty("displayState").GetString());
+            Equal(2, result.GetProperty("suggestion").GetProperty("Candidates").GetArrayLength());
+            Equal("two", result.GetProperty("candidatePreviews")[1].GetProperty("source").GetProperty("Value").GetString());
+            Equal(JsonValueKind.Null, result.GetProperty("result").GetProperty("ExpectedValue").ValueKind);
+        });
+        Test("Comparison CSV alias source failures stay visible in candidate previews and evidence", () =>
+        {
+            FieldDefinition[] fields = [new("BASE", FieldDataType.Text, 4), new("ALIAS", FieldDataType.Text, 4, RedefinesName: "BASE")];
+            var aliased = ComparisonDataSet.FromRecords(fields, new[] { new[] { "BASE", "invented" } }, new(DataFileFormat.Csv));
+            using (var form = new ComparisonForm(ComparisonUiData(["ALIAS"], ["anything"])))
+            {
+                Invoke(form, "SetInputDataSet", aliased);
+                Equal(true, ComparisonCell(form, 0, "InputValues").Contains("取得不可", StringComparison.Ordinal));
+                Equal(false, ComparisonCell(form, 0, "InputValues").Contains("invented", StringComparison.Ordinal));
+            }
+            using var outputForm = new ComparisonForm(aliased);
+            Invoke(outputForm, "SetInputDataSet", ComparisonUiData(["ALIAS"], ["anything"]));
+            Equal("算出不可", ComparisonCell(outputForm, 1, "ComparisonState"));
+            var path = Path.Combine(temporaryDirectory, "comparison-alias-error-evidence.json");
+            Invoke(outputForm, "SaveEvidenceToPath", path);
+            using var json = JsonDocument.Parse(File.ReadAllBytes(path));
+            Equal("CannotEvaluate", json.RootElement.GetProperty("results")[1].GetProperty("result").GetProperty("Status").GetString());
+            Equal("算出不可", json.RootElement.GetProperty("results")[1].GetProperty("displayState").GetString());
+        });
+        Test("Manual comparison pairing removes the stale input-only classification", () =>
+        {
+            using var form = new ComparisonForm(ComparisonUiData(["ID"], ["X"], ["NEW"]));
+            Invoke(form, "SetInputDataSet", ComparisonUiData(["ID"], ["ONLY"], ["X"]));
+            Invoke(form, "ApplyKeyPairs", new[] { 0 }, new[] { 0 });
+            var pairs = Get<List<ComparisonRecordPair>>(form, "recordPairs");
+            Equal(true, pairs.Any(pair => pair.Kind == ComparisonPairKind.InputOnly && pair.InputRecordIndex == 0));
+            Get<NumericUpDown>(form, "inputRecordNumber").Value = 1;
+            Get<NumericUpDown>(form, "outputRecordNumber").Value = 2;
+            Invoke(form, "ConfirmCurrentPair");
+            Equal(false, pairs.Any(pair => pair.Kind == ComparisonPairKind.InputOnly && pair.InputRecordIndex == 0));
+            Equal(true, pairs.Any(pair => pair.Kind == ComparisonPairKind.Manual && pair.InputRecordIndex == 0 && pair.OutputRecordIndex == 1));
         });
     }
 
     private static ComparisonDataSet ComparisonUiData(string[] names, params string[][] records) => ComparisonDataSet.FromRecords(
         names.Select(name => new FieldDefinition(name, FieldDataType.Text, 40)), records, new ComparisonDataProfile(DataFileFormat.Csv));
     private static string ComparisonCell(ComparisonForm form, int row, string column) => Convert.ToString(Get<DataGridView>(form, "comparisonGrid")[column, row].Value) ?? "";
-    private static Form ComparisonUiLoader() => (Form)Activator.CreateInstance(typeof(ComparisonForm).GetNestedType("ComparisonLoadForm", BindingFlags.NonPublic)!, new object?[] { "入力", null })!;
+    private static Form ComparisonUiLoader(string side = "入力", ComparisonDataSet? current = null) =>
+        (Form)Activator.CreateInstance(typeof(ComparisonForm).GetNestedType("ComparisonLoadForm", BindingFlags.NonPublic)!, new object?[] { side, current })!;
 }

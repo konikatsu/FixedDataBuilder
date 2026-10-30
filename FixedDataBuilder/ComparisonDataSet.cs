@@ -41,6 +41,8 @@ public sealed class ComparisonDataSet
     public IReadOnlyList<FieldDefinition> Fields { get; }
     public IReadOnlyList<IReadOnlyList<string>> Records { get; }
     public ComparisonDataProfile Profile { get; }
+    /// <summary>The requested definition codec, including Auto, retained independently for this side.</summary>
+    public DefinitionTextEncoding DefinitionEncoding { get; }
     public string? DefinitionPath { get; }
     public string? DataPath { get; }
     /// <summary>SHA-256 of the complete logical field definitions, including comments.</summary>
@@ -54,11 +56,13 @@ public sealed class ComparisonDataSet
 
     private ComparisonDataSet(IEnumerable<FieldDefinition> fields, IEnumerable<IEnumerable<string>> records,
         ComparisonDataProfile profile, string? definitionPath, string? dataPath,
-        byte[]? source, byte[]? definitionBytes)
+        byte[]? source, byte[]? definitionBytes, DefinitionTextEncoding definitionEncoding)
     {
         ValidateProfile(profile);
+        if (!Enum.IsDefined(definitionEncoding)) throw new ArgumentException("定義の文字コード指定が不正です。", nameof(definitionEncoding));
         var copiedFields = fields.ToArray();
-        if (copiedFields.Any(field => field is null || field.Length <= 0 || field.PhysicalByteLength <= 0))
+        if (copiedFields.Any(field => field is null || field.Length <= 0
+            || profile.Format == DataFileFormat.FixedLength && field.PhysicalByteLength <= 0))
             throw new ArgumentException("定義に無効な項目があります。", nameof(fields));
         Fields = Array.AsReadOnly(copiedFields);
         var copiedRecords = records.Select(record =>
@@ -70,6 +74,7 @@ public sealed class ComparisonDataSet
         }).ToArray();
         Records = Array.AsReadOnly(copiedRecords);
         Profile = profile;
+        DefinitionEncoding = definitionEncoding;
         DefinitionPath = definitionPath;
         DataPath = dataPath;
         DefinitionFingerprint = Hash(JsonSerializer.SerializeToUtf8Bytes(copiedFields));
@@ -77,7 +82,9 @@ public sealed class ComparisonDataSet
         sourceBytes = source?.ToArray();
         SourceFingerprint = sourceBytes is null ? null : Hash(sourceBytes);
         RecordFingerprint = Hash(JsonSerializer.SerializeToUtf8Bytes(new { Profile, Records, SourceFingerprint }));
-        fieldOffsets = BuildFieldOffsets(copiedFields);
+        // CSV has logical columns, not fixed storage ranges; a skipped REDEFINES alias
+        // must not impose a physical boundary on a CSV record.
+        fieldOffsets = profile.Format == DataFileFormat.FixedLength ? BuildFieldOffsets(copiedFields) : [];
         rawRecords = Array.AsReadOnly(sourceBytes is not null && profile.Format == DataFileFormat.FixedLength
             ? FindRawRecords(sourceBytes, copiedFields.Sum(field => field.StorageByteLength), profile.SeparatorMode)
             : []);
@@ -88,8 +95,8 @@ public sealed class ComparisonDataSet
     /// <summary>Copy the current output model without reading or replacing a MainForm model.</summary>
     public static ComparisonDataSet FromRecords(IEnumerable<FieldDefinition> fields,
         IEnumerable<IEnumerable<string>> records, ComparisonDataProfile? profile = null,
-        string? definitionPath = null, string? dataPath = null) =>
-        new(fields, records, profile ?? new(), definitionPath, dataPath, null, null);
+        string? definitionPath = null, string? dataPath = null, DefinitionTextEncoding definitionEncoding = DefinitionTextEncoding.Auto) =>
+        new(fields, records, profile ?? new(), definitionPath, dataPath, null, null, definitionEncoding);
 
     /// <summary>Read CSV/COPY definitions with existing readers, preserving a stable source-file snapshot.</summary>
     public static ComparisonDataSet Load(string definitionPath, string dataPath, ComparisonDataProfile profile,
@@ -119,7 +126,7 @@ public sealed class ComparisonDataSet
         var records = profile.Format == DataFileFormat.Csv
             ? CsvDataReader.Read(dataPath, fields, profile.CsvEncoding, profile.CsvHasHeader)
             : FixedLengthDataReader.Read(dataPath, fields, profile.SeparatorMode, profile.DataEncoding, profile.NationalEncoding);
-        return new(fields, records, profile, definitionPath, dataPath, bytes, definitionBytes);
+        return new(fields, records, profile, definitionPath, dataPath, bytes, definitionBytes, definitionEncoding);
     }
 
     private static byte[] SnapshotBytes(FileStream stream)

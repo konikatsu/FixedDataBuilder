@@ -328,6 +328,7 @@ internal static partial class Program
             RunComparisonRuleFormTests(repo);
             RunComparisonFormTests(repo);
             RunComparisonIntegrationTests(repo);
+            RunComparisonCsvAliasTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);
