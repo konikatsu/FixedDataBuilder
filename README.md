@@ -6,13 +6,13 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.74 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.74/FixedDataBuilder-v0.1.74-win-x64-framework-dependent.zip)
+[v0.1.75 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.75/FixedDataBuilder-v0.1.75-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.74 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.74) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.75 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.75) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
-## v0.1.75 起動確認待ち：入力と出力を上下の一覧で目視確認
+## v0.1.75：入力と出力を上下の一覧で目視確認
 
 **上段に入力レコードの一覧、下段に出力レコードの一覧**を表示する画面へ変更しました。入力と出力はそれぞれ独立して、縦横にスクロールできます。**「入力・出力の上下を入れ替え」**ボタンで表示位置を交換でき、各一覧のデータ・選択・スクロール位置を保持します。
 
@@ -23,7 +23,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 各列にはカラム番号・項目名・型を表示し、定義にコメントがあればコメント行も表示します。空白表示を切り替えられ、セルを選ぶと各一覧の下に読込値と空白数が出ます。データは読み取り専用で、元ファイルやメイン画面の編集内容を書き換えません。文字コードエラーは、定義とデータのどちらで起きたかを表示します。
 
-[同梱サンプルの操作手順](samples/comparison-example.md)も更新しました。確認用軽量版を準備し、利用者の起動確認後に公開します。現在のダウンロードは上記の起動確認済みv0.1.74です。**自動テスト337件は未実行です。** 新しい画面画像は撮影していません。
+[同梱サンプルの操作手順](samples/comparison-example.md)も更新しました。ビルドは警告0・エラー0で、利用者が起動を確認した再作成版（rebuild-v002）のEXE・DLLを再ビルドせず公開しています。**自動テスト337件は未実行です。** 新しい画面画像は撮影していません。配布する再作成版の別PCでの起動は未確認です。
 
 ## v0.1.74：入力と出力を並べて比較（旧画面）
 

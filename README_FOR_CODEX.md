@@ -1,6 +1,6 @@
 # README_FOR_CODEX
 
-## v0.1.75：上下2つのレコード一覧（2026-10-30、起動確認待ち）
+## v0.1.75：上下2つのレコード一覧（2026-10-30、利用者起動確認後の公開）
 
 - 初回候補v001は利用者が起動未確認の後「ブロックされた、再作成して」と報告。製品コード全体にSplitContainer参照なし、上下はTableLayoutPanel/Panel。18:28:49 JSTのCodeIntegrity 3077/Record5496は同梱DLLをVerifiedAndReputableDesktopで拒否し、SHA256 Flat Hashがv001のD041CFC8…と一致する。関連3089は署名0/Unknown。これを特定UI部品・命令が禁止された証拠とは扱わない。
 - 利用者依頼で同一製品ソースをv002の独立artifactsへ--no-incrementalビルド、警告0/エラー0、publish --no-build。旧v001と公開v74は保全。再作成候補はC:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.75-rebuild-v002-win-x64-framework-dependent、ZIP370167バイト/50項目、SHA256=AE675143DD02AB4E18837EA8080F92BCA0DCA6EF7EDF33E19850690120848E0F。EXEはv001と同一、DLLはC0A4FBFCF401C0EE2B8C5E75969C35A8B4101AC12A5F70CCDD4C9F7100B6F53Aへ変化。ソース変更なし、ブロック解消とは未確認。製品・テスト337件はassistant未実行、利用者がこのv002を確認するまでmain/Releaseはv74を維持。証拠reviews/visual-comparison-v0.1.75/v002。
@@ -10,6 +10,8 @@
 - VisualComparisonTests10件を追加し全337件、未実行。利用者が製品・テスト・撮影helperを起動する指示を継続、assistantはbuild/publish --no-build/package/static確認のみ。旧製品・既公開ZIPは変更しない。起動OKの同一artifactのみmain/Releaseへ反映。新画面画像を捏造しない。レビューは迷う点がある場合に版数付きrequest/resultsへ、Argonの有用性を判断し必要時Claude単独。
 - 証拠reviews/visual-comparison-v0.1.75/v001。確認前の公開main/Releaseはv74を維持し、source branchのみpushする。公開後は最新3版v75/v74/v73を残し、v72 Releaseだけmetadata・実ZIPの保管/sha確認後整理、tag/history/localは保持。
 - 最終build-v003は--no-incremental、警告0/エラー0、source前後hash不変、test内製品DLLと一致。publish --no-build、ZIP370173バイト/50項目、SHA256=E322687E0405A406D72294E53791EE3A64EF674CDABD5115C8DD61D4A599E25C。DLL SHA256=D041CFC8D171CC72FF5BBED6593BAD33D2F8DC2F5B0958A915E2979660F63C07。v74の製品/ZIPは不変。利用者のv75具体EXEパスの起動報告を待ち、確認後も再ビルドしない。337件は未実行、実画面確認は利用者担当。
+
+- 利用者が再作成版v75 rebuild-v002のEXEリンクに続き「今度は起動OKです」と報告。同一v002製品/ZIPをhash照合し、再ビルド・製品/テスト実行なしでmain/README/release/とGitHub Releaseへ反映。元v001の別PC拒否とv002の成功を区別し、v002の別PC起動を確認済みとはしない。337件は未実行。公開証拠reviews/visual-comparison-v0.1.75/release-v001、起動確認証拠v002/user-startup-confirmation-v001.json。配布asset名は通常のFixedDataBuilder-v0.1.75-win-x64-framework-dependent.zip、内容はAE675143…のv002 ZIPそのもの。最新3版v75/v74/v73を保持しv72 Releaseだけ実ZIP・metadata保管検証後整理、tag/history/localは保持。
 
 ## v0.1.74：読み取り専用の入力・出力比較（2026-10-30、利用者起動確認後の公開）
 
