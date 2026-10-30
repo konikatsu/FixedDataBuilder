@@ -1,6 +1,6 @@
 # README_FOR_CODEX
 
-## v0.1.76：比較画面のバイト目盛りと列最小幅（2026-10-30、起動確認待ち）
+## v0.1.76：比較画面のバイト目盛りと列最小幅（2026-10-30、利用者起動確認後の公開）
 
 - 利用者が比較モードのバイト目盛りを表示/非表示にしたいと依頼。入力/出力の各一覧へ「バイト目盛り」チェックを追加し初期値ON、独立切替、metadata末尾に目盛り行。表示変更でも同じrecord/fieldの選択・scroll・列幅・各record行高・片側の状態を保持し、上下入替で各paneに設定が残る。TableLayoutPanel/PanelのままSplitContainerは使わない。
 - 利用者の追加依頼で通常/比較の共通ByteRulerTextの数字と青い縦破線を5/10/15…へ変更。各項目先頭1、下段は1byteごと。固定長はPhysicalByteLength(N/packedの格納長)、CSVは選択codecの全record論理値最大byte数をfield単位に遅延cacheし、dataset更新で破棄。CSV alias/計測errorは明示し値を書き換えない。淡いgrayの目盛りとdata行までのguides、実glyph幅・折返し位置とbyte単位を同一視しない。
@@ -8,6 +8,8 @@
 - 基点407748f（v75/main）をfetch確認しcodex/comparison-byte-ruler-v0.1.76を新worktreeで実装。製品/test/helperは利用者が実行する方針を継続しassistantはbuild/publish --no-build/静的確認/packageのみ。v75確認済み製品/ZIPは保持し、main/release/GitHub Releaseはv75のまま、v76具体EXEの利用者起動OKを得た同一binaryだけ公開する。新しい画像は未撮影。
 - 新規比較ruler9件、見出し設定5件、既存ruler/画像の期待値を5単位へ変更。計351件、全件未実行。証拠reviews/comparison-byte-ruler-v0.1.76/v001。公開後は最新3版v76/v75/v74を保持しv73 Releaseだけmetadata/実ZIP保管とsize/SHA検証後に整理、tag/history/localは保持。
 - build-v001は--no-incremental/警告0/エラー0、publish --no-build。v76軽量版ZIP374868バイト/50項目、SHA256=F8AE13AB1616CAF381E69F2015A993816EE2AEF60C9C8F8BBE323419EAA1E241、DLL=9AE31BBB50C2A704A6394836F33B5C68617167FD6408BCF8D2C3D929E9F18AA1。製品test内DLL同一、v75確認済みartifact/公開release不変。source manifestはbuild後/package時に採取し全source mtime<=compiled DLLを検証（build前後hash比較とは表現しない）。Test呼出353中2件は外部file引数付きintegration専用のため通常対象351、未実行。通常候補EXEはC:/dev/FixedDataBuilder/FixedDataBuilder-v0.1.76-win-x64-framework-dependent/FixedDataBuilder.exe。利用者のこの版の起動OKを待ち、確認後に再ビルドせず公開する。
+
+- 利用者がv76の具体的製品EXEパスへの質問に「起動できた」と回答。確認済み製品5/ZIPをSHA照合し、再ビルド・製品/テスト起動なしでmain/README/release/とGitHub Releaseへ反映。自動テスト351件は未実行、別PC起動と機能操作の合格は確認していない。公開証拠reviews/comparison-byte-ruler-v0.1.76/release-v001、起動確認v001/user-startup-confirmation-v001.json。最新3版v76/v75/v74を保持しv73 Releaseだけmetadata/実ZIPのsize/SHA照合後整理、tag/history/localは保持。
 
 ## v0.1.75：上下2つのレコード一覧（2026-10-30、利用者起動確認後の公開）
 

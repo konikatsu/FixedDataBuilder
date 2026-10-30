@@ -7,7 +7,7 @@
   "targets": {
     ".NETCoreApp,Version=v8.0": {},
     ".NETCoreApp,Version=v8.0/win-x64": {
-      "FixedDataBuilder/0.1.75": {
+      "FixedDataBuilder/0.1.76": {
         "runtime": {
           "FixedDataBuilder.dll": {}
         }
@@ -15,7 +15,7 @@
     }
   },
   "libraries": {
-    "FixedDataBuilder/0.1.75": {
+    "FixedDataBuilder/0.1.76": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

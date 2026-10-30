@@ -6,13 +6,13 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 ## ダウンロード
 
-[v0.1.75 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.75/FixedDataBuilder-v0.1.75-win-x64-framework-dependent.zip)
+[v0.1.76 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v0.1.76/FixedDataBuilder-v0.1.76-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱していません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。開発用SDKは不要です。
 
-[v0.1.75 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.75) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
+[v0.1.76 の変更内容](https://github.com/konikatsu/FixedDataBuilder/releases/tag/v0.1.76) ／ [リリース一覧](https://github.com/konikatsu/FixedDataBuilder/releases)
 
-## v0.1.76 起動確認待ち：比較画面のバイト目盛り・5バイト単位の補助線・列の最小幅設定
+## v0.1.76：比較画面のバイト目盛り・5バイト単位の補助線・列の最小幅設定
 
 入力と出力を上下に並べる比較画面に、**「バイト目盛り」** のチェックを追加しました。初期表示はONです。入力・出力それぞれで表示と非表示を切り替えられ、選択中のデータ・スクロール位置・列幅・行高を保持します。上下を入れ替えた場合も、それぞれの表示設定を引き継ぎます。
 
@@ -22,7 +22,7 @@ FixedDataBuilder は、COBOL 固定長データのテストデータを作成・
 
 **「表示 → 折り返し表示設定...」の「列の最小幅（半角文字数）」** で、横表示の列幅の下限を **1〜200文字** に設定できます。初期値は半角10文字相当（全角なら約5文字分）で、データの折り返し表示をOFFにしていても設定できます。メイン画面へすぐに反映し、比較画面は開いた時点の設定を引き継ぎます。すでに開いている比較画面の幅は変更しません。設定はその起動中に有効です。データに必要な幅や手動で広げた幅は、この下限より広くなる場合があります。項目名は実際の列幅に合わせて折り返し、見出し行の高さも調整します。この幅は画面上の文字幅を基準にしており、CSVのバイト数とは別の設定です。
 
-確認用軽量版は警告0・エラー0でビルドし、利用者の起動確認後に公開します。現在のダウンロードは上記の起動確認済みv0.1.75です。製品の起動確認と自動テスト351件は利用者が実行するため、こちらでは未実行です。新しい画面画像は撮影していません。
+ビルドは警告0・エラー0で、利用者が起動を確認した同一EXE・DLL・ZIPを再ビルドせず公開しています。**自動テスト351件は未実行です。** 新しい画面画像は撮影していません。別PCでの起動は未確認です。
 
 ## v0.1.75：入力と出力を上下の一覧で目視確認
 
