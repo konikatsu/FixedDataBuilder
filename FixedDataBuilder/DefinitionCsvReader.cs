@@ -1,0 +1,181 @@
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.VisualBasic.FileIO;
+
+namespace FixedDataBuilder;
+
+public static partial class DefinitionCsvReader
+{
+    public static IReadOnlyList<FieldDefinition> Read(string path, DefinitionTextEncoding encoding = DefinitionTextEncoding.Auto)
+    {
+        using var reader = new TextFieldParser(new StringReader(DefinitionFileText.Read(path, encoding)))
+        {
+            TextFieldType = FieldType.Delimited,
+            HasFieldsEnclosedInQuotes = true,
+            TrimWhiteSpace = false
+        };
+        reader.SetDelimiters(",");
+        var fields = new List<FieldDefinition>();
+        var firstRecord = true;
+        while (!reader.EndOfData)
+        {
+            var lineNumber = checked((int)reader.LineNumber);
+            string[] cells;
+            try { cells = reader.ReadFields() ?? []; }
+            catch (MalformedLineException ex)
+            {
+                throw new InvalidDataException($"{reader.ErrorLineNumber} 行目: 定義CSVの引用符や区切りが不正です。", ex);
+            }
+            if (firstRecord && IsHeader(1, cells))
+            {
+                firstRecord = false;
+                continue;
+            }
+            firstRecord = false;
+            fields.Add(ParseField(cells, lineNumber));
+        }
+
+        if (fields.Count == 0)
+        {
+            throw new InvalidDataException("定義書に項目がありません。");
+        }
+
+        return fields;
+    }
+
+    public static FieldDefinition ParseFieldDefinition(string name, string definition, int lineNumber = 1)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new InvalidDataException($"{lineNumber} 行目: 項目名が空です。");
+        }
+
+        if (string.IsNullOrWhiteSpace(definition))
+        {
+            throw new InvalidDataException($"{lineNumber} 行目: 定義が空です。");
+        }
+
+        return ParseCobolPicture(name.Trim(), definition.Trim(), lineNumber);
+    }
+
+    private static FieldDefinition ParseField(IReadOnlyList<string> cells, int lineNumber)
+    {
+        if (cells.Count < 2)
+        {
+            throw new InvalidDataException($"{lineNumber} 行目: 項目名と定義が必要です。");
+        }
+
+        var name = cells[0].Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            throw new InvalidDataException($"{lineNumber} 行目: 項目名が空です。");
+        }
+
+        var legacyType = cells[1].Trim();
+        var isLegacyType = legacyType is "平数字" or "PAC_符号なし" or "PAC/packed decimal 符号なし"
+            or "PAC_符号あり" or "PAC/packed decimal 符号あり" or "文字" or "文字_半角" or "文字_全角";
+        if (isLegacyType && cells.Count >= 3 && int.TryParse(cells[2].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var legacyLength))
+        {
+            if (legacyLength <= 0)
+            {
+                throw new InvalidDataException($"{lineNumber} 行目: 桁数は正の整数で指定してください。");
+            }
+
+            return new FieldDefinition(name, ParseLegacyType(legacyType), legacyLength, $"{legacyType} {legacyLength}",
+                Comment: cells.Count >= 4 ? cells[3] : "");
+        }
+
+        return ParseFieldDefinition(name, cells[1], lineNumber) with { Comment = cells.Count >= 3 ? cells[2] : "" };
+    }
+
+    private static FieldDefinition ParseCobolPicture(string name, string picture, int lineNumber)
+    {
+        var normalized = SpaceRegex().Replace(picture.Trim(), " ").ToUpperInvariant();
+        // Legacy fields keep their original attribute when exported from the live definition editor.
+        var legacyMatch = LegacyDisplayPictureRegex().Match(normalized);
+        if (legacyMatch.Success)
+            return new FieldDefinition(name, ParseLegacyType(legacyMatch.Groups[1].Value),
+                ParseLength(legacyMatch.Groups[2].Value, lineNumber), normalized);
+
+        var textMatch = TextPictureRegex().Match(normalized);
+        if (textMatch.Success)
+        {
+            return new FieldDefinition(name, FieldDataType.Text, ParseLength(textMatch.Groups[1].Value, lineNumber), normalized);
+        }
+
+        var fullWidthTextMatch = FullWidthTextPictureRegex().Match(normalized);
+        if (fullWidthTextMatch.Success)
+        {
+            return new FieldDefinition(name, FieldDataType.FullWidthText, ParseLength(fullWidthTextMatch.Groups[1].Value, lineNumber), normalized);
+        }
+
+        var numberMatch = NumberPictureRegex().Match(normalized);
+        if (numberMatch.Success)
+        {
+            var signed = numberMatch.Groups["sign"].Success;
+            var integerLength = ParseLength(numberMatch.Groups["integer"].Value, lineNumber);
+            var decimalScale = numberMatch.Groups["decimal"].Success
+                ? ParseLength(numberMatch.Groups["decimal"].Value, lineNumber)
+                : 0;
+            var length = integerLength + decimalScale;
+            var packed = numberMatch.Groups["packed"].Success;
+
+            if (packed)
+            {
+                return new FieldDefinition(name, signed ? FieldDataType.PackedSigned : FieldDataType.PackedUnsigned, length, normalized, decimalScale);
+            }
+
+            return new FieldDefinition(name, signed ? FieldDataType.SignedNumber : FieldDataType.PlainNumber, length, normalized, decimalScale);
+        }
+
+        throw new InvalidDataException($"{lineNumber} 行目: 未対応の COBOL 表記です: {picture}");
+    }
+
+    private static int ParseLength(string value, int lineNumber)
+    {
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var length) || length <= 0)
+        {
+            throw new InvalidDataException($"{lineNumber} 行目: 桁数は正の整数で指定してください。");
+        }
+
+        return length;
+    }
+
+    private static bool IsHeader(int lineNumber, IReadOnlyList<string> cells)
+    {
+        if (lineNumber != 1 || cells.Count == 0)
+        {
+            return false;
+        }
+
+        var first = cells[0].Trim();
+        return first is "項目名" or "項目";
+    }
+
+    private static FieldDataType ParseLegacyType(string value) => value switch
+    {
+        "平数字" => FieldDataType.PlainNumber,
+        "PAC_符号なし" or "PAC/packed decimal 符号なし" => FieldDataType.PackedUnsigned,
+        "PAC_符号あり" or "PAC/packed decimal 符号あり" => FieldDataType.PackedSigned,
+        "文字" => FieldDataType.Text,
+        "文字_半角" => FieldDataType.HalfWidthText,
+        "文字_全角" => FieldDataType.FullWidthText,
+        _ => throw new InvalidDataException($"未対応の型です: {value}")
+    };
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex SpaceRegex();
+
+    [GeneratedRegex(@"^(平数字|PAC_符号なし|PAC_符号あり|文字|文字_半角|文字_全角) (\d+)$")]
+    private static partial Regex LegacyDisplayPictureRegex();
+
+    [GeneratedRegex(@"^X\((\d+)\)$")]
+    private static partial Regex TextPictureRegex();
+
+    [GeneratedRegex(@"^N\((\d+)\)$")]
+    private static partial Regex FullWidthTextPictureRegex();
+
+    [GeneratedRegex(@"^(?<sign>S)?9\((?<integer>\d+)(V(?<decimal>\d+))?\)(?<packed> COMP-3)?$")]
+    private static partial Regex NumberPictureRegex();
+}

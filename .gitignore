@@ -1,0 +1,6 @@
+bin/
+obj/
+*.user
+.vs/
+FixedDataBuilder-v*.zip
+FixedDataBuilder-v*.msi
