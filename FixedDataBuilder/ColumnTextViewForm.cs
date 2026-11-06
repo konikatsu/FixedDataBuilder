@@ -25,6 +25,9 @@ public sealed class ColumnTextViewForm : Form
     private int pageIndex;
     private bool updating;
     private bool reflowPending;
+    private bool reflowing;
+    private bool closing;
+    private Size appliedSize;
 
     public ColumnTextViewForm()
     {
@@ -120,14 +123,20 @@ public sealed class ColumnTextViewForm : Form
 
     private void ScheduleReflow()
     {
-        if (updating || reflowPending || !IsHandleCreated || IsDisposed) return;
+        if (updating || reflowing || closing || reflowPending || !IsHandleCreated || IsDisposed) return;
         reflowPending = true;
-        BeginInvoke((Action)(() => { reflowPending = false; if (!IsDisposed) Reflow(); }));
+        BeginInvoke((Action)(() =>
+        {
+            reflowPending = false;
+            if (!IsDisposed && !closing && columnsPanel.ClientSize != appliedSize) Reflow();
+        }));
     }
 
     private void Reflow()
     {
-        if (updating) return;
+        if (updating || reflowing || closing || IsDisposed) return;
+        var previousUpdating = updating;
+        var size = columnsPanel.ClientSize;
         var anchor = document is null ? 0 : VisibleMatch()?.LineIndex ?? pagination.FirstLine(pageIndex, document.Lines.Count);
         var rowHeight = Math.Max(12, textFont.Height + 2);
         var digitWidth = Math.Max(1, TextRenderer.MeasureText("0000000000", textFont, Size.Empty, TextFormatFlags.NoPadding).Width / 10);
@@ -135,6 +144,7 @@ public sealed class ColumnTextViewForm : Form
         pagination = ColumnPageLayout.Fit(columnsPanel.ClientSize.Width, columnsPanel.ClientSize.Height,
             digitWidth * (int)columnCharacters.Value + gutter + 8, rowHeight, rowHeight + SystemInformation.HorizontalScrollBarHeight + 8);
         pageIndex = pagination.ClampPage(anchor / pagination.Capacity, document?.Lines.Count ?? 0);
+        reflowing = true;
         updating = true;
         columnsPanel.SuspendLayout();
         try
@@ -166,12 +176,22 @@ public sealed class ColumnTextViewForm : Form
             }
             FillPage();
         }
-        finally { columnsPanel.ResumeLayout(); updating = false; }
+        finally
+        {
+            try { columnsPanel.ResumeLayout(); }
+            finally
+            {
+                updating = previousUpdating;
+                reflowing = false;
+                appliedSize = size;
+                if (columnsPanel.ClientSize != appliedSize) ScheduleReflow();
+            }
+        }
     }
 
     private WheelZoomDataGridView CreatePane()
     {
-        var pane = new WheelZoomDataGridView
+        var pane = new ResponsiveDataGridView
         {
             Dock = DockStyle.Fill, Margin = new Padding(0, 0, 2, 0), BackgroundColor = Color.White,
             ReadOnly = true, VirtualMode = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
@@ -184,9 +204,9 @@ public sealed class ColumnTextViewForm : Form
         pane.DefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
         pane.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
         pane.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(225, 242, 252);
-        pane.Columns.Add(new DataGridViewTextBoxColumn { Name = "SourceLine", HeaderText = "行", SortMode = DataGridViewColumnSortMode.NotSortable,
+        pane.Columns.Add(new ResponsiveTextColumn { Name = "SourceLine", HeaderText = "行", SortMode = DataGridViewColumnSortMode.NotSortable,
             Frozen = true, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.RoyalBlue } });
-        pane.Columns.Add(new DataGridViewTextBoxColumn { Name = "SourceText", HeaderText = "内容", SortMode = DataGridViewColumnSortMode.NotSortable });
+        pane.Columns.Add(new ResponsiveTextColumn { Name = "SourceText", HeaderText = "内容", SortMode = DataGridViewColumnSortMode.NotSortable });
         pane.ZoomWheel += (_, e) => fontSize.Value = Math.Clamp(fontSize.Value + Math.Sign(e.Delta), fontSize.Minimum, fontSize.Maximum);
         return pane;
     }
@@ -250,7 +270,8 @@ public sealed class ColumnTextViewForm : Form
         pane[1, row].Selected = true;
         // Bring matches beyond the visible part of a long physical line into view.
         var prefix = document.Lines[match.LineIndex][..match.CharacterIndex];
-        var x = TextRenderer.MeasureText(prefix, textFont, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+        var x = TextRenderer.MeasureText(prefix, textFont, Size.Empty,
+            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width;
         var available = Math.Max(1, pane.ClientSize.Width - pane.Columns[0].Width);
         pane.HorizontalScrollingOffset = Math.Min(Math.Max(0, x - available / 3),
             Math.Max(0, pane.Columns[1].Width - available));
@@ -265,6 +286,7 @@ public sealed class ColumnTextViewForm : Form
     private void UpdatePageControls()
     {
         var count = document?.Lines.Count ?? 0;
+        var previousUpdating = updating;
         updating = true;
         try
         {
@@ -278,7 +300,14 @@ public sealed class ColumnTextViewForm : Form
             status.Text = $"{first}～{last}行 / 全{count}行　{pagination.Columns}段 × {pagination.RowsPerColumn}行　（PgUp / PgDnでページ送り、Ctrl＋ホイールで拡大縮小）";
             status.ForeColor = SystemColors.ControlText;
         }
-        finally { updating = false; }
+        finally { updating = previousUpdating; }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        closing = true;
+        base.OnFormClosing(e);
+        if (e.Cancel) { closing = false; ScheduleReflow(); }
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
