@@ -4,7 +4,7 @@
 
 ## ダウンロード
 
-[v1.0.2 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v1.0.2/FixedDataBuilder-v1.0.2-win-x64-framework-dependent.zip)
+[v1.0.3 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v1.0.3/FixedDataBuilder-v1.0.3-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱しません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。SDKは不要です。ZIPを展開し、フォルダー内の `FixedDataBuilder.exe` を起動してください。
 
@@ -19,7 +19,7 @@
 
 CSVを定義なしで開いたときは、プレビューとヘッダーの指定を確認し、画面右下の **「この定義で取り込む」** を押すとメイン画面へ反映します。「キャンセル」は取り込まずに閉じます。
 
-v1.0.3では、この取込ボタンが画面下部で隠れる配置を修正しています。確認用の軽量版は起動確認待ちです。自動テスト469件は未実行です。ダウンロードリンクは起動確認済みのv1.0.2です。
+v1.0.3では、この取込ボタンが画面下部で隠れる配置を修正しています。利用者によるCSVの取り込み確認済みです。
 
 定義CSVの例：
 
@@ -85,7 +85,7 @@ UTF-16LE・UTF-32LEのCSV読込はv1.0.2から利用できます。
 
 ## 検証状況
 
-v1.0.2は警告0・エラー0でビルドし、利用者が製品EXEの起動を確認した同一ファイルを再ビルドせず公開しています。**自動テスト463件は未実行です。** 別PCでの起動・各機能の実操作確認は未報告です。
+v1.0.3は警告0・エラー0でビルドし、利用者が製品EXEの起動とCSVの取り込みを確認した同一ファイルを再ビルドせず公開しています。**自動テスト469件は未実行です。** 別PCでの起動・その他の機能の実操作確認は未報告です。
 
 ## 開発
 
