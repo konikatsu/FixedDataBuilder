@@ -4,7 +4,7 @@
 
 ## ダウンロード
 
-[v1.0.1 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v1.0.1/FixedDataBuilder-v1.0.1-win-x64-framework-dependent.zip)
+[v1.0.2 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v1.0.2/FixedDataBuilder-v1.0.2-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱しません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。SDKは不要です。ZIPを展開し、フォルダー内の `FixedDataBuilder.exe` を起動してください。
 
@@ -36,7 +36,7 @@ BOMがある場合はその指定を候補にします。BOMなしはバイト�
 
 起動引数は `--csv-encoding utf16le` / `utf32le`、自動判別は `--csv-encoding auto` です。固定長Xの文字コード指定には影響しません。
 
-この機能を追加したv1.0.2は、警告0・エラー0でビルド済み、起動確認待ちです。**自動テスト463件は未実行です。** ダウンロードリンクは起動確認済みのv1.0.1です。
+UTF-16LE・UTF-32LEのCSV読込はv1.0.2から利用できます。
 
 ## 表示・編集
 
@@ -81,7 +81,7 @@ BOMがある場合はその指定を候補にします。BOMなしはバイト�
 
 ## 検証状況
 
-v1.0.1は警告0・エラー0でビルドし、利用者が製品EXEの起動を確認した同一ファイルを再ビルドせず公開しています。**自動テスト451件は未実行です。** 別PCでの起動・各機能の実操作確認は未報告です。
+v1.0.2は警告0・エラー0でビルドし、利用者が製品EXEの起動を確認した同一ファイルを再ビルドせず公開しています。**自動テスト463件は未実行です。** 別PCでの起動・各機能の実操作確認は未報告です。
 
 ## 開発
 
