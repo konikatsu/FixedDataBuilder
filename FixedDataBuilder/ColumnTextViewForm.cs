@@ -13,6 +13,12 @@ public sealed class ColumnTextViewForm : Form
     private readonly Label status = new() { Name = "ColumnStatus", Dock = DockStyle.Bottom, Height = 28, TextAlign = ContentAlignment.MiddleLeft };
     private readonly TableLayoutPanel columnsPanel = new() { Name = "TextColumns", Dock = DockStyle.Fill, RowCount = 1, Margin = Padding.Empty };
     private readonly List<WheelZoomDataGridView> panes = new();
+    private readonly TextBox searchBox = new() { Name = "ColumnSearchText", Width = 230 };
+    private readonly CheckBox matchCase = new() { Name = "ColumnSearchMatchCase", Text = "大文字・小文字を区別", AutoSize = true };
+    private readonly Button findNext = new() { Name = "ColumnFindNext", Text = "次を検索 (F3)", AutoSize = true };
+    private readonly Button findPrevious = new() { Name = "ColumnFindPrevious", Text = "前を検索", AutoSize = true };
+    private readonly Label searchResult = new() { Name = "ColumnSearchResult", AutoSize = true, Margin = new Padding(6, 7, 0, 0) };
+    private ColumnTextMatch? searchMatch;
     private ColumnTextDocument? document;
     private ColumnPageLayout pagination = new(1, 1);
     private Font textFont = new("MS Gothic", 9);
@@ -43,7 +49,14 @@ public sealed class ColumnTextViewForm : Form
             Caption("段幅の目安（半角文字）"), columnCharacters, Caption("文字コード"), encodingBox]);
         var help = new Label { Dock = DockStyle.Top, Height = 24,
             Text = "ウィンドウに合わせて自動段組み ／ 左の段の上→下、次の段へ ／ 元ファイルを表示（保存前の編集は含みません）" };
-        Controls.Add(columnsPanel); Controls.Add(status); Controls.Add(help); Controls.Add(tools); Controls.Add(fileBar);
+        var searchBar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(4), WrapContents = true };
+        searchBar.Controls.AddRange([Caption("検索 (Ctrl+F)"), searchBox, findNext, findPrevious, matchCase, searchResult]);
+        Controls.Add(columnsPanel); Controls.Add(status); Controls.Add(help); Controls.Add(searchBar); Controls.Add(tools); Controls.Add(fileBar);
+        searchBox.TextChanged += (_, _) => ResetSearch();
+        matchCase.CheckedChanged += (_, _) => ResetSearch();
+        findNext.Click += (_, _) => Search(true);
+        findPrevious.Click += (_, _) => Search(false);
+        ResetSearch();
         open.Click += (_, _) => ChooseFile();
         reload.Click += (_, _) => ReloadFile();
         previous.Click += (_, _) => MovePage(pageIndex - 1);
@@ -68,6 +81,7 @@ public sealed class ColumnTextViewForm : Form
         // Decode first: failed loads must leave the current file/page intact.
         var loaded = ColumnTextDocument.Load(path, encoding);
         document = loaded; pageIndex = 0;
+        ResetSearch();
         updating = true;
         try { pathBox.Text = loaded.Path; encodingBox.SelectedIndex = (int)loaded.Encoding; }
         finally { updating = false; }
@@ -114,7 +128,7 @@ public sealed class ColumnTextViewForm : Form
     private void Reflow()
     {
         if (updating) return;
-        var anchor = document is null ? 0 : pagination.FirstLine(pageIndex, document.Lines.Count);
+        var anchor = document is null ? 0 : VisibleMatch()?.LineIndex ?? pagination.FirstLine(pageIndex, document.Lines.Count);
         var rowHeight = Math.Max(12, textFont.Height + 2);
         var digitWidth = Math.Max(1, TextRenderer.MeasureText("0000000000", textFont, Size.Empty, TextFormatFlags.NoPadding).Width / 10);
         var gutter = digitWidth * Math.Max(3, (document?.Lines.Count ?? 0).ToString().Length) + 16;
@@ -192,6 +206,54 @@ public sealed class ColumnTextViewForm : Form
             pane.ClearSelection(); pane.Invalidate();
         }
         UpdatePageControls();
+        SelectSearchMatch();
+    }
+
+    private ColumnTextMatch? VisibleMatch() => document is not null && searchMatch is not null
+        && searchMatch.LineIndex / pagination.Capacity == pageIndex ? searchMatch : null;
+
+    private void ResetSearch()
+    {
+        searchMatch = null;
+        findNext.Enabled = findPrevious.Enabled = document is not null && searchBox.Text.Length > 0;
+        searchResult.Text = searchBox.Text.Length == 0 ? "ファイル全体を検索" : "Enter：次 ／ Shift+Enter：前";
+        searchResult.ForeColor = SystemColors.ControlText;
+        foreach (var pane in panes) pane.ClearSelection();
+    }
+
+    private void Search(bool forward)
+    {
+        if (document is null || searchBox.Text.Length == 0) return;
+        var match = ColumnTextSearch.Find(document.Lines, searchBox.Text, matchCase.Checked, searchMatch, forward,
+            pagination.FirstLine(pageIndex, document.Lines.Count));
+        if (match is null)
+        {
+            searchResult.Text = "見つかりません";
+            searchResult.ForeColor = Color.Firebrick;
+            return;
+        }
+        searchMatch = match;
+        MovePage(match.LineIndex / pagination.Capacity);
+        searchResult.ForeColor = SystemColors.ControlText;
+        searchResult.Text = $"{match.LineIndex + 1}行目・{match.CharacterIndex + 1}文字目"
+            + (match.Wrapped ? forward ? "（先頭に戻りました）" : "（末尾に戻りました）" : "");
+    }
+
+    private void SelectSearchMatch()
+    {
+        var match = VisibleMatch();
+        if (match is null || document is null) return;
+        var offset = match.LineIndex % pagination.Capacity;
+        var pane = panes[offset / pagination.RowsPerColumn];
+        var row = offset % pagination.RowsPerColumn;
+        pane.CurrentCell = pane[1, row];
+        pane[1, row].Selected = true;
+        // Bring matches beyond the visible part of a long physical line into view.
+        var prefix = document.Lines[match.LineIndex][..match.CharacterIndex];
+        var x = TextRenderer.MeasureText(prefix, textFont, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+        var available = Math.Max(1, pane.ClientSize.Width - pane.Columns[0].Width);
+        pane.HorizontalScrollingOffset = Math.Min(Math.Max(0, x - available / 3),
+            Math.Max(0, pane.Columns[1].Width - available));
     }
 
     private void MovePage(int requested)
@@ -221,6 +283,9 @@ public sealed class ColumnTextViewForm : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        if (keyData == (Keys.Control | Keys.F)) { searchBox.Focus(); searchBox.SelectAll(); return true; }
+        if (keyData == Keys.F3 || (searchBox.Focused && keyData == Keys.Enter)) { Search(true); return true; }
+        if (keyData == (Keys.Shift | Keys.F3) || (searchBox.Focused && keyData == (Keys.Shift | Keys.Enter))) { Search(false); return true; }
         if (keyData is Keys.PageDown or Keys.PageUp) { MovePage(pageIndex + (keyData == Keys.PageDown ? 1 : -1)); return true; }
         return base.ProcessCmdKey(ref msg, keyData);
     }

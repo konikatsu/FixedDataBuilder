@@ -175,6 +175,7 @@ internal static partial class Program
             RunComparisonSetTests(repo);
             RunDirectComparisonTests(repo);
             RunColumnViewTests();
+            RunColumnSearchTests();
             RunReloadTests(repo);
             RunHeaderRowsTests(repo);
             RunUnsavedAndSettingsTests(repo);
