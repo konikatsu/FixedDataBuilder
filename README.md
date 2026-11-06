@@ -4,7 +4,7 @@
 
 ## ダウンロード
 
-[v1.0.0 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v1.0.0/FixedDataBuilder-v1.0.0-win-x64-framework-dependent.zip)
+[v1.0.1 軽量版（Windows x64）をダウンロード](https://github.com/konikatsu/FixedDataBuilder/releases/download/v1.0.1/FixedDataBuilder-v1.0.1-win-x64-framework-dependent.zip)
 
 軽量版は.NETを同梱しません。実行するPCに **.NET 8 Windows Desktop Runtime（x64）** が必要です。SDKは不要です。ZIPを展開し、フォルダー内の `FixedDataBuilder.exe` を起動してください。
 
@@ -48,7 +48,7 @@
 - 長い行は段ごとの横スクロールで確認できます。ビューは読み取り専用です。
 - 文字コードはBOMや妥当性から候補を選び、UTF-8・MS932・SJIS・UTF-16LE・UTF-32LEへ手動変更できます。「再読み込み」で変更を取り込みます。64MBまでの文字ファイルが対象です。
 
-段組みビューを追加したv1.0.1は起動確認待ちです。ビルドは警告0・エラー0、自動テスト451件は未実行です。ダウンロードリンクは起動確認済みのv1.0.0です。
+段組みビューはv1.0.1から利用できます。
 
 ## 入力と出力の目視比較
 
@@ -71,7 +71,7 @@
 
 ## 検証状況
 
-v1.0.0は警告0・エラー0でビルドし、利用者が製品EXEの起動を確認した同一ファイルを再ビルドせず公開しています。**自動テスト439件は未実行です。** 別PCでの起動・各機能の実操作確認は未報告です。
+v1.0.1は警告0・エラー0でビルドし、利用者が製品EXEの起動を確認した同一ファイルを再ビルドせず公開しています。**自動テスト451件は未実行です。** 別PCでの起動・各機能の実操作確認は未報告です。
 
 ## 開発
 
