@@ -33,7 +33,8 @@ public sealed partial class MainForm
         };
         panel.Controls.AddRange([listViewButton, singleViewButton, singleRecordNavigator,
             addDataRowButton, duplicateDataRowButton, deleteDataRowButton,
-            copyAllGridImageButton, generateTestDataButton, comparisonButton]);
+            copyAllGridImageButton, generateTestDataButton, comparisonButton, columnViewButton]);
+        columnViewButton.Click += (_, _) => OpenColumnView();
         generateTestDataButton.Click += (_, _) => GenerateTestData();
         comparisonButton.Click += (_, _) => OpenComparison();
         copyAllGridImageButton.Click += (_, _) => CopyAllGridImage();

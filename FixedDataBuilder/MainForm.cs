@@ -475,6 +475,7 @@ public sealed partial class MainForm : Form
             fieldRowsButton,
             recordRowsButton,
             singleRecordViewButton,
+            columnViewMenu,
             new ToolStripSeparator(),
             CreateMenuItem("表示項目...", (_, _) => ChooseVisibleFields()),
             CreateMenuItem("フォント設定...", (_, _) => ChooseDisplayFont()),
@@ -487,6 +488,7 @@ public sealed partial class MainForm : Form
         generateTestDataMenu.Click += (_, _) => GenerateTestData();
         generationReportMenu.Click += (_, _) => SaveGenerationReport();
         comparisonMenu.Click += (_, _) => OpenComparison();
+        columnViewMenu.Click += (_, _) => OpenColumnView();
         menuStrip.Items.Add(CreateMenu("ツール",
             generateTestDataMenu,
             generationReportMenu,
