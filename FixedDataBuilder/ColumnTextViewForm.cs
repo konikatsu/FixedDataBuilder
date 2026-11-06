@@ -191,7 +191,7 @@ public sealed class ColumnTextViewForm : Form
 
     private WheelZoomDataGridView CreatePane()
     {
-        var pane = new ResponsiveDataGridView
+        var pane = new WheelZoomDataGridView
         {
             Dock = DockStyle.Fill, Margin = new Padding(0, 0, 2, 0), BackgroundColor = Color.White,
             ReadOnly = true, VirtualMode = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
@@ -204,9 +204,9 @@ public sealed class ColumnTextViewForm : Form
         pane.DefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
         pane.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
         pane.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(225, 242, 252);
-        pane.Columns.Add(new ResponsiveTextColumn { Name = "SourceLine", HeaderText = "行", SortMode = DataGridViewColumnSortMode.NotSortable,
+        pane.Columns.Add(new DataGridViewTextBoxColumn { Name = "SourceLine", HeaderText = "行", SortMode = DataGridViewColumnSortMode.NotSortable,
             Frozen = true, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.RoyalBlue } });
-        pane.Columns.Add(new ResponsiveTextColumn { Name = "SourceText", HeaderText = "内容", SortMode = DataGridViewColumnSortMode.NotSortable });
+        pane.Columns.Add(new DataGridViewTextBoxColumn { Name = "SourceText", HeaderText = "内容", SortMode = DataGridViewColumnSortMode.NotSortable });
         pane.ZoomWheel += (_, e) => fontSize.Value = Math.Clamp(fontSize.Value + Math.Sign(e.Delta), fontSize.Minimum, fontSize.Maximum);
         return pane;
     }

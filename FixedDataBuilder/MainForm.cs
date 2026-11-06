@@ -45,7 +45,7 @@ public sealed partial class MainForm : Form
     private readonly Label selectionSpaceLabel = new() { Name = "SelectedSpaceCount", Text = "半角スペース: — / 全角スペース: —", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
     private readonly Label zoomLabel = new() { Name = "DisplayZoom", AutoSize = true, TextAlign = ContentAlignment.MiddleRight, Dock = DockStyle.Fill };
     private int zoomWheelRemainder;
-    private readonly WheelZoomDataGridView grid = new ResponsiveDataGridView();
+    private readonly WheelZoomDataGridView grid = new();
     private readonly Panel hexArea = new() { Name = "ResizableHexArea", Dock = DockStyle.Bottom, Height = 88 };
     private readonly Panel hexResizeGrip = new()
     {
@@ -3448,7 +3448,7 @@ public sealed partial class MainForm : Form
 
     private static DataGridViewTextBoxColumn CreateReadOnlyColumn(string name, string header, int width, bool frozen)
     {
-        return new ResponsiveTextColumn
+        return new DataGridViewTextBoxColumn
         {
             FillWeight = 1,
             Name = name,
@@ -3462,7 +3462,7 @@ public sealed partial class MainForm : Form
 
     private static DataGridViewTextBoxColumn CreateEditableColumn(string name, string header, int width)
     {
-        return new ResponsiveTextColumn
+        return new DataGridViewTextBoxColumn
         {
             FillWeight = 1,
             Name = name,
