@@ -2,7 +2,7 @@ using System.Text;
 
 namespace FixedDataBuilder;
 
-public enum CsvTextEncoding { Utf8 = 0, ShiftJis = 1, StrictShiftJis = 2 }
+public enum CsvTextEncoding { Utf8 = 0, ShiftJis = 1, StrictShiftJis = 2, Utf16Le = 3, Utf32Le = 4 }
 
 /// <summary>定義の物理項目順に、CSVの各列を画面の値として取り込む。</summary>
 public static class CsvDataReader
@@ -33,11 +33,7 @@ public static class CsvDataReader
         int? expectedColumnCount, bool hasHeader)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        // StreamReader consumes a UTF-8 preamble even with encoding auto-detection disabled.
-        // Writers and HEX use BOM-less UTF-8, but readers must recognize an optional BOM.
-        var encoding = textEncoding == CsvTextEncoding.Utf8 ? new UTF8Encoding(true, true)
-            : JapaneseEncodings.ForCsv(textEncoding);
-        using var reader = new StreamReader(path, encoding, detectEncodingFromByteOrderMarks: false);
+        using var reader = CsvUnicodeEncoding.OpenReader(path, textEncoding);
         var records = new List<List<string>>();
         var cells = new List<string>();
         var cell = new StringBuilder();

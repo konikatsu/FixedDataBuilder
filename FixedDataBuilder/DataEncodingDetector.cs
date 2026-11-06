@@ -18,16 +18,17 @@ public static class DataEncodingDetector
     public static DataEncodingDetection Csv(string path)
     {
         var bytes = File.ReadAllBytes(path);
-        if (bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }))
+        var bom = CsvUnicodeEncoding.Bom(bytes);
+        if (bom.Encoding is { } bomEncoding)
         {
-            // An invalid UTF-8 BOM payload must not fall back to MS932.
-            JapaneseEncodings.ForCsv(CsvTextEncoding.Utf8).GetCharCount(bytes.AsSpan(3));
-            return new(CsvTextEncoding.Utf8, "UTF-8（BOMあり）");
+            // A malformed BOM payload must not fall back to another codec.
+            JapaneseEncodings.ForCsv(bomEncoding).GetCharCount(bytes.AsSpan(bom.Length));
+            return new(bomEncoding, JapaneseEncodings.Name(bomEncoding) + "（BOMあり）");
         }
-        if (bytes.AsSpan().StartsWith(new byte[] { 0xff, 0xfe })
-            || bytes.AsSpan().StartsWith(new byte[] { 0xfe, 0xff })
-            || bytes.AsSpan().StartsWith(new byte[] { 0, 0, 0xfe, 0xff }))
-            throw new InvalidDataException("入力CSVのUTF-16/UTF-32には対応していません。UTF-8・SJIS・MS932を使用してください。");
+        if (CsvUnicodeEncoding.BomlessCandidate(bytes) is { } unicode)
+            return new(unicode, JapaneseEncodings.Name(unicode) + "候補（BOMなし。文字化け時は手動指定）");
+        if (bytes.Contains((byte)0))
+            throw new InvalidDataException("CSVの文字コードを判別できません。UTF-16LE・UTF-32LEなどを手動指定し、元ファイルを確認してください。");
         var candidates = new Candidates();
         candidates.Observe(bytes);
         var result = candidates.Result();

@@ -167,6 +167,7 @@ internal static partial class Program
             RunCellDisplayTests(repo);
             RunDragDropTests(repo);
             RunCsvDataTests(repo);
+            RunCsvUnicodeTests();
             RunCsvDefinitionInferenceTests(repo);
             RunFlexibleDefinitionTests(repo);
             RunLiveCommentReviewTests(repo);

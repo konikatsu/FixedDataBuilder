@@ -8,6 +8,12 @@ CSV、固定長のX項目、固定長の型NでSJISとMS932を区別します。
 
 固定長の補完、桁数、数値・COMP-3の扱い、CSVの空欄・空白・先頭ゼロを保持する仕様は従来どおりです。選択した文字コードを、表示・HEX・保存・F5・読込条件の記憶へ引き継ぎます。SJISへの変換に失敗した場合は、既存の保存先ファイルを変更しません。
 
+## CSVのUTF-16LE・UTF-32LE
+
+CSV文字コードでUTF-16LE・UTF-32LEを選べます。読込はBOMあり／なしの両方に対応し、BOMは項目値やHEXへ含めません。BOMなしの候補判別は完全ではなく、特に日本語だけの短いデータは手動指定が必要になることがあります。
+
+UTF-16LEは通常の漢字・英数字・空白が2バイト、補助文字はサロゲートペアの4バイトです。UTF-32LEはUnicodeのコードポイントごとに4バイトです。CSVは全体の文字コードを1つ選び、固定長のX／N別の文字コード設定とは区別します。保存はBOMなしです。
+
 ## 記号の対応
 
 | バイト | SJIS | MS932 |
@@ -31,7 +37,7 @@ ASCIIと全角バックスラッシュの対応は[CPythonのCJK codec仕様](ht
 
 ## 起動引数
 
-- CSV：`--format csv --csv-encoding sjis`、`--csv-encoding ms932`、`--csv-encoding utf8`
+- CSV：`--format csv --csv-encoding sjis`、`--csv-encoding ms932`、`--csv-encoding utf8`、`--csv-encoding utf16le`、`--csv-encoding utf32le`
 - 固定長X：`--text-encoding sjis` / `ms932` / `utf8`
 - 固定長N：`--national-encoding sjis` / `ms932` / `utf16` / `utf32`
 

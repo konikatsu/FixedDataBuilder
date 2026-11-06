@@ -57,7 +57,7 @@ public sealed partial class MainForm
         currentCsvHasHeader = inference.HasHeader;
         currentDataEncodingProfile = inference.Encoding switch
         {
-            CsvTextEncoding.Utf8 => DataEncodingProfile.Utf8WithNationalText,
+            CsvTextEncoding.Utf8 or CsvTextEncoding.Utf16Le or CsvTextEncoding.Utf32Le => DataEncodingProfile.Utf8WithNationalText,
             CsvTextEncoding.StrictShiftJis => DataEncodingProfile.StrictShiftJis,
             _ => DataEncodingProfile.ShiftJis
         };

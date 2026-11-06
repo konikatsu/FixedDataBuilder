@@ -1494,7 +1494,9 @@ public sealed partial class MainForm : Form
         null or "utf8" => CsvTextEncoding.Utf8,
         "sjis" or "shiftjis" => CsvTextEncoding.StrictShiftJis,
         "ms932" or "cp932" or "windows31j" => CsvTextEncoding.ShiftJis,
-        _ => throw new InvalidDataException("CSV文字コードはUTF-8・SJIS・MS932から指定してください。")
+        "utf16" or "utf16le" => CsvTextEncoding.Utf16Le,
+        "utf32" or "utf32le" => CsvTextEncoding.Utf32Le,
+        _ => throw new InvalidDataException("CSV文字コードはUTF-8・SJIS・MS932・UTF-16LE・UTF-32LEから指定してください。")
     };
 
     private static DataEncodingProfile? ParseTextEncoding(string? value) => NormalizeEncoding(value) switch

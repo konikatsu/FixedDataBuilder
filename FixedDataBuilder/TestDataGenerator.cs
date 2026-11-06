@@ -340,7 +340,7 @@ public static class TestDataGenerator
             if (Has(settings, GenerationRequirement.TextEmpty)) count++;
             if (Has(settings, GenerationRequirement.TextHalfSpaces) && field.Type != FieldDataType.FullWidthText) count++;
             if (Has(settings, GenerationRequirement.TextFullSpaces) && (field.Type == FieldDataType.FullWidthText
-                || field.Type == FieldDataType.Text && field.Length >= (settings.OutputOptions.CsvEncoding == CsvTextEncoding.Utf8 ? 3 : 2))) count++;
+                || field.Type == FieldDataType.Text && field.Length >= JapaneseEncodings.ForCsv(settings.OutputOptions.CsvEncoding).GetByteCount("　"))) count++;
         }
         return count;
     }

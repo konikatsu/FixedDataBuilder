@@ -49,10 +49,7 @@ public sealed record CsvDefinitionAnalysis(CsvTextEncoding Encoding, IReadOnlyLi
 
             // 観測したCSVだけから業務上の上限や数字属性は確定できない。値を変えないXで保持する。
             var length = Math.Max(1, maximum);
-            var encodingName = Encoding switch
-            {
-                CsvTextEncoding.Utf8 => "UTF-8", CsvTextEncoding.StrictShiftJis => "SJIS", _ => "MS932"
-            };
+            var encodingName = JapaneseEncodings.Name(Encoding);
             var comment = $"CSV実測: {maximum}byte/{encodingName}（仕様上限未確定）";
             fields.Add(new FieldDefinition(name, FieldDataType.Text, length, $"X({length})", Comment: comment));
             columns.Add(new CsvColumnInference(column + 1, name, maximum,

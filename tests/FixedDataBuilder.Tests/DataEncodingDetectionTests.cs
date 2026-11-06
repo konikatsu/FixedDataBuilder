@@ -54,8 +54,7 @@ internal static partial class Program
         });
         Test("Input CSV Unicode BOMs outside the supported formats cannot silently become MS932", () =>
         {
-            foreach (var codec in new Encoding[] { new UnicodeEncoding(false, true), new UnicodeEncoding(true, true),
-                new UTF32Encoding(false, true), new UTF32Encoding(true, true) })
+            foreach (var codec in new Encoding[] { new UnicodeEncoding(true, true), new UTF32Encoding(true, true) })
             {
                 File.WriteAllText(csv, "東京\r\n", codec);
                 Throws<InvalidDataException>(() => DataEncodingDetector.Csv(csv));

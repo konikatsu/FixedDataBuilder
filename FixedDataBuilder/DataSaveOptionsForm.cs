@@ -68,8 +68,8 @@ public sealed class DataSaveOptionsForm : Form
             csvEncoding.Enabled = labels[1].Enabled = isCsv;
             separator.Enabled = national.Enabled = textEncoding.Enabled = labels[2].Enabled = labels[3].Enabled = labels[4].Enabled = !isCsv;
             note.Text = format.SelectedIndex == 2
-                ? "CSV: 先頭行に定義の項目名を出力します。\r\nデータの空欄・空白・先頭ゼロを保持。全列引用符・CRLF。"
-                : "CSV: 空欄・空白・先頭ゼロを保持。桁合わせなし。\r\n全列を引用符で囲み、CRLFで出力します。";
+                ? "CSV: 先頭行に定義の項目名を出力します。\r\n空欄・空白・先頭ゼロを保持。全列引用符・CRLF・BOMなし。"
+                : "CSV: 空欄・空白・先頭ゼロを保持。桁合わせなし。\r\n全列引用符・CRLF・BOMなしで出力します。";
             note.Visible = isCsv;
         }
         format.SelectedIndexChanged += (_, _) => UpdateOptions();

@@ -6,13 +6,15 @@ public static class JapaneseEncodings
 {
     // Enum values named ShiftJis predate the split and intentionally remain CP932
     // so existing saved settings and callers retain their original behavior.
-    public static readonly string[] CsvNames = ["UTF-8", "MS932 (CP932)", "SJIS (JIS X 0208)"];
+    public static readonly string[] CsvNames = ["UTF-8", "MS932 (CP932)", "SJIS (JIS X 0208)", "UTF-16LE", "UTF-32LE"];
     public static readonly string[] TextNames = ["MS932 (CP932)", "UTF-8", "SJIS (JIS X 0208)"];
     public static Encoding ForCsv(CsvTextEncoding value) => value switch
     {
         CsvTextEncoding.Utf8 => new UTF8Encoding(false, true),
         CsvTextEncoding.ShiftJis => Ms932(strict: true),
         CsvTextEncoding.StrictShiftJis => StrictShiftJisEncoding.Instance,
+        CsvTextEncoding.Utf16Le => new UnicodeEncoding(false, false, true),
+        CsvTextEncoding.Utf32Le => new UTF32Encoding(false, false, true),
         _ => throw new ArgumentOutOfRangeException(nameof(value))
     };
     public static Encoding ForData(DataEncodingProfile value) => value switch
