@@ -112,9 +112,11 @@ public sealed class CsvDefinitionImportForm : Form
         root.Controls.Add(content, 0, 6);
         var footer = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Margin = new Padding(0, 5, 0, 0)
+            Name = "CsvInferenceFooter", Dock = DockStyle.Fill, AutoSize = true,
+            ColumnCount = 3, RowCount = 2, Margin = new Padding(0, 5, 0, 0)
         };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -124,15 +126,18 @@ public sealed class CsvDefinitionImportForm : Form
             AutoSize = true, Dock = DockStyle.Fill, ForeColor = Color.FromArgb(55, 70, 85)
         };
         footer.Controls.Add(note, 0, 0);
-        footer.SetColumnSpan(note, 2);
-        var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft };
+        footer.SetColumnSpan(note, 3);
         var cancel = new Button
         {
-            Name = "CsvInferenceCancel", Text = "キャンセル", AutoSize = true, DialogResult = DialogResult.Cancel
+            Name = "CsvInferenceCancel", Text = "キャンセル", AutoSize = true,
+            Anchor = AnchorStyles.Right, DialogResult = DialogResult.Cancel, TabIndex = 1
         };
-        buttons.Controls.Add(cancel);
-        buttons.Controls.Add(import);
-        footer.Controls.Add(buttons, 1, 1);
+        // Reserve each button's preferred width independently. A right-to-left
+        // auto-sized flow panel in an auto-sized table column can clip the import button.
+        import.Anchor = AnchorStyles.Right;
+        import.TabIndex = 0;
+        footer.Controls.Add(import, 1, 1);
+        footer.Controls.Add(cancel, 2, 1);
         CancelButton = cancel;
         root.Controls.Add(footer, 0, 7);
         return root;
