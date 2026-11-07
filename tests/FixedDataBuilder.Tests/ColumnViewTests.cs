@@ -6,6 +6,21 @@ internal static partial class Program
 {
     private static void RunColumnViewTests()
     {
+        Test("Adaptive column pages cover every line once when widths change", () =>
+        {
+            var map = ColumnAdaptivePagination.Build(23, 3, 250,
+                (first, _) => first < 9 ? 70 : first < 15 ? 180 : 90);
+            var seen = new List<int>();
+            for (var p = 0; p < map.Count; p++)
+            {
+                var page = map[p];
+                seen.AddRange(Enumerable.Range(page.Start, page.End - page.Start));
+                for (var i = page.Start; i < page.End; i++) Equal(p, map.PageForLine(i));
+            }
+            Equal(true, seen.SequenceEqual(Enumerable.Range(0, 23)));
+            Equal(true, map[0].Columns > map[1].Columns);
+            Equal(1, ColumnAdaptivePagination.Build(0, 3, 1, (_, _) => 20).Count);
+        });
         string Write(string name, byte[] bytes)
         {
             var path = Path.Combine(temporaryDirectory, name); File.WriteAllBytes(path, bytes); return path;
@@ -53,17 +68,6 @@ internal static partial class Program
             var widths = ColumnPageLayout.FitPaneWidths([300, 30, 50, 0, 300], 291);
             Equal(true, widths.SequenceEqual([105, 30, 50, 0, 106]));
             Equal(true, ColumnPageLayout.FitPaneWidths([300, 30, 0], 0).SequenceEqual([0, 0, 0]));
-        });
-        Test("Short records permit more columns than wide records in the same window", () =>
-        {
-            using var form = new ColumnTextViewForm { ClientSize = new Size(1600, 600) };
-            form.PerformLayout();
-            var shortLines = Enumerable.Repeat("A", 1000).ToArray();
-            var longLines = Enumerable.Repeat(new string('X', 300), 1000).ToArray();
-            var narrow = (int)Invoke(form, "CountColumnsThatFit", shortLines, 30, 45, 7)!;
-            var wide = (int)Invoke(form, "CountColumnsThatFit", longLines, 30, 45, 7)!;
-            Equal(true, narrow > wide);
-            Equal(true, narrow <= 32 && wide >= 1);
         });
         Test("Raw column documents preserve CSV quoting blank lines spaces tabs and original file bytes", () =>
         {
@@ -119,8 +123,9 @@ internal static partial class Program
             var layout = Get<ColumnPageLayout>(form, "pagination");
             Invoke(form, "MovePage", 1);
             var panes = Get<List<WheelZoomDataGridView>>(form, "panes");
-            Equal(layout.Capacity + 1, panes[0][0, 0].Value);
-            Equal($"{layout.Capacity + 1:D4},データ", panes[0][1, 0].Value);
+            var first = Get<ColumnAdaptivePagination>(form, "pageMap")[1].Start + 1;
+            Equal(first, panes[0][0, 0].Value);
+            Equal($"{first:D4},データ", panes[0][1, 0].Value);
             Equal(true, panes.All(pane => pane.ReadOnly && !pane.AllowUserToAddRows && pane.VirtualMode));
             Invoke(form, "MovePage", int.MaxValue); Equal(false, Get<Button>(form, "next").Enabled);
             Invoke(form, "MovePage", -1); Equal(false, Get<Button>(form, "previous").Enabled);
@@ -133,7 +138,7 @@ internal static partial class Program
             var layout = Get<ColumnPageLayout>(form, "pagination");
             var panel = Get<TableLayoutPanel>(form, "columnsPanel");
             var shortWidth = panel.ColumnStyles[0].Width;
-            Invoke(form, "MovePage", (2500 + layout.Capacity - 1) / layout.Capacity);
+            Invoke(form, "MovePage", Get<ColumnAdaptivePagination>(form, "pageMap").PageForLine(2600));
             Equal(true, panel.ColumnStyles[0].Width > shortWidth);
             Invoke(form, "MovePage", 0);
             Equal(shortWidth, panel.ColumnStyles[0].Width);
@@ -144,10 +149,10 @@ internal static partial class Program
             form.LoadFile(Write("column-reflow.txt", Encoding.UTF8.GetBytes(string.Join("\n", Enumerable.Range(1, 5000)))));
             Invoke(form, "MovePage", 2);
             var before = Get<ColumnPageLayout>(form, "pagination");
-            var anchor = before.FirstLine(Get<int>(form, "pageIndex"), 5000);
+            var anchor = Get<ColumnAdaptivePagination>(form, "pageMap")[Get<int>(form, "pageIndex")].Start;
             form.ClientSize = new Size(900, 500); form.PerformLayout(); Invoke(form, "Reflow");
             var after = Get<ColumnPageLayout>(form, "pagination");
-            var first = after.FirstLine(Get<int>(form, "pageIndex"), 5000);
+            var first = Get<ColumnAdaptivePagination>(form, "pageMap")[Get<int>(form, "pageIndex")].Start;
             Equal(true, first <= anchor && anchor < first + after.Capacity);
             var oldRows = after.RowsPerColumn;
             Get<NumericUpDown>(form, "fontSize").Value = 18;

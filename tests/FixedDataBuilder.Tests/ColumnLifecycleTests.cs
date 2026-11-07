@@ -5,6 +5,11 @@ internal static partial class Program
 {
     private static void RunColumnLifecycleTests()
     {
+        Test("Column view title includes the product version", () =>
+        {
+            using var form = new ColumnTextViewForm();
+            Equal(true, form.Text.Contains($"v{typeof(MainForm).Assembly.GetName().Version?.ToString(3)}"));
+        });
         Test("Column font selection stays in effect when the text size changes", () =>
         {
             using var form = new ColumnTextViewForm();

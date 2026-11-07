@@ -22,17 +22,22 @@ public sealed class ColumnTextViewForm : Form
     private ColumnTextMatch? searchMatch;
     private ColumnTextDocument? document;
     private ColumnPageLayout pagination = new(1, 1);
+    private ColumnAdaptivePagination pageMap = ColumnAdaptivePagination.Build(0, 1, 1, (_, _) => 1);
+    private CancellationTokenSource? layoutCancellation;
+    private int layoutGeneration;
+    private int anchorLine;
     private Font textFont = MainForm.CreateDefaultDisplayFont(DefaultFontSize);
     private int pageIndex;
     private bool updating;
     private bool reflowPending;
     private bool reflowing;
+    private bool layoutPending;
     private bool closing;
     private Size appliedSize;
 
     public ColumnTextViewForm()
     {
-        Text = "段組みビュー";
+        Text = $"段組みビュー - FixedDataBuilder v{typeof(MainForm).Assembly.GetName().Version?.ToString(3)}";
         Icon = AppIcon.Load();
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1280, 820);
@@ -122,10 +127,14 @@ public sealed class ColumnTextViewForm : Form
     }
 
     public void LoadFile(string path, ColumnTextEncoding? encoding = null)
+        => LoadFileAt(path, encoding, 0);
+
+    private void LoadFileAt(string path, ColumnTextEncoding? encoding, int anchor)
     {
         // Decode first: failed loads must leave the current file/page intact.
         var loaded = ColumnTextDocument.Load(path, encoding);
         document = loaded; pageIndex = 0;
+        anchorLine = Math.Clamp(anchor, 0, Math.Max(0, loaded.Lines.Count - 1));
         ResetSearch();
         updating = true;
         try { pathBox.Text = loaded.Path; encodingBox.SelectedIndex = (int)loaded.Encoding; }
@@ -144,11 +153,10 @@ public sealed class ColumnTextViewForm : Form
     private void ReloadFile()
     {
         if (document is null) return;
-        var anchor = pagination.FirstLine(pageIndex, document.Lines.Count);
+        var anchor = pageMap[pageIndex].Start;
         try
         {
-            LoadFile(document.Path, (ColumnTextEncoding)encodingBox.SelectedIndex);
-            MovePage(anchor / pagination.Capacity);
+            LoadFileAt(document.Path, (ColumnTextEncoding)encodingBox.SelectedIndex, anchor);
         }
         catch (Exception ex) when (IsLoadError(ex))
         {
@@ -177,20 +185,106 @@ public sealed class ColumnTextViewForm : Form
     private void Reflow()
     {
         if (updating || reflowing || closing || IsDisposed) return;
-        var previousUpdating = updating;
         var size = columnsPanel.ClientSize;
-        var anchor = document is null ? 0 : VisibleMatch()?.LineIndex ?? pagination.FirstLine(pageIndex, document.Lines.Count);
+        var anchor = document is null ? 0 : anchorLine;
         var rowHeight = Math.Max(12, textFont.Height + 2);
         var digitWidth = Math.Max(1, TextRenderer.MeasureText("0000000000", textFont, Size.Empty, TextFormatFlags.NoPadding).Width / 10);
         var gutter = digitWidth * Math.Max(3, (document?.Lines.Count ?? 0).ToString().Length) + 16;
-        pagination = ColumnPageLayout.Fit(columnsPanel.ClientSize.Width, columnsPanel.ClientSize.Height,
-            digitWidth * (int)columnCharacters.Value + gutter + 8, rowHeight, rowHeight + SystemInformation.HorizontalScrollBarHeight + 8);
-        if (document is not null && document.Lines.Count > 0)
+        var rows = ColumnPageLayout.Fit(size.Width, size.Height, 1, rowHeight,
+            rowHeight + SystemInformation.HorizontalScrollBarHeight + 8).RowsPerColumn;
+        var snapshot = document;
+        var generation = ++layoutGeneration;
+        layoutCancellation?.Cancel();
+        layoutCancellation = new CancellationTokenSource();
+        var token = layoutCancellation.Token;
+        var measuredFont = (Font)textFont.Clone();
+        var minimumWidth = Math.Max(80, digitWidth * (int)columnCharacters.Value);
+        ColumnAdaptivePagination Calculate()
         {
-            var columns = CountColumnsThatFit(document.Lines, pagination.RowsPerColumn, gutter, digitWidth);
-            pagination = new ColumnPageLayout(columns, pagination.RowsPerColumn);
+            using (measuredFont)
+            {
+                var lines = snapshot?.Lines ?? Array.Empty<string>();
+                var available = Math.Max(1, size.Width);
+                var cachedStart = -1; var cachedWidth = 0;
+                return ColumnAdaptivePagination.Build(lines.Count, rows, available, (first, last) =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (first == cachedStart) return cachedWidth;
+                    var header = $"{first + 1}～{last}行";
+                    var width = Math.Max(minimumWidth, TextRenderer.MeasureText(header, measuredFont, Size.Empty,
+                        TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + 20);
+                    for (var i = first; i < last && width < available; i++)
+                    {
+                        if ((i & 63) == 0) token.ThrowIfCancellationRequested();
+                        var line = lines[i];
+                        // A very long physical line needs horizontal scrolling; avoid measuring unbounded text.
+                        var sample = line.Length > 4096 ? line[..4096] : line;
+                        var measured = TextRenderer.MeasureText(sample, measuredFont, Size.Empty,
+                            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.ExpandTabs).Width + 24;
+                        width = Math.Max(width, line.Length > 4096 ? Math.Max(measured, available) : measured);
+                    }
+                    cachedStart = first;
+                    return cachedWidth = (int)Math.Min(int.MaxValue, (long)gutter + width + 4);
+                }, token);
+            }
         }
-        pageIndex = pagination.ClampPage(anchor / pagination.Capacity, document?.Lines.Count ?? 0);
+        void Apply(ColumnAdaptivePagination map)
+        {
+            if (generation != layoutGeneration || closing || IsDisposed) return;
+            pageMap = map;
+            pageIndex = map.PageForLine(anchor);
+            layoutPending = false;
+            columnsPanel.Enabled = true;
+            searchBox.Enabled = true;
+            ApplyPageLayout(size, rowHeight, gutter);
+        }
+        if (!IsHandleCreated)
+        {
+            Apply(Calculate());
+            return;
+        }
+        columnsPanel.Enabled = false;
+        layoutPending = true;
+        searchBox.Enabled = false;
+        previous.Enabled = next.Enabled = pageNumber.Enabled = findNext.Enabled = findPrevious.Enabled = false;
+        foreach (var pane in panes) pane.RowCount = 0;
+        status.Text = "段組みのページを計算しています...";
+        _ = Task.Run(Calculate).ContinueWith(task =>
+        {
+            if (task.IsCanceled || IsDisposed || closing || generation != layoutGeneration) return;
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    if (generation != layoutGeneration || closing || IsDisposed) return;
+                    if (task.IsFaulted)
+                    {
+                        layoutPending = false;
+                        columnsPanel.Enabled = true; searchBox.Enabled = true;
+                        status.ForeColor = Color.Firebrick;
+                        status.Text = "段組みの計算に失敗しました：" + task.Exception!.GetBaseException().Message;
+                        return;
+                    }
+                    Apply(task.Result);
+                    findNext.Enabled = findPrevious.Enabled = document is not null && searchBox.Text.Length > 0;
+                }));
+            }
+            catch (InvalidOperationException) { /* Form was closed before dispatch. */ }
+        }, TaskScheduler.Default);
+    }
+
+    private int LineIndex(int column, int row)
+    {
+        if (document is null || row < 0 || row >= pagination.RowsPerColumn) return -1;
+        var page = pageMap[pageIndex];
+        var line = (long)page.Start + (long)column * pagination.RowsPerColumn + row;
+        return line >= page.Start && line < page.End ? (int)line : -1;
+    }
+
+    private void ApplyPageLayout(Size size, int rowHeight, int gutter)
+    {
+        var previousUpdating = updating;
+        pagination = new ColumnPageLayout(pageMap[pageIndex].Columns, pageMap.RowsPerColumn);
         reflowing = true;
         updating = true;
         columnsPanel.SuspendLayout();
@@ -212,7 +306,7 @@ public sealed class ColumnTextViewForm : Form
                     pane.CellValueNeeded += (_, e) =>
                     {
                         if (document is null) return;
-                        var line = pagination.LineIndex(pageIndex, index, e.RowIndex, document.Lines.Count);
+                        var line = LineIndex(index, e.RowIndex);
                         if (line >= 0) e.Value = e.ColumnIndex == 0 ? (object)(line + 1) : document.Lines[line];
                     };
                 }
@@ -236,37 +330,6 @@ public sealed class ColumnTextViewForm : Form
             }
         }
         SelectSearchMatch();
-    }
-
-    private int CountColumnsThatFit(IReadOnlyList<string> lines, int rowsPerColumn, int gutter, int digitWidth)
-    {
-        var available = columnsPanel.ClientSize.Width;
-        var maximumDataWidth = Math.Max(80, digitWidth * (int)columnCharacters.Value);
-        var usedWidth = 0;
-        var columns = 0;
-        for (var column = 0; column < 32; column++)
-        {
-            var first = (long)column * rowsPerColumn;
-            if (first >= lines.Count) break;
-            var last = (int)Math.Min(first + rowsPerColumn, lines.Count);
-            var heading = $"{first + 1}～{last}行";
-            var dataWidth = Math.Max(80, TextRenderer.MeasureText(heading, textFont, Size.Empty,
-                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + 6);
-            for (var line = (int)first; line < last && dataWidth < maximumDataWidth; line++)
-            {
-                var text = lines[line];
-                // The view limits the estimated pane width; bounding the sample keeps very long records responsive.
-                if (text.Length > 256) text = text[..256];
-                var width = TextRenderer.MeasureText(text, textFont, Size.Empty,
-                    TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + 12;
-                dataWidth = Math.Max(dataWidth, Math.Min(width, maximumDataWidth));
-            }
-            var requestedWidth = gutter + dataWidth + 2;
-            if (columns > 0 && (long)usedWidth + requestedWidth > available) break;
-            usedWidth += requestedWidth;
-            columns++;
-        }
-        return Math.Max(1, columns);
     }
 
     private WheelZoomDataGridView CreatePane()
@@ -301,10 +364,9 @@ public sealed class ColumnTextViewForm : Form
             for (var column = 0; column < panes.Count; column++)
             {
                 var pane = panes[column];
-                var first = pagination.FirstLine(pageIndex, lineCount) + column * pagination.RowsPerColumn;
+                var first = pageMap[pageIndex].Start + column * pagination.RowsPerColumn;
+                pane.RowCount = 0;
                 pane.RowCount = Math.Clamp(lineCount - first, 0, pagination.RowsPerColumn);
-                // Shared rows may keep heights from the previous font setting.
-                foreach (DataGridViewRow row in pane.Rows) row.Height = pane.RowTemplate.Height;
                 pane.Columns[1].HeaderText = pane.RowCount == 0 ? "—" : $"{first + 1}～{first + pane.RowCount}行";
                 var dataWidth = pane.Columns[1].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, true);
                 pane.Columns[1].Width = (int)Math.Clamp(dataWidth + 6L, 80L, 65_536L);
@@ -322,7 +384,7 @@ public sealed class ColumnTextViewForm : Form
     }
 
     private ColumnTextMatch? VisibleMatch() => document is not null && searchMatch is not null
-        && searchMatch.LineIndex / pagination.Capacity == pageIndex ? searchMatch : null;
+        && pageMap.PageForLine(searchMatch.LineIndex) == pageIndex ? searchMatch : null;
 
     private void ResetSearch()
     {
@@ -335,9 +397,9 @@ public sealed class ColumnTextViewForm : Form
 
     private void Search(bool forward)
     {
-        if (document is null || searchBox.Text.Length == 0) return;
+        if (layoutPending || document is null || searchBox.Text.Length == 0) return;
         var match = ColumnTextSearch.Find(document.Lines, searchBox.Text, matchCase.Checked, searchMatch, forward,
-            pagination.FirstLine(pageIndex, document.Lines.Count));
+            pageMap[pageIndex].Start);
         if (match is null)
         {
             searchResult.Text = "見つかりません";
@@ -345,7 +407,8 @@ public sealed class ColumnTextViewForm : Form
             return;
         }
         searchMatch = match;
-        MovePage(match.LineIndex / pagination.Capacity);
+        MovePage(pageMap.PageForLine(match.LineIndex));
+        anchorLine = match.LineIndex;
         searchResult.ForeColor = SystemColors.ControlText;
         searchResult.Text = $"{match.LineIndex + 1}行目・{match.CharacterIndex + 1}文字目"
             + (match.Wrapped ? forward ? "（先頭に戻りました）" : "（末尾に戻りました）" : "");
@@ -355,7 +418,7 @@ public sealed class ColumnTextViewForm : Form
     {
         var match = VisibleMatch();
         if (match is null || document is null) return;
-        var offset = match.LineIndex % pagination.Capacity;
+        var offset = match.LineIndex - pageMap[pageIndex].Start;
         var pane = panes[offset / pagination.RowsPerColumn];
         var row = offset % pagination.RowsPerColumn;
         pane.CurrentCell = pane[1, row];
@@ -371,8 +434,13 @@ public sealed class ColumnTextViewForm : Form
 
     private void MovePage(int requested)
     {
-        pageIndex = pagination.ClampPage(requested, document?.Lines.Count ?? 0);
-        FillPage();
+        if (layoutPending) return;
+        pageIndex = Math.Clamp(requested, 0, pageMap.Count - 1);
+        anchorLine = pageMap[pageIndex].Start;
+        var rowHeight = Math.Max(12, textFont.Height + 2);
+        var digitWidth = Math.Max(1, TextRenderer.MeasureText("0000000000", textFont, Size.Empty, TextFormatFlags.NoPadding).Width / 10);
+        var gutter = digitWidth * Math.Max(3, (document?.Lines.Count ?? 0).ToString().Length) + 16;
+        ApplyPageLayout(columnsPanel.ClientSize, rowHeight, gutter);
         SelectSearchMatch();
     }
 
@@ -383,14 +451,16 @@ public sealed class ColumnTextViewForm : Form
         updating = true;
         try
         {
-            pageNumber.Maximum = pagination.PageCount(count); pageNumber.Value = pageIndex + 1;
+            pageNumber.Maximum = pageMap.Count; pageNumber.Value = pageIndex + 1;
             pageNumber.Enabled = count > 0;
-            pageCount.Text = $"/ {pagination.PageCount(count)} ページ";
+            pageCount.Text = $"/ {pageMap.Count} ページ";
             previous.Enabled = count > 0 && pageIndex > 0;
-            next.Enabled = count > 0 && pageIndex + 1 < pagination.PageCount(count);
-            var first = count == 0 ? 0 : pagination.FirstLine(pageIndex, count) + 1;
-            var last = Math.Min(count, (long)pagination.FirstLine(pageIndex, count) + pagination.Capacity);
+            next.Enabled = count > 0 && pageIndex + 1 < pageMap.Count;
+            var first = count == 0 ? 0 : pageMap[pageIndex].Start + 1;
+            var last = pageMap[pageIndex].End;
             status.Text = $"{first}～{last}行 / 全{count}行　{pagination.Columns}段 × {pagination.RowsPerColumn}行　（PgUp / PgDnでページ送り、Ctrl＋ホイールで拡大縮小）";
+            if (panes.Any(p => p.RowCount > 0 && p.Columns[0].Width + p.Columns[1].Width > p.ClientSize.Width))
+                status.Text += "　画面に収まらない行は下のスクロールバーで確認できます。";
             status.ForeColor = SystemColors.ControlText;
         }
         finally { updating = previousUpdating; }
@@ -399,6 +469,7 @@ public sealed class ColumnTextViewForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         closing = true;
+        layoutCancellation?.Cancel();
         base.OnFormClosing(e);
         if (e.Cancel) { closing = false; ScheduleReflow(); }
     }
@@ -415,6 +486,6 @@ public sealed class ColumnTextViewForm : Form
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (disposing) textFont.Dispose();
+        if (disposing) { layoutCancellation?.Cancel(); layoutCancellation?.Dispose(); textFont.Dispose(); }
     }
 }

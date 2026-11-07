@@ -60,9 +60,10 @@ internal static partial class Program
             var bytes = File.ReadAllBytes(path); form.LoadFile(path);
             Get<TextBox>(form, "searchBox").Text = "target"; Invoke(form, "Search", true);
             var layout = Get<ColumnPageLayout>(form, "pagination");
-            Equal(4567 / layout.Capacity, Get<int>(form, "pageIndex"));
+            var map = Get<ColumnAdaptivePagination>(form, "pageMap");
+            Equal(map.PageForLine(4567), Get<int>(form, "pageIndex"));
             var panes = Get<List<WheelZoomDataGridView>>(form, "panes");
-            var pane = panes[(4567 % layout.Capacity) / layout.RowsPerColumn];
+            var pane = panes[(4567 - map[Get<int>(form, "pageIndex")].Start) / layout.RowsPerColumn];
             Equal("target", pane.CurrentCell!.Value); Equal(true, pane.CurrentCell.Selected);
             Equal(true, Get<Label>(form, "searchResult").Text.StartsWith("4568行目"));
             Equal(true, bytes.SequenceEqual(File.ReadAllBytes(path)));
@@ -88,7 +89,7 @@ internal static partial class Program
             form.LoadFile(path); Get<TextBox>(form, "searchBox").Text = "row1999"; Invoke(form, "Search", true);
             form.ClientSize = new Size(800, 450); form.PerformLayout(); Invoke(form, "Reflow");
             var layout = Get<ColumnPageLayout>(form, "pagination");
-            Equal(1999 / layout.Capacity, Get<int>(form, "pageIndex"));
+            Equal(Get<ColumnAdaptivePagination>(form, "pageMap").PageForLine(1999), Get<int>(form, "pageIndex"));
             form.LoadFile(path); Equal(true, Get<ColumnTextMatch?>(form, "searchMatch") is null);
             Equal(0, Get<int>(form, "pageIndex"));
         });
