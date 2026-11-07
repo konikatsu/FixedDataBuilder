@@ -5,6 +5,20 @@ internal static partial class Program
 {
     private static void RunColumnLifecycleTests()
     {
+        Test("Column font selection stays in effect when the text size changes", () =>
+        {
+            using var form = new ColumnTextViewForm();
+            var size = Get<NumericUpDown>(form, "fontSize");
+            Equal(10m, size.Value);
+            using var selected = new Font(FontFamily.GenericSansSerif, 14, FontStyle.Bold);
+            Invoke(form, "ApplyTextFont", selected, 14m);
+            Equal(14m, size.Value);
+            size.Value = 16m;
+            var actual = Get<Font>(form, "textFont");
+            Equal(selected.Name, actual.Name);
+            Equal(selected.Style, actual.Style);
+            Equal(16f, actual.SizeInPoints);
+        });
         Test("Main and column views use standard grid row and text cell templates", () =>
         {
             using var main = new MainForm();

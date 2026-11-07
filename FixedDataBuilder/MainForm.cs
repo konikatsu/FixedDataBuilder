@@ -854,7 +854,7 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private static Font CreateDefaultDisplayFont()
+    internal static Font CreateDefaultDisplayFont(float points = 12f)
     {
         foreach (var fontName in new[] { "MS Gothic", "ＭＳ ゴシック" })
         {
@@ -863,7 +863,7 @@ public sealed partial class MainForm : Form
                 using var fontFamily = new FontFamily(fontName);
                 if (fontFamily.IsStyleAvailable(FontStyle.Regular))
                 {
-                    return new Font(fontFamily, 12f, FontStyle.Regular);
+                    return new Font(fontFamily, points, FontStyle.Regular);
                 }
             }
             catch
@@ -872,7 +872,7 @@ public sealed partial class MainForm : Form
             }
         }
 
-        return new Font(FontFamily.GenericMonospace, 12f, FontStyle.Regular);
+        return new Font(FontFamily.GenericMonospace, points, FontStyle.Regular);
     }
 
     private void RefreshGridSizing()

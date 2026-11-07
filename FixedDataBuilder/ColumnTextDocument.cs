@@ -59,6 +59,27 @@ public sealed record ColumnPageLayout(int Columns, int RowsPerColumn)
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rowHeight);
         return new(Math.Clamp(width / columnWidth, 1, 32), Math.Clamp((Math.Max(0, height - reservedHeight)) / rowHeight, 1, 10000));
     }
+
+    public static int[] FitPaneWidths(IReadOnlyList<int> preferredWidths, int availableWidth)
+    {
+        var widths = new int[preferredWidths.Count];
+        if (availableWidth <= 0) return widths;
+
+        var byWidth = Enumerable.Range(0, preferredWidths.Count)
+            .Where(index => preferredWidths[index] > 0)
+            .OrderBy(index => preferredWidths[index])
+            .ToArray();
+        // Give smaller requests their preferred width when it fits within their share.
+        for (var i = 0; i < byWidth.Length; i++)
+        {
+            var index = byWidth[i];
+            var width = Math.Min(preferredWidths[index], availableWidth / (byWidth.Length - i));
+            widths[index] = width;
+            availableWidth -= width;
+        }
+        return widths;
+    }
+
     public int PageCount(int lineCount) => (int)Math.Max(1, ((long)lineCount + Capacity - 1) / Capacity);
     public int ClampPage(int page, int lineCount) => Math.Clamp(page, 0, PageCount(lineCount) - 1);
     public int FirstLine(int page, int lineCount) => ClampPage(page, lineCount) * Capacity;

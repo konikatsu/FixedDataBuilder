@@ -43,6 +43,17 @@ internal static partial class Program
             Equal(int.MaxValue, layout.PageCount(int.MaxValue));
             Throws<ArgumentOutOfRangeException>(() => ColumnPageLayout.Fit(100, 100, 0, 10, 10));
         });
+        Test("Column widths preserve pane order and leave unused space after content that fits", () =>
+        {
+            var widths = ColumnPageLayout.FitPaneWidths([80, 0, 20], 150);
+            Equal(true, widths.SequenceEqual([80, 0, 20]));
+        });
+        Test("Column widths fit the viewport and share remaining pixels among wider panes", () =>
+        {
+            var widths = ColumnPageLayout.FitPaneWidths([300, 30, 50, 0, 300], 291);
+            Equal(true, widths.SequenceEqual([105, 30, 50, 0, 106]));
+            Equal(true, ColumnPageLayout.FitPaneWidths([300, 30, 0], 0).SequenceEqual([0, 0, 0]));
+        });
         Test("Raw column documents preserve CSV quoting blank lines spaces tabs and original file bytes", () =>
         {
             var text = "\"001\",\" A　 \"\r\n\r\n\"002\",\"two\nphysical lines\"\r\n\t end  ";
@@ -102,6 +113,19 @@ internal static partial class Program
             Equal(true, panes.All(pane => pane.ReadOnly && !pane.AllowUserToAddRows && pane.VirtualMode));
             Invoke(form, "MovePage", int.MaxValue); Equal(false, Get<Button>(form, "next").Enabled);
             Invoke(form, "MovePage", -1); Equal(false, Get<Button>(form, "previous").Enabled);
+        });
+        Test("Column form recalculates the pane widths when navigating between short and long pages", () =>
+        {
+            using var form = new ColumnTextViewForm { ClientSize = new Size(900, 500) };
+            var lines = Enumerable.Repeat("A", 2500).Concat(Enumerable.Repeat(new string('X', 200), 2500));
+            form.LoadFile(Write("column-page-widths.txt", Encoding.UTF8.GetBytes(string.Join("\n", lines))));
+            var layout = Get<ColumnPageLayout>(form, "pagination");
+            var panel = Get<TableLayoutPanel>(form, "columnsPanel");
+            var shortWidth = panel.ColumnStyles[0].Width;
+            Invoke(form, "MovePage", (2500 + layout.Capacity - 1) / layout.Capacity);
+            Equal(true, panel.ColumnStyles[0].Width > shortWidth);
+            Invoke(form, "MovePage", 0);
+            Equal(shortWidth, panel.ColumnStyles[0].Width);
         });
         Test("Resizing and zooming the column form reflows while keeping the previous first line on the page", () =>
         {

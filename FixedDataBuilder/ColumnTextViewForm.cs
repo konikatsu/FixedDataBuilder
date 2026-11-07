@@ -2,9 +2,10 @@ namespace FixedDataBuilder;
 
 public sealed class ColumnTextViewForm : Form
 {
+    private const int DefaultFontSize = 10;
     private readonly TextBox pathBox = new() { Name = "ColumnFilePath", ReadOnly = true, Dock = DockStyle.Fill };
     private readonly ComboBox encodingBox = new() { Name = "ColumnEncoding", DropDownStyle = ComboBoxStyle.DropDownList, Width = 135 };
-    private readonly NumericUpDown fontSize = new() { Name = "ColumnFontSize", Minimum = 6, Maximum = 24, Value = 9, Width = 55 };
+    private readonly NumericUpDown fontSize = new() { Name = "ColumnFontSize", Minimum = 6, Maximum = 24, Value = DefaultFontSize, Width = 55 };
     private readonly NumericUpDown columnCharacters = new() { Name = "ColumnMinimumWidth", Minimum = 10, Maximum = 200, Value = 30, Width = 65 };
     private readonly NumericUpDown pageNumber = new() { Name = "ColumnPageNumber", Minimum = 1, Maximum = 1, Value = 1, Width = 65 };
     private readonly Button previous = new() { Name = "PreviousColumnPage", Text = "◀ 前のページ", AutoSize = true };
@@ -21,7 +22,7 @@ public sealed class ColumnTextViewForm : Form
     private ColumnTextMatch? searchMatch;
     private ColumnTextDocument? document;
     private ColumnPageLayout pagination = new(1, 1);
-    private Font textFont = new("MS Gothic", 9);
+    private Font textFont = MainForm.CreateDefaultDisplayFont(DefaultFontSize);
     private int pageIndex;
     private bool updating;
     private bool reflowPending;
@@ -45,10 +46,11 @@ public sealed class ColumnTextViewForm : Form
         var reload = new Button { Name = "ReloadColumnFile", Text = "再読み込み", Dock = DockStyle.Fill };
         fileBar.Controls.Add(pathBox, 0, 0); fileBar.Controls.Add(open, 1, 0); fileBar.Controls.Add(reload, 2, 0);
         var tools = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(4), WrapContents = true };
+        var chooseFont = new Button { Name = "ChooseColumnFont", Text = "フォント...", AutoSize = true };
         Label Caption(string text) => new() { Text = text, AutoSize = true, Margin = new Padding(6, 7, 2, 0) };
         encodingBox.Items.AddRange(ColumnTextDocument.EncodingNames);
         encodingBox.SelectedIndex = 0;
-        tools.Controls.AddRange([previous, pageNumber, pageCount, next, Caption("文字サイズ"), fontSize,
+        tools.Controls.AddRange([previous, pageNumber, pageCount, next, chooseFont, Caption("文字サイズ"), fontSize,
             Caption("段幅の目安（半角文字）"), columnCharacters, Caption("文字コード"), encodingBox]);
         var help = new Label { Dock = DockStyle.Top, Height = 24,
             Text = "ウィンドウに合わせて自動段組み ／ 左の段の上→下、次の段へ ／ 元ファイルを表示（保存前の編集は含みません）" };
@@ -66,17 +68,57 @@ public sealed class ColumnTextViewForm : Form
         next.Click += (_, _) => MovePage(pageIndex + 1);
         pageNumber.ValueChanged += (_, _) => { if (!updating) MovePage((int)pageNumber.Value - 1); };
         columnCharacters.ValueChanged += (_, _) => Reflow();
+        chooseFont.Click += (_, _) => ChooseTextFont();
         fontSize.ValueChanged += (_, _) =>
         {
-            var old = textFont;
-            textFont = new Font("MS Gothic", (float)fontSize.Value);
-            foreach (var pane in panes) pane.Font = textFont;
-            Reflow(); old.Dispose();
+            if (!updating) ApplyTextFont(textFont, fontSize.Value);
         };
         encodingBox.SelectedIndexChanged += (_, _) => { if (!updating) ReloadFile(); };
         columnsPanel.SizeChanged += (_, _) => ScheduleReflow();
         Shown += (_, _) => Reflow();
         UpdatePageControls();
+    }
+
+    private void ChooseTextFont()
+    {
+        using var initial = (Font)textFont.Clone();
+        using var dialog = new FontDialog
+        {
+            Font = initial,
+            FontMustExist = true,
+            ShowEffects = false,
+            AllowVerticalFonts = false,
+            MinSize = (int)fontSize.Minimum,
+            MaxSize = (int)fontSize.Maximum
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        var selected = dialog.Font;
+        try
+        {
+            var points = Math.Clamp((decimal)MathF.Round(selected.SizeInPoints), fontSize.Minimum, fontSize.Maximum);
+            ApplyTextFont(selected, points);
+        }
+        finally
+        {
+            if (!ReferenceEquals(selected, initial)) selected.Dispose();
+        }
+    }
+
+    private void ApplyTextFont(Font selected, decimal points)
+    {
+        var replacement = new Font(selected.FontFamily, (float)points, selected.Style, GraphicsUnit.Point);
+        using var old = textFont;
+        textFont = replacement;
+        var previousUpdating = updating;
+        updating = true;
+        try
+        {
+            fontSize.Value = points;
+            foreach (var pane in panes) pane.Font = replacement;
+        }
+        finally { updating = previousUpdating; }
+        Reflow();
     }
 
     public void LoadFile(string path, ColumnTextEncoding? encoding = null)
@@ -153,11 +195,11 @@ public sealed class ColumnTextViewForm : Form
             {
                 var pane = panes[^1]; panes.RemoveAt(panes.Count - 1); columnsPanel.Controls.Remove(pane); pane.Dispose();
             }
-            columnsPanel.ColumnCount = pagination.Columns;
+            columnsPanel.ColumnCount = pagination.Columns + 1;
             columnsPanel.ColumnStyles.Clear();
             for (var column = 0; column < pagination.Columns; column++)
             {
-                columnsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / pagination.Columns));
+                columnsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute));
                 if (column >= panes.Count)
                 {
                     var index = column;
@@ -174,6 +216,7 @@ public sealed class ColumnTextViewForm : Form
                 current.ColumnHeadersHeight = rowHeight + 4;
                 current.Columns[0].Width = gutter;
             }
+            columnsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             FillPage();
         }
         finally
@@ -187,6 +230,7 @@ public sealed class ColumnTextViewForm : Form
                 if (columnsPanel.ClientSize != appliedSize) ScheduleReflow();
             }
         }
+        SelectSearchMatch();
     }
 
     private WheelZoomDataGridView CreatePane()
@@ -214,19 +258,31 @@ public sealed class ColumnTextViewForm : Form
     private void FillPage()
     {
         var lineCount = document?.Lines.Count ?? 0;
-        for (var column = 0; column < panes.Count; column++)
+        var preferredWidths = new int[panes.Count];
+        columnsPanel.SuspendLayout();
+        try
         {
-            var pane = panes[column];
-            var first = pagination.FirstLine(pageIndex, lineCount) + column * pagination.RowsPerColumn;
-            pane.RowCount = Math.Clamp(lineCount - first, 0, pagination.RowsPerColumn);
-            // Shared rows may keep heights from the previous font setting.
-            foreach (DataGridViewRow row in pane.Rows) row.Height = pane.RowTemplate.Height;
-            pane.Columns[1].HeaderText = pane.RowCount == 0 ? "—" : $"{first + 1}～{first + pane.RowCount}行";
-            pane.Columns[1].Width = Math.Max(80, pane.Columns[1].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, true) + 6);
-            pane.ClearSelection(); pane.Invalidate();
+            for (var column = 0; column < panes.Count; column++)
+            {
+                var pane = panes[column];
+                var first = pagination.FirstLine(pageIndex, lineCount) + column * pagination.RowsPerColumn;
+                pane.RowCount = Math.Clamp(lineCount - first, 0, pagination.RowsPerColumn);
+                // Shared rows may keep heights from the previous font setting.
+                foreach (DataGridViewRow row in pane.Rows) row.Height = pane.RowTemplate.Height;
+                pane.Columns[1].HeaderText = pane.RowCount == 0 ? "—" : $"{first + 1}～{first + pane.RowCount}行";
+                var dataWidth = pane.Columns[1].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, true);
+                pane.Columns[1].Width = (int)Math.Clamp(dataWidth + 6L, 80L, 65_536L);
+                if (pane.RowCount > 0 || (lineCount == 0 && column == 0))
+                    preferredWidths[column] = pane.Columns[0].Width + pane.Columns[1].Width + pane.Margin.Horizontal;
+                pane.ClearSelection(); pane.Invalidate();
+            }
+
+            var widths = ColumnPageLayout.FitPaneWidths(preferredWidths, columnsPanel.ClientSize.Width);
+            for (var column = 0; column < widths.Length; column++)
+                columnsPanel.ColumnStyles[column].Width = widths[column];
         }
+        finally { columnsPanel.ResumeLayout(); }
         UpdatePageControls();
-        SelectSearchMatch();
     }
 
     private ColumnTextMatch? VisibleMatch() => document is not null && searchMatch is not null
@@ -281,6 +337,7 @@ public sealed class ColumnTextViewForm : Form
     {
         pageIndex = pagination.ClampPage(requested, document?.Lines.Count ?? 0);
         FillPage();
+        SelectSearchMatch();
     }
 
     private void UpdatePageControls()
