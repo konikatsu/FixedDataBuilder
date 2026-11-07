@@ -185,6 +185,11 @@ public sealed class ColumnTextViewForm : Form
         var gutter = digitWidth * Math.Max(3, (document?.Lines.Count ?? 0).ToString().Length) + 16;
         pagination = ColumnPageLayout.Fit(columnsPanel.ClientSize.Width, columnsPanel.ClientSize.Height,
             digitWidth * (int)columnCharacters.Value + gutter + 8, rowHeight, rowHeight + SystemInformation.HorizontalScrollBarHeight + 8);
+        if (document is not null && document.Lines.Count > 0)
+        {
+            var columns = CountColumnsThatFit(document.Lines, pagination.RowsPerColumn, gutter, digitWidth);
+            pagination = new ColumnPageLayout(columns, pagination.RowsPerColumn);
+        }
         pageIndex = pagination.ClampPage(anchor / pagination.Capacity, document?.Lines.Count ?? 0);
         reflowing = true;
         updating = true;
@@ -231,6 +236,37 @@ public sealed class ColumnTextViewForm : Form
             }
         }
         SelectSearchMatch();
+    }
+
+    private int CountColumnsThatFit(IReadOnlyList<string> lines, int rowsPerColumn, int gutter, int digitWidth)
+    {
+        var available = columnsPanel.ClientSize.Width;
+        var maximumDataWidth = Math.Max(80, digitWidth * (int)columnCharacters.Value);
+        var usedWidth = 0;
+        var columns = 0;
+        for (var column = 0; column < 32; column++)
+        {
+            var first = (long)column * rowsPerColumn;
+            if (first >= lines.Count) break;
+            var last = (int)Math.Min(first + rowsPerColumn, lines.Count);
+            var heading = $"{first + 1}～{last}行";
+            var dataWidth = Math.Max(80, TextRenderer.MeasureText(heading, textFont, Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + 6);
+            for (var line = (int)first; line < last && dataWidth < maximumDataWidth; line++)
+            {
+                var text = lines[line];
+                // The view limits the estimated pane width; bounding the sample keeps very long records responsive.
+                if (text.Length > 256) text = text[..256];
+                var width = TextRenderer.MeasureText(text, textFont, Size.Empty,
+                    TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + 12;
+                dataWidth = Math.Max(dataWidth, Math.Min(width, maximumDataWidth));
+            }
+            var requestedWidth = gutter + dataWidth + 2;
+            if (columns > 0 && (long)usedWidth + requestedWidth > available) break;
+            usedWidth += requestedWidth;
+            columns++;
+        }
+        return Math.Max(1, columns);
     }
 
     private WheelZoomDataGridView CreatePane()

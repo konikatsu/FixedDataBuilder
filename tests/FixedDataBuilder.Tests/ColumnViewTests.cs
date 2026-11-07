@@ -54,6 +54,17 @@ internal static partial class Program
             Equal(true, widths.SequenceEqual([105, 30, 50, 0, 106]));
             Equal(true, ColumnPageLayout.FitPaneWidths([300, 30, 0], 0).SequenceEqual([0, 0, 0]));
         });
+        Test("Short records permit more columns than wide records in the same window", () =>
+        {
+            using var form = new ColumnTextViewForm { ClientSize = new Size(1600, 600) };
+            form.PerformLayout();
+            var shortLines = Enumerable.Repeat("A", 1000).ToArray();
+            var longLines = Enumerable.Repeat(new string('X', 300), 1000).ToArray();
+            var narrow = (int)Invoke(form, "CountColumnsThatFit", shortLines, 30, 45, 7)!;
+            var wide = (int)Invoke(form, "CountColumnsThatFit", longLines, 30, 45, 7)!;
+            Equal(true, narrow > wide);
+            Equal(true, narrow <= 32 && wide >= 1);
+        });
         Test("Raw column documents preserve CSV quoting blank lines spaces tabs and original file bytes", () =>
         {
             var text = "\"001\",\" A　 \"\r\n\r\n\"002\",\"two\nphysical lines\"\r\n\t end  ";
