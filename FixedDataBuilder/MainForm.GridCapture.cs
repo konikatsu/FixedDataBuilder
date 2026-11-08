@@ -84,6 +84,12 @@ public sealed partial class MainForm
             SetStatus($"画像保存{(cancelled ? "を中止しました。保存済み画像" : "しました")}: {directory}");
             MessageBox.Show(this, $"{(cancelled ? "中止しました。保存済みの画像は残しています。" : $"PNG {plan.Count}枚を保存しました。")}{Environment.NewLine}{directory}",
                 "一覧の画像保存", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            var images = Enumerable.Range(0, plan.Count)
+                .Select(index => Path.Combine(directory,
+                    $"{prefix}_p{index + 1:D4}_y{index / plan.Columns.Count + 1:D3}_x{index % plan.Columns.Count + 1:D3}.png"))
+                .Where(File.Exists)
+                .ToArray();
+            if (images.Length > 0) new CaptureImageCopyForm(images).Show(this);
         }
         catch (Exception ex)
         {

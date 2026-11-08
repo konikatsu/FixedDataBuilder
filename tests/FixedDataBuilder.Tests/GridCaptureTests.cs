@@ -6,6 +6,30 @@ internal static partial class Program
 {
     private static void RunGridCaptureTests(string repo)
     {
+        Test("Saved capture pages can be chosen and copied individually", () =>
+        {
+            var paths = new[] { Path.Combine(temporaryDirectory, "copy-page-1.png"), Path.Combine(temporaryDirectory, "copy-page-2.png") };
+            for (var index = 0; index < paths.Length; index++)
+            {
+                using var image = new Bitmap(2, 2);
+                image.SetPixel(0, 0, index == 0 ? Color.Red : Color.Blue);
+                image.Save(paths[index], System.Drawing.Imaging.ImageFormat.Png);
+            }
+            using var form = new CaptureImageCopyForm(paths);
+            var page = Get<NumericUpDown>(form, "page");
+            Equal(false, Get<Button>(form, "previous").Enabled);
+            Equal(true, Get<Button>(form, "next").Enabled);
+            Color copied = Color.Empty;
+            var copy = new Action<Image>(image => copied = ((Bitmap)image).GetPixel(0, 0));
+            Invoke(form, "CopySelectedImageTo", copy);
+            Equal(Color.Red.ToArgb(), copied.ToArgb());
+            page.Value = 2;
+            Equal(true, Get<Button>(form, "previous").Enabled);
+            Equal(false, Get<Button>(form, "next").Enabled);
+            Invoke(form, "CopySelectedImageTo", copy);
+            Equal(Color.Blue.ToArgb(), copied.ToArgb());
+            using var unlocked = new FileStream(paths[1], FileMode.Open, FileAccess.Read, FileShare.None);
+        });
         Test("A capture that fits on screen keeps the original one-page layout", () =>
         {
             using var form = CreateCellDisplayForm(true);
