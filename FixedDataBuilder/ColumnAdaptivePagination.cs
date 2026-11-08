@@ -5,11 +5,19 @@ public sealed class ColumnAdaptivePagination
 {
     public sealed record Page(int Start, int Columns, int End);
     private readonly List<Page> pages;
+    private readonly List<int> paneWidths;
     public int RowsPerColumn { get; }
     public int Count => pages.Count;
     public Page this[int index] => pages[Math.Clamp(index, 0, pages.Count - 1)];
 
-    private ColumnAdaptivePagination(List<Page> pages, int rows) { this.pages = pages; RowsPerColumn = rows; }
+    private ColumnAdaptivePagination(List<Page> pages, List<int> paneWidths, int rows)
+    {
+        this.pages = pages;
+        this.paneWidths = paneWidths;
+        RowsPerColumn = rows;
+    }
+
+    public int PaneWidth(int page, int column) => paneWidths[this[page].Start / RowsPerColumn + column];
 
     public static ColumnAdaptivePagination Build(int lineCount, int rows, int availableWidth,
         Func<int, int, int> groupWidth, CancellationToken cancellationToken = default)
@@ -17,6 +25,7 @@ public sealed class ColumnAdaptivePagination
         rows = Math.Max(1, rows);
         availableWidth = Math.Max(1, availableWidth);
         var result = new List<Page>();
+        var widths = new List<int>();
         var start = 0;
         while (start < lineCount)
         {
@@ -29,6 +38,7 @@ public sealed class ColumnAdaptivePagination
                 var next = (int)Math.Min((long)end + rows, lineCount);
                 var width = Math.Max(1, groupWidth(end, next));
                 if (columns > 0 && used + width > availableWidth) break;
+                widths.Add(width);
                 used += width;
                 columns++;
                 end = next;
@@ -36,8 +46,12 @@ public sealed class ColumnAdaptivePagination
             result.Add(new Page(start, columns, end));
             start = end;
         }
-        if (result.Count == 0) result.Add(new Page(0, 1, 0));
-        return new ColumnAdaptivePagination(result, rows);
+        if (result.Count == 0)
+        {
+            result.Add(new Page(0, 1, 0));
+            widths.Add(Math.Max(1, groupWidth(0, 0)));
+        }
+        return new ColumnAdaptivePagination(result, widths, rows);
     }
 
     public int PageForLine(int line)

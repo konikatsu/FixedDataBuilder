@@ -96,9 +96,17 @@ internal static partial class Program
         Test("Column form scrolls long matched lines horizontally and retains search after failed loads", () =>
         {
             using var form = new ColumnTextViewForm();
-            var path = FileWithLines("column-search-long.txt", [new string('a', 2000) + "needle"]);
-            form.LoadFile(path); Get<TextBox>(form, "searchBox").Text = "needle"; Invoke(form, "Search", true);
-            Equal(true, Get<List<WheelZoomDataGridView>>(form, "panes")[0].HorizontalScrollingOffset > 0);
+            var prefix = new string('a', 2000);
+            var path = FileWithLines("column-search-long.txt", [prefix + "needle"]);
+            form.LoadFile(path);
+            ShowColumnViewForTest(form);
+            Get<TextBox>(form, "searchBox").Text = "needle"; Invoke(form, "Search", true);
+            var pane = Get<List<WheelZoomDataGridView>>(form, "panes")[0];
+            var offset = pane.HorizontalScrollingOffset;
+            var matchX = TextRenderer.MeasureText(prefix, pane.Font, Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width;
+            Equal(true, offset > 0 && offset <= matchX &&
+                matchX < offset + pane.ClientSize.Width - pane.Columns[0].Width);
             var match = Get<ColumnTextMatch>(form, "searchMatch");
             Throws<FileNotFoundException>(() => form.LoadFile(Path.Combine(temporaryDirectory, "missing-search-file.txt")));
             Equal(match, Get<ColumnTextMatch>(form, "searchMatch"));

@@ -4,6 +4,73 @@ using FixedDataBuilder;
 
 internal static partial class Program
 {
+    private static void VerifyProvidedColumnView(string path)
+    {
+        var original = File.ReadAllBytes(path);
+        foreach (var viewportWidth in new[] { 1600, 1100 })
+        {
+            using var form = new ColumnTextViewForm { ClientSize = new Size(viewportWidth, 1110) };
+            form.PerformLayout();
+            form.LoadFile(path);
+            ShowColumnViewForTest(form);
+            var document = Get<ColumnTextDocument>(form, "document");
+            var map = Get<ColumnAdaptivePagination>(form, "pageMap");
+            var panel = Get<TableLayoutPanel>(form, "columnsPanel");
+            var panes = Get<List<WheelZoomDataGridView>>(form, "panes");
+            var visited = 0;
+            for (var page = 0; page < map.Count; page++)
+            {
+                Invoke(form, "MovePage", page);
+                Equal(map[page].Start, visited);
+                Equal(map[page].Columns, panes.Count);
+                var usedWidth = 0f;
+                for (var column = 0; column < panes.Count; column++)
+                {
+                    var pane = panes[column];
+                    var required = pane.Columns[1].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, true);
+                    if (pane.Columns[1].Width < required ||
+                        pane.ClientSize.Width < pane.Columns[0].Width + pane.Columns[1].Width)
+                    {
+                        throw new InvalidOperationException(
+                            $"Clipped pane at {viewportWidth}px, page {page + 1}, pane {column + 1}: " +
+                            $"body width {pane.Columns[1].Width}, preferred {required}, pane width {pane.ClientSize.Width}.");
+                    }
+                    usedWidth += panel.ColumnStyles[column].Width;
+                    for (var row = 0; row < pane.RowCount; row++)
+                    {
+                        Equal(visited + 1, pane[0, row].Value);
+                        Equal(true, Equals(document.Lines[visited], pane[1, row].Value));
+                        visited++;
+                    }
+                }
+                Equal(map[page].End, visited);
+                if (page + 1 < map.Count && panes.Count < 32)
+                    Equal(true, panel.ClientSize.Width - usedWidth < map.PaneWidth(page + 1, 0));
+            }
+            Equal(document.Lines.Count, visited);
+            Invoke(form, "MovePage", 0);
+            Console.WriteLine($"{viewportWidth}px: {visited} lines across {map.Count} pages, {panes.Count} panes on page one");
+        }
+        Equal(true, original.SequenceEqual(File.ReadAllBytes(path)));
+    }
+
+    private static void ShowColumnViewForTest(ColumnTextViewForm form)
+    {
+        form.StartPosition = FormStartPosition.Manual;
+        form.Location = new Point(-30000, -30000);
+        form.ShowInTaskbar = false;
+        form.Show();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        do
+        {
+            Application.DoEvents();
+            if (!Get<bool>(form, "layoutPending") && !Get<bool>(form, "reflowPending")) return;
+            Thread.Sleep(5);
+        }
+        while (timer.Elapsed < TimeSpan.FromSeconds(10));
+        throw new TimeoutException("Column view did not finish laying out.");
+    }
+
     private static void RunColumnViewTests()
     {
         Test("Adaptive column pages cover every line once when widths change", () =>

@@ -26,6 +26,16 @@ internal static partial class Program
         try
         {
             var repo = Path.GetFullPath(args[0]);
+            if (args.Length == 3 && args[1] == "--verify-column-view")
+            {
+                RunColumnViewTests();
+                RunColumnSearchTests();
+                RunColumnLifecycleTests();
+                Test("Provided CSV fills column-view pages without clipping or losing lines",
+                    () => VerifyProvidedColumnView(args[2]));
+                Console.WriteLine($"PASS: {passed} tests");
+                return 0;
+            }
             if (args.Length >= 4 && args[1] == "--capture-unsaved")
             {
                 using var form = CreateCellDisplayForm(recordRows: true);

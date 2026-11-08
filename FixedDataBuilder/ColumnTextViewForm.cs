@@ -3,10 +3,16 @@ namespace FixedDataBuilder;
 public sealed class ColumnTextViewForm : Form
 {
     private const int DefaultFontSize = 10;
+    private const int PaneGap = 2;
+    private const int CellWidthAllowance = 10;
+    private const int MaxGridColumnWidth = 65_536;
+    private const int MaxMeasuredLineLength = 4096;
+    private const TextFormatFlags LineMeasureFlags = TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
+    private static readonly Size UnboundedTextSize = new(int.MaxValue, int.MaxValue);
     private readonly TextBox pathBox = new() { Name = "ColumnFilePath", ReadOnly = true, Dock = DockStyle.Fill };
     private readonly ComboBox encodingBox = new() { Name = "ColumnEncoding", DropDownStyle = ComboBoxStyle.DropDownList, Width = 135 };
     private readonly NumericUpDown fontSize = new() { Name = "ColumnFontSize", Minimum = 6, Maximum = 24, Value = DefaultFontSize, Width = 55 };
-    private readonly NumericUpDown columnCharacters = new() { Name = "ColumnMinimumWidth", Minimum = 10, Maximum = 200, Value = 30, Width = 65 };
+    private readonly NumericUpDown columnCharacters = new() { Name = "ColumnMinimumWidth", Minimum = 10, Maximum = 200, Value = 10, Width = 65 };
     private readonly NumericUpDown pageNumber = new() { Name = "ColumnPageNumber", Minimum = 1, Maximum = 1, Value = 1, Width = 65 };
     private readonly Button previous = new() { Name = "PreviousColumnPage", Text = "◀ 前のページ", AutoSize = true };
     private readonly Button next = new() { Name = "NextColumnPage", Text = "次のページ ▶", AutoSize = true };
@@ -56,7 +62,7 @@ public sealed class ColumnTextViewForm : Form
         encodingBox.Items.AddRange(ColumnTextDocument.EncodingNames);
         encodingBox.SelectedIndex = 0;
         tools.Controls.AddRange([previous, pageNumber, pageCount, next, chooseFont, Caption("文字サイズ"), fontSize,
-            Caption("段幅の目安（半角文字）"), columnCharacters, Caption("文字コード"), encodingBox]);
+            Caption("最小段幅（半角文字）"), columnCharacters, Caption("文字コード"), encodingBox]);
         var help = new Label { Dock = DockStyle.Top, Height = 24,
             Text = "ウィンドウに合わせて自動段組み ／ 左の段の上→下、次の段へ ／ 元ファイルを表示（保存前の編集は含みません）" };
         var searchBar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(4), WrapContents = true };
@@ -198,7 +204,7 @@ public sealed class ColumnTextViewForm : Form
         layoutCancellation = new CancellationTokenSource();
         var token = layoutCancellation.Token;
         var measuredFont = (Font)textFont.Clone();
-        var minimumWidth = Math.Max(80, digitWidth * (int)columnCharacters.Value);
+        var minimumWidth = Math.Clamp(digitWidth * (int)columnCharacters.Value, 80, MaxGridColumnWidth);
         ColumnAdaptivePagination Calculate()
         {
             using (measuredFont)
@@ -210,21 +216,15 @@ public sealed class ColumnTextViewForm : Form
                 {
                     token.ThrowIfCancellationRequested();
                     if (first == cachedStart) return cachedWidth;
-                    var header = $"{first + 1}～{last}行";
-                    var width = Math.Max(minimumWidth, TextRenderer.MeasureText(header, measuredFont, Size.Empty,
-                        TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + 20);
-                    for (var i = first; i < last && width < available; i++)
+                    var header = first == last ? "—" : $"{first + 1}～{last}行";
+                    var width = Math.Max(minimumWidth, MeasureCellWidth(header, measuredFont));
+                    for (var i = first; i < last && width < MaxGridColumnWidth; i++)
                     {
                         if ((i & 63) == 0) token.ThrowIfCancellationRequested();
-                        var line = lines[i];
-                        // A very long physical line needs horizontal scrolling; avoid measuring unbounded text.
-                        var sample = line.Length > 4096 ? line[..4096] : line;
-                        var measured = TextRenderer.MeasureText(sample, measuredFont, Size.Empty,
-                            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.ExpandTabs).Width + 24;
-                        width = Math.Max(width, line.Length > 4096 ? Math.Max(measured, available) : measured);
+                        width = Math.Max(width, MeasureCellWidth(lines[i], measuredFont));
                     }
                     cachedStart = first;
-                    return cachedWidth = (int)Math.Min(int.MaxValue, (long)gutter + width + 4);
+                    return cachedWidth = gutter + width + PaneGap;
                 }, token);
             }
         }
@@ -273,6 +273,14 @@ public sealed class ColumnTextViewForm : Form
         }, TaskScheduler.Default);
     }
 
+    private static int MeasureCellWidth(string text, Font font)
+    {
+        // Very long lines already require scrolling. Bound the work sent to GDI.
+        if (text.Length > MaxMeasuredLineLength) return MaxGridColumnWidth;
+        var width = TextRenderer.MeasureText(text, font, UnboundedTextSize, LineMeasureFlags).Width;
+        return Math.Min(width + CellWidthAllowance, MaxGridColumnWidth);
+    }
+
     private int LineIndex(int column, int row)
     {
         if (document is null || row < 0 || row >= pagination.RowsPerColumn) return -1;
@@ -316,7 +324,7 @@ public sealed class ColumnTextViewForm : Form
                 current.Columns[0].Width = gutter;
             }
             columnsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            FillPage();
+            FillPage(size.Width);
         }
         finally
         {
@@ -336,7 +344,7 @@ public sealed class ColumnTextViewForm : Form
     {
         var pane = new WheelZoomDataGridView
         {
-            Dock = DockStyle.Fill, Margin = new Padding(0, 0, 2, 0), BackgroundColor = Color.White,
+            Dock = DockStyle.Fill, Margin = new Padding(0, 0, PaneGap, 0), BackgroundColor = Color.White,
             ReadOnly = true, VirtualMode = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
             AllowUserToOrderColumns = false, RowHeadersVisible = false, BorderStyle = BorderStyle.None,
             CellBorderStyle = DataGridViewCellBorderStyle.None, ScrollBars = ScrollBars.Horizontal,
@@ -347,6 +355,7 @@ public sealed class ColumnTextViewForm : Form
         pane.DefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
         pane.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
         pane.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(225, 242, 252);
+        pane.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
         pane.Columns.Add(new DataGridViewTextBoxColumn { Name = "SourceLine", HeaderText = "行", SortMode = DataGridViewColumnSortMode.NotSortable,
             Frozen = true, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.RoyalBlue } });
         pane.Columns.Add(new DataGridViewTextBoxColumn { Name = "SourceText", HeaderText = "内容", SortMode = DataGridViewColumnSortMode.NotSortable });
@@ -354,10 +363,9 @@ public sealed class ColumnTextViewForm : Form
         return pane;
     }
 
-    private void FillPage()
+    private void FillPage(int availableWidth)
     {
         var lineCount = document?.Lines.Count ?? 0;
-        var preferredWidths = new int[panes.Count];
         columnsPanel.SuspendLayout();
         try
         {
@@ -368,16 +376,11 @@ public sealed class ColumnTextViewForm : Form
                 pane.RowCount = 0;
                 pane.RowCount = Math.Clamp(lineCount - first, 0, pagination.RowsPerColumn);
                 pane.Columns[1].HeaderText = pane.RowCount == 0 ? "—" : $"{first + 1}～{first + pane.RowCount}行";
-                var dataWidth = pane.Columns[1].GetPreferredWidth(DataGridViewAutoSizeColumnMode.AllCells, true);
-                pane.Columns[1].Width = (int)Math.Clamp(dataWidth + 6L, 80L, 65_536L);
-                if (pane.RowCount > 0 || (lineCount == 0 && column == 0))
-                    preferredWidths[column] = pane.Columns[0].Width + pane.Columns[1].Width + pane.Margin.Horizontal;
+                var paneWidth = pageMap.PaneWidth(pageIndex, column);
+                pane.Columns[1].Width = paneWidth - pane.Columns[0].Width - PaneGap;
+                columnsPanel.ColumnStyles[column].Width = Math.Min(paneWidth, availableWidth);
                 pane.ClearSelection(); pane.Invalidate();
             }
-
-            var widths = ColumnPageLayout.FitPaneWidths(preferredWidths, columnsPanel.ClientSize.Width);
-            for (var column = 0; column < widths.Length; column++)
-                columnsPanel.ColumnStyles[column].Width = widths[column];
         }
         finally { columnsPanel.ResumeLayout(); }
         UpdatePageControls();
@@ -428,8 +431,8 @@ public sealed class ColumnTextViewForm : Form
         var x = TextRenderer.MeasureText(prefix, textFont, Size.Empty,
             TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width;
         var available = Math.Max(1, pane.ClientSize.Width - pane.Columns[0].Width);
-        pane.HorizontalScrollingOffset = Math.Min(Math.Max(0, x - available / 3),
-            Math.Max(0, pane.Columns[1].Width - available));
+        pane.ScrollHorizontallyTo(Math.Min(Math.Max(0, x - available / 3),
+            Math.Max(0, pane.Columns[1].Width - available)));
     }
 
     private void MovePage(int requested)
@@ -441,7 +444,6 @@ public sealed class ColumnTextViewForm : Form
         var digitWidth = Math.Max(1, TextRenderer.MeasureText("0000000000", textFont, Size.Empty, TextFormatFlags.NoPadding).Width / 10);
         var gutter = digitWidth * Math.Max(3, (document?.Lines.Count ?? 0).ToString().Length) + 16;
         ApplyPageLayout(columnsPanel.ClientSize, rowHeight, gutter);
-        SelectSearchMatch();
     }
 
     private void UpdatePageControls()
