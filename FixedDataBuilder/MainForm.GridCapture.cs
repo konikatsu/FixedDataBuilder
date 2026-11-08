@@ -34,9 +34,20 @@ public sealed partial class MainForm
     private GridCapturePlan BuildGridCapturePlan()
     {
         var (columns, rows) = BuildGridCaptureBands();
-        var result = new GridCapturePlan(
-            GridCapturePagination.Paginate(columns, Math.Clamp(grid.ClientSize.Width - SystemInformation.VerticalScrollBarWidth, 64, 4096)),
-            GridCapturePagination.Paginate(rows, Math.Clamp(grid.ClientSize.Height - SystemInformation.HorizontalScrollBarHeight, 64, 4096)));
+        var columnPages = GridCapturePagination.Paginate(columns,
+            Math.Clamp(grid.ClientSize.Width - SystemInformation.VerticalScrollBarWidth, 64, 4096));
+        var screenRowHeight = Math.Clamp(grid.ClientSize.Height - SystemInformation.HorizontalScrollBarHeight, 64, 4096);
+        var screenRowPages = GridCapturePagination.Paginate(rows, screenRowHeight);
+        var rowPages = screenRowPages;
+        if (columnPages.Count > 1 || screenRowPages.Count > 1)
+        {
+            var widestImage = Math.Max(640, columnPages.Max(page => page.Length));
+            var maxHeightByPixels = GridCaptureImageLayout.MaximumPixels / widestImage;
+            var rowHeightLimit = (int)Math.Min(GridCaptureImageLayout.MaximumDimension, maxHeightByPixels)
+                - CaptureBannerHeight - CaptureFooterHeight;
+            rowPages = GridCapturePagination.Paginate(rows, Math.Max(screenRowHeight, rowHeightLimit));
+        }
+        var result = new GridCapturePlan(columnPages, rowPages);
         if ((long)result.Columns.Count * result.Rows.Count > 10000)
             throw new InvalidOperationException("画像が10,000ページを超えます。文字サイズや列幅を小さくして実行してください。");
         return result;

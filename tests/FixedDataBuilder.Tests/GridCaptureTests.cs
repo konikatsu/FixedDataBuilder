@@ -6,6 +6,48 @@ internal static partial class Program
 {
     private static void RunGridCaptureTests(string repo)
     {
+        Test("A capture that fits on screen keeps the original one-page layout", () =>
+        {
+            using var form = CreateCellDisplayForm(true);
+            form.ClientSize = new Size(1400, 900);
+            var grid = Get<DataGridView>(form, "grid");
+            foreach (DataGridViewColumn column in grid.Columns) column.Width = 80;
+            foreach (DataGridViewRow row in grid.Rows) row.Height = 24;
+            var bands = ((IReadOnlyList<GridCaptureBand> Columns, IReadOnlyList<GridCaptureBand> Rows))
+                Invoke(form, "BuildGridCaptureBands")!;
+            var expectedColumns = GridCapturePagination.Paginate(bands.Columns,
+                Math.Clamp(grid.ClientSize.Width - SystemInformation.VerticalScrollBarWidth, 64, 4096));
+            var expectedRows = GridCapturePagination.Paginate(bands.Rows,
+                Math.Clamp(grid.ClientSize.Height - SystemInformation.HorizontalScrollBarHeight, 64, 4096));
+            var (columns, rows) = CaptureAxes(Invoke(form, "BuildGridCapturePlan")!);
+            Equal(1, expectedColumns.Count);
+            Equal(1, expectedRows.Count);
+            Equal(true, expectedColumns[0].Slices.SequenceEqual(columns[0].Slices));
+            Equal(true, expectedRows[0].Slices.SequenceEqual(rows[0].Slices));
+        });
+        Test("Capture divides very tall records within bitmap limits without losing row pixels", () =>
+        {
+            using var form = CreateCaptureTestForm(true);
+            var records = Get<List<List<string>>>(form, "records");
+            while (records.Count < 450) records.Add(records[records.Count % 5].ToList());
+            Invoke(form, "RefreshGrid");
+            var grid = Get<DataGridView>(form, "grid");
+            foreach (DataGridViewRow row in grid.Rows) if (!row.Frozen) row.Height = 80;
+            var bands = ((IReadOnlyList<GridCaptureBand> Columns, IReadOnlyList<GridCaptureBand> Rows))
+                Invoke(form, "BuildGridCaptureBands")!;
+            var (columns, rows) = CaptureAxes(Invoke(form, "BuildGridCapturePlan")!);
+            Equal(true, rows.Count > 1);
+            foreach (var y in rows)
+            foreach (var x in columns)
+            {
+                var width = Math.Max(640, x.Length);
+                var height = y.Length + 126;
+                Equal(true, height <= GridCaptureImageLayout.MaximumDimension);
+                Equal(true, (long)width * height <= GridCaptureImageLayout.MaximumPixels);
+            }
+            AssertCaptureCoverage(bands.Rows.Where(b => !b.Repeat),
+                rows.SelectMany(page => page.Slices).Where(slice => !slice.Repeated));
+        });
         Test("Capture pagination repeats headings and covers every body pixel once", () =>
         {
             GridCaptureBand[] bands = [new(-1, 20, true), new(0, 30, true), new(1, 35, false), new(2, 240, false), new(3, 50, false)];
@@ -52,11 +94,38 @@ internal static partial class Program
             Throws<ArgumentException>(() => GridCapturePagination.Paginate([new(0, 1, false), new(0, 2, false)], 10));
             Throws<InvalidOperationException>(() => GridCapturePagination.Paginate([new(0, 10001, false)], 1));
         });
+        Test("Captured cells show half-width and full-width space markers", () =>
+        {
+            using var form = CreateCellDisplayForm(true);
+            var grid = Get<DataGridView>(form, "grid");
+            var row = (int)Invoke(form, "RecordRowsDataStartIndex")!;
+            var field = Get<List<FieldDefinition>>(form, "fields")[0];
+            var value = "A B　C";
+            grid[1, row].Value = value;
+            var visible = (string)Invoke(form, "GetVisibleTextValue", field, value)!;
+            Equal(true, visible.StartsWith("A･B□C"));
+            using var image = new Bitmap(400, 50);
+            using (var graphics = Graphics.FromImage(image))
+            {
+                graphics.Clear(Color.White);
+                Invoke(form, "PaintGridCaptureCell", graphics, 1, row,
+                    new Rectangle(0, 0, 400, 50), new Rectangle(0, 0, 400, 50));
+            }
+            var yellow = Color.FromArgb(255, 250, 205).ToArgb();
+            Equal(true, Enumerable.Range(0, image.Width)
+                .Any(x => Enumerable.Range(0, image.Height).Any(y => image.GetPixel(x, y).ToArgb() == yellow)));
+        });
         Test("Both list layouts save all tiles, metadata and hashes without changing selection, scroll or data", () =>
         {
             foreach (var horizontal in new[] { false, true })
             {
                 using var form = CreateCaptureTestForm(horizontal);
+                form.StartPosition = FormStartPosition.Manual;
+                form.Location = new Point(-30000, -30000);
+                form.ShowInTaskbar = false;
+                form.Show();
+                form.ClientSize = new Size(780, 1000);
+                Application.DoEvents();
                 var grid = Get<DataGridView>(form, "grid");
                 grid.CurrentCell = grid[horizontal ? 2 : 4, horizontal ? 7 : 1];
                 grid.FirstDisplayedScrollingRowIndex = horizontal ? 5 : 1;
@@ -69,7 +138,10 @@ internal static partial class Program
                 var excel = JsonSerializer.Serialize(Invoke(form, "BuildExcelRows"));
                 var plan = Invoke(form, "BuildGridCapturePlan")!;
                 var (columns, rows) = CaptureAxes(plan);
-                Equal(true, columns.Count > 1 && rows.Count > 1);
+                Equal(true, columns.Count > 1 && rows.Count == 1);
+                var expectedRows = grid.Rows.Cast<DataGridViewRow>()
+                    .Count(row => row.Visible && !row.IsNewRow) + (grid.ColumnHeadersVisible ? 1 : 0);
+                Equal(expectedRows, rows[0].Slices.Count);
                 var folder = Path.Combine(temporaryDirectory, "capture-" + horizontal);
                 Directory.CreateDirectory(folder);
                 CompleteCaptureTask((Task)Invoke(form, "WriteGridCaptureAsync", folder, "test", plan,
@@ -172,7 +244,8 @@ internal static partial class Program
             foreach (var x in columns)
             {
                 using var bitmap = (Bitmap)Invoke(form, "RenderGridCapturePage", x, y, "test")!;
-                Equal(true, bitmap.Width <= 4096 && bitmap.Height <= 4222);
+                Equal(true, bitmap.Width <= 4096 && bitmap.Height <= GridCaptureImageLayout.MaximumDimension);
+                Equal(true, (long)bitmap.Width * bitmap.Height <= GridCaptureImageLayout.MaximumPixels);
             }
             Equal(false, Get<List<int>>(form, "recordGridColumnFieldIndexes").Contains(0));
             Equal(before, JsonSerializer.Serialize(Get<List<List<string>>>(form, "records")));
