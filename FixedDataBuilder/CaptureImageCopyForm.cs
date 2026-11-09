@@ -10,6 +10,9 @@ public sealed class CaptureImageCopyForm : Form
     private readonly Label message = new() { Name = "CaptureCopyMessage", AutoSize = true, MaximumSize = new Size(550, 0) };
     private readonly Button previous = new() { Name = "CaptureCopyPrevious", Text = "◀ 前へ", AutoSize = true };
     private readonly Button next = new() { Name = "CaptureCopyNext", Text = "次へ ▶", AutoSize = true };
+    private readonly Panel previewPanel = new() { Name = "CapturePreviewPanel", Dock = DockStyle.Fill, AutoScroll = true,
+        BackColor = SystemColors.ControlDark };
+    private readonly PictureBox preview = new() { Name = "CapturePreview", SizeMode = PictureBoxSizeMode.AutoSize };
 
     public CaptureImageCopyForm(IReadOnlyList<string> images)
     {
@@ -18,16 +21,18 @@ public sealed class CaptureImageCopyForm : Form
         this.images = images.ToArray();
         Text = "保存した画像をコピー";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(600, 190);
-        MinimumSize = new Size(480, 220);
+        ClientSize = new Size(960, 700);
+        MinimumSize = new Size(480, 360);
         page.Maximum = images.Count;
         var copy = new Button { Name = "CaptureCopyImage", Text = "この画像をコピー", AutoSize = true };
         var close = new Button { Text = "閉じる", AutoSize = true };
         var controls = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10) };
         controls.Controls.AddRange([previous, page, new Label { Text = $"/ {images.Count} 枚", AutoSize = true, Margin = new Padding(3, 8, 8, 0) }, next, copy, close]);
-        var information = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, Padding = new Padding(12) };
+        var information = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 75, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, Padding = new Padding(12, 4, 12, 4) };
         information.Controls.AddRange([fileName, message]);
+        previewPanel.Controls.Add(preview);
+        Controls.Add(previewPanel);
         Controls.Add(information);
         Controls.Add(controls);
         previous.Click += (_, _) => page.Value = Math.Max(page.Minimum, page.Value - 1);
@@ -44,7 +49,21 @@ public sealed class CaptureImageCopyForm : Form
         previous.Enabled = index > 0;
         next.Enabled = index + 1 < images.Count;
         fileName.Text = Path.GetFileName(images[index]);
-        message.Text = "画像をコピーしてExcelなどに貼り付け、次の画像を選んでください。";
+        var previousImage = preview.Image;
+        preview.Image = null;
+        previousImage?.Dispose();
+        try
+        {
+            using var stream = new FileStream(images[index], FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var source = Image.FromStream(stream);
+            preview.Image = new Bitmap(source);
+            previewPanel.AutoScrollPosition = Point.Empty;
+            message.Text = "プレビューはスクロールできます。コピー後、Excelなどに貼り付けてください。";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or OutOfMemoryException)
+        {
+            message.Text = "プレビューを表示できません: " + ex.Message;
+        }
     }
 
     private void CopySelectedImage()
@@ -66,5 +85,16 @@ public sealed class CaptureImageCopyForm : Form
     {
         using var image = Image.FromFile(images[(int)page.Value - 1]);
         writeImage(image);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            var image = preview.Image;
+            preview.Image = null;
+            image?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }

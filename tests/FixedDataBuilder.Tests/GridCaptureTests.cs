@@ -16,7 +16,19 @@ internal static partial class Program
                 image.Save(paths[index], System.Drawing.Imaging.ImageFormat.Png);
             }
             using var form = new CaptureImageCopyForm(paths);
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(-30000, -30000);
+            form.ShowInTaskbar = false;
+            form.Show();
+            Application.DoEvents();
             var page = Get<NumericUpDown>(form, "page");
+            var preview = Get<PictureBox>(form, "preview");
+            var previewPanel = Get<Panel>(form, "previewPanel");
+            Equal(true, previewPanel.AutoScroll && previewPanel.ClientSize.Width > 0 && previewPanel.ClientSize.Height > 0);
+            Equal(true, preview.Visible && preview.Width > 0 && preview.Height > 0);
+            Equal(true, previewPanel.RectangleToScreen(previewPanel.ClientRectangle)
+                .IntersectsWith(preview.RectangleToScreen(preview.ClientRectangle)));
+            Equal(Color.Red.ToArgb(), ((Bitmap)preview.Image!).GetPixel(0, 0).ToArgb());
             Equal(false, Get<Button>(form, "previous").Enabled);
             Equal(true, Get<Button>(form, "next").Enabled);
             Color copied = Color.Empty;
@@ -24,11 +36,22 @@ internal static partial class Program
             Invoke(form, "CopySelectedImageTo", copy);
             Equal(Color.Red.ToArgb(), copied.ToArgb());
             page.Value = 2;
+            Equal(Color.Blue.ToArgb(), ((Bitmap)preview.Image!).GetPixel(0, 0).ToArgb());
             Equal(true, Get<Button>(form, "previous").Enabled);
             Equal(false, Get<Button>(form, "next").Enabled);
             Invoke(form, "CopySelectedImageTo", copy);
             Equal(Color.Blue.ToArgb(), copied.ToArgb());
             using var unlocked = new FileStream(paths[1], FileMode.Open, FileAccess.Read, FileShare.None);
+        });
+        Test("A missing capture page reports an error and the next preview still works", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "preview-valid.png");
+            using (var image = new Bitmap(3, 3)) image.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            using var form = new CaptureImageCopyForm([Path.Combine(temporaryDirectory, "missing-preview.png"), path]);
+            Equal(true, Get<PictureBox>(form, "preview").Image is null);
+            Equal(true, Get<Label>(form, "message").Text.StartsWith("プレビューを表示できません"));
+            Get<NumericUpDown>(form, "page").Value = 2;
+            Equal(true, Get<PictureBox>(form, "preview").Image is not null);
         });
         Test("A capture that fits on screen keeps the original one-page layout", () =>
         {
