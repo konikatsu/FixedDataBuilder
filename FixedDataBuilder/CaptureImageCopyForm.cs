@@ -13,6 +13,10 @@ public sealed class CaptureImageCopyForm : Form
     private readonly Panel previewPanel = new() { Name = "CapturePreviewPanel", Dock = DockStyle.Fill, AutoScroll = true,
         BackColor = SystemColors.ControlDark };
     private readonly PictureBox preview = new() { Name = "CapturePreview", SizeMode = PictureBoxSizeMode.AutoSize };
+    private readonly NumericUpDown excelColumns = new() { Name = "ExcelImageColumns", Minimum = 1, Maximum = 100, Value = 3, Width = 55 };
+    private readonly Label excelTarget = new() { Name = "ExcelCaptureTarget", AutoSize = true, MaximumSize = new Size(900, 0) };
+    private readonly Button pasteExcel = new() { Name = "PasteCaptureImagesToExcel", Text = "Excelへ貼り付け", AutoSize = true, Enabled = false };
+    private ExcelCaptureTarget? selectedExcelTarget;
 
     public CaptureImageCopyForm(IReadOnlyList<string> images)
     {
@@ -28,19 +32,58 @@ public sealed class CaptureImageCopyForm : Form
         var close = new Button { Text = "閉じる", AutoSize = true };
         var controls = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10) };
         controls.Controls.AddRange([previous, page, new Label { Text = $"/ {images.Count} 枚", AutoSize = true, Margin = new Padding(3, 8, 8, 0) }, next, copy, close]);
-        var information = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 75, FlowDirection = FlowDirection.TopDown,
+        var excelControls = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10, 0, 10, 0) };
+        var selectExcel = new Button { Name = "SelectExcelCaptureTarget", Text = "Excelの選択位置を取得", AutoSize = true };
+        excelControls.Controls.AddRange([selectExcel, new Label { Text = "横に並べる枚数", AutoSize = true, Margin = new Padding(8, 8, 3, 0) }, excelColumns, pasteExcel]);
+        var information = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 95, FlowDirection = FlowDirection.TopDown,
             WrapContents = false, Padding = new Padding(12, 4, 12, 4) };
-        information.Controls.AddRange([fileName, message]);
+        excelTarget.Text = "Excelのセルを選んで「Excelの選択位置を取得」を押してください。";
+        information.Controls.AddRange([fileName, message, excelTarget]);
         previewPanel.Controls.Add(preview);
         Controls.Add(previewPanel);
         Controls.Add(information);
+        Controls.Add(excelControls);
         Controls.Add(controls);
         previous.Click += (_, _) => page.Value = Math.Max(page.Minimum, page.Value - 1);
         next.Click += (_, _) => page.Value = Math.Min(page.Maximum, page.Value + 1);
         page.ValueChanged += (_, _) => UpdatePage();
         copy.Click += (_, _) => CopySelectedImage();
+        selectExcel.Click += (_, _) => SelectExcelTarget();
+        pasteExcel.Click += (_, _) => PasteImagesToExcel();
         close.Click += (_, _) => Close();
         UpdatePage();
+    }
+
+    private void SelectExcelTarget()
+    {
+        try
+        {
+            selectedExcelTarget = ExcelCapturePlacement.CurrentTarget();
+            excelTarget.Text = $"貼り付け先: {selectedExcelTarget.Workbook} / {selectedExcelTarget.Sheet} / {selectedExcelTarget.Address}";
+            pasteExcel.Enabled = true;
+        }
+        catch (Exception ex)
+        {
+            selectedExcelTarget = null;
+            pasteExcel.Enabled = false;
+            excelTarget.Text = ex.Message;
+        }
+    }
+
+    private void PasteImagesToExcel()
+    {
+        if (selectedExcelTarget is null) return;
+        try
+        {
+            UseWaitCursor = true;
+            var count = ExcelCapturePlacement.Insert(selectedExcelTarget, images, (int)excelColumns.Value);
+            message.Text = $"{count}枚をExcelへ貼り付けました。ブックを確認して保存してください。";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Excelへの貼り付け", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally { UseWaitCursor = false; }
     }
 
     private void UpdatePage()

@@ -22,6 +22,8 @@ internal static partial class Program
             form.Show();
             Application.DoEvents();
             var page = Get<NumericUpDown>(form, "page");
+            Equal(false, Get<Button>(form, "pasteExcel").Enabled);
+            Equal(3m, Get<NumericUpDown>(form, "excelColumns").Value);
             var preview = Get<PictureBox>(form, "preview");
             var previewPanel = Get<Panel>(form, "previewPanel");
             Equal(true, previewPanel.AutoScroll && previewPanel.ClientSize.Width > 0 && previewPanel.ClientSize.Height > 0);
