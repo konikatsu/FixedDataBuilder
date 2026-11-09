@@ -4,6 +4,52 @@ internal static partial class Program
 {
     private static void RunByteRulerTests(string repo)
     {
+        Test("The seventeenth CSV field fits an eleven-digit value and the full byte ruler", () =>
+        {
+            var definition = Path.Combine(temporaryDirectory, "ruler-17-definition.csv");
+            var data = Path.Combine(temporaryDirectory, "ruler-17-data.csv");
+            var columns = Enumerable.Range(1, 17)
+                .Select(index => new DefinitionCsvRow($"項目{index}", index == 17 ? "X(11)" : "X(1)"))
+                .ToArray();
+            DefinitionCsvWriter.Write(definition, columns);
+            var values = Enumerable.Repeat("1", 16).Append("01234567890").ToArray();
+            File.WriteAllText(data, string.Join(",", values) + "\r\n");
+            using var form = new MainForm(["--definition", definition, "--data", data, "--csv-encoding", "utf8", "--layout", "record"]);
+            var grid = Get<DataGridView>(form, "grid");
+            using var font = new Font("MS Gothic", 9f);
+            grid.Font = font;
+            Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
+            foreach (var wrapped in new[] { false, true })
+            {
+                Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(wrapped, 20, 20, false, 100, 10));
+                var ruler = Get<int>(form, "recordRulerRowIndex");
+                var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
+                Equal("01234567890", grid[17, start].Value);
+                Equal(ByteRulerText.Format(11, 11), grid[17, ruler].Value);
+                var cell = grid[17, start];
+                var textWidth = TextRenderer.MeasureText("01234567890", cell.InheritedStyle.Font ?? grid.Font,
+                    Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
+                Equal(true, grid.Columns[17].Width >= textWidth + cell.InheritedStyle.Padding.Horizontal + 8);
+            }
+        });
+        Test("Long wrapped values do not force the byte ruler to make the column unreasonably wide", () =>
+        {
+            var definition = Path.Combine(temporaryDirectory, "ruler-wrapped-definition.csv");
+            var data = Path.Combine(temporaryDirectory, "ruler-wrapped-data.csv");
+            DefinitionCsvWriter.Write(definition, [new("長い文字", "X(100)")]);
+            var value = new string('1', 100);
+            File.WriteAllText(data, value + "\r\n");
+            using var form = new MainForm(["--definition", definition, "--data", data, "--csv-encoding", "utf8", "--layout", "record"]);
+            Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
+            Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 20, 10, false, 100, 10));
+            var grid = Get<DataGridView>(form, "grid");
+            var ruler = Get<int>(form, "recordRulerRowIndex");
+            var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
+            Equal(value, grid[1, start].Value);
+            Equal(true, grid[1, ruler].Value!.ToString()!.EndsWith("…"));
+            var digitWidth = (float)Invoke(form, "ByteRulerDigitWidth")!;
+            Equal(true, grid.Columns[1].Width < digitWidth * 100);
+        });
         Test("Byte ruler shows relative byte positions, five-byte labels and bounded continuation", () =>
         {
             var lines = ByteRulerText.Format(22, 22).Split('\n');

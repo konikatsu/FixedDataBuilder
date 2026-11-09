@@ -110,6 +110,19 @@ public sealed partial class MainForm
         return byteRulerMetricsWidth;
     }
 
+    private int MinimumColumnWidthForByteRuler(DataGridViewColumn column)
+    {
+        if (layout != GridLayout.RecordRows || recordRulerRowIndex < 0 || column.Index < 1) return 0;
+        var field = FieldIndexFromRecordColumn(column.Index);
+        if (!byteRulerLengths.TryGetValue(field, out var length) || length <= 0) return 0;
+        // When wrapping is enabled, keep the column compact for deliberately wrapped long values.
+        if (displayWrapOptions.Enabled && length >= displayWrapOptions.ThresholdBytes)
+            length = Math.Min(length, Math.Max(displayWrapOptions.LineBytes, displayWrapOptions.ThresholdBytes - 1));
+        var positions = Math.Min(length, 2048);
+        var padding = grid.Rows[recordRulerRowIndex].Cells[column.Index].InheritedStyle.Padding.Horizontal;
+        return (int)Math.Min(65536L, (long)Math.Ceiling(positions * ByteRulerDigitWidth()) + padding + 8);
+    }
+
     private bool TryPaintByteRulerCell(DataGridViewCellPaintingEventArgs e)
     {
         if (layout != GridLayout.RecordRows || recordRulerRowIndex < 0 || e.RowIndex != recordRulerRowIndex

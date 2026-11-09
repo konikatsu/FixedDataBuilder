@@ -674,8 +674,9 @@ public sealed partial class MainForm : Form
                 }
                 foreach (var line in lines)
                     width = Math.Max(width, TextRenderer.MeasureText(line, cell.InheritedStyle.Font ?? grid.Font,
-                        Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + cell.InheritedStyle.Padding.Horizontal + 2);
+                        Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + cell.InheritedStyle.Padding.Horizontal + 8);
             }
+            width = Math.Max(width, MinimumColumnWidthForByteRuler(column));
             column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
         }
     }
@@ -2648,8 +2649,9 @@ public sealed partial class MainForm : Form
                 var visibleValue = GetVisibleTextValue(field, value);
                 var textWidth = TextRenderer.MeasureText(visibleValue, style.Font ?? grid.Font,
                     Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
-                width = Math.Max(width, textWidth + style.Padding.Horizontal + 2);
+                width = Math.Max(width, textWidth + style.Padding.Horizontal + 8);
             }
+            width = Math.Max(width, MinimumColumnWidthForByteRuler(column));
             column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
         }
         AdjustRecordItemNameHeight();

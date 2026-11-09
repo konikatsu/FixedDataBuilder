@@ -26,6 +26,12 @@ internal static partial class Program
         try
         {
             var repo = Path.GetFullPath(args[0]);
+            if (args.Length == 2 && args[1] == "--test-byte-ruler")
+            {
+                RunByteRulerTests(repo);
+                Console.WriteLine($"PASS: {passed} tests");
+                return 0;
+            }
             if (args.Length == 2 && args[1] == "--test-excel-capture")
             {
                 RunExcelCaptureTests();
