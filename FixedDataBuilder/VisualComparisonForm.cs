@@ -12,7 +12,7 @@ public sealed partial class VisualComparisonForm : Form
     private readonly Button swapButton = new() { Name = "SwapRecordLists", Text = "入力・出力の上下を入れ替え", AutoSize = true };
     private bool inputOnTop = true;
 
-    public VisualComparisonForm(ComparisonDataSet? output = null, Font? dataFont = null, int minimumHeaderCharacters = 10)
+    public VisualComparisonForm(ComparisonDataSet? output = null, Font? dataFont = null, int minimumHeaderCharacters = 10, DisplayWrapOptions? wrapOptions = null)
     {
         if (minimumHeaderCharacters is < 1 or > 200) throw new ArgumentOutOfRangeException(nameof(minimumHeaderCharacters));
         Text = "入力・出力を並べて表示（目視確認）";
@@ -20,8 +20,8 @@ public sealed partial class VisualComparisonForm : Form
         Size = new Size(1400, 920);
         MinimumSize = new Size(900, 650);
         AutoScaleMode = AutoScaleMode.Font;
-        inputPane = new RecordListPane("入力", dataFont, minimumHeaderCharacters);
-        outputPane = new RecordListPane("出力", dataFont, minimumHeaderCharacters);
+        inputPane = new RecordListPane("入力", dataFont, minimumHeaderCharacters, wrapOptions ?? new());
+        outputPane = new RecordListPane("出力", dataFont, minimumHeaderCharacters, wrapOptions ?? new());
         inputPane.OpenRequested += (_, _) => OpenSide(inputPane);
         outputPane.OpenRequested += (_, _) => OpenSide(outputPane);
         var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(8) };
@@ -96,6 +96,7 @@ public sealed partial class VisualComparisonForm : Form
         private readonly ToolTip hints = new();
         private readonly Font ownedFont;
         private readonly int minimumHeaderCharacters;
+        private readonly DisplayWrapOptions wrapOptions;
         private int metadataRows;
         private int positionRow = -1;
         private int commentRow = -1;
@@ -104,10 +105,11 @@ public sealed partial class VisualComparisonForm : Form
         public ComparisonDataSet? DataSet { get; private set; }
         public event EventHandler? OpenRequested;
 
-        public RecordListPane(string side, Font? dataFont, int minimumHeaderCharacters)
+        public RecordListPane(string side, Font? dataFont, int minimumHeaderCharacters, DisplayWrapOptions wrapOptions)
         {
             Side = side;
             this.minimumHeaderCharacters = minimumHeaderCharacters;
+            this.wrapOptions = wrapOptions;
             Name = side == "入力" ? "InputRecordPane" : "OutputRecordPane";
             Dock = DockStyle.Fill;
             Margin = Padding.Empty;
@@ -221,6 +223,7 @@ public sealed partial class VisualComparisonForm : Form
                 }
                 if (rulerRow >= 0) grid.Rows[rulerRow].Height = ownedFont.Height * 2 + 8;
                 AdjustMetadataRowHeights();
+                AdjustComparisonDataRows();
                 UpdateHeaderPinning();
                 if (data.Records.Count > 0 && data.Fields.Count > 0) grid.CurrentCell = grid[1, metadataRows];
             }

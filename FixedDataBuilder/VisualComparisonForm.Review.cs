@@ -155,7 +155,11 @@ public sealed partial class VisualComparisonForm
             foreach (var cell in side.Reviewed) reviewedCells.Add(cell);
             for (var column = 0; column < grid.ColumnCount; column++)
                 grid.Columns[column].Width = Math.Max(grid.Columns[column].MinimumWidth, side.View.ColumnWidths[column]);
-            foreach (var item in side.View.RowHeights) grid.Rows[metadataRows + item.Key].Height = item.Value;
+            foreach (var item in side.View.RowHeights)
+            {
+                var row = metadataRows + item.Key;
+                grid.Rows[row].Height = wrapOptions.Enabled ? Math.Max(item.Value, grid.Rows.SharedRow(row).Height) : item.Value;
+            }
             SelectReviewCell(side.View.CurrentRecord, side.View.CurrentField);
             RestoreViewport(new(metadataRows + side.View.FirstRecord, side.View.FirstField, side.View.HorizontalOffset));
             UpdateReviewCount(); grid.Invalidate();

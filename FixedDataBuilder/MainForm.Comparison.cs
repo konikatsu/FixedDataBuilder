@@ -12,7 +12,7 @@ public sealed partial class MainForm
 
     internal VisualComparisonForm CreateVisualComparisonForm() => new(fields.Count > 0 && records.Count > 0
         ? CreateComparisonOutputSnapshot() : null, displayFont,
-        displayWrapOptions.HeaderMinimumCharacters);
+        displayWrapOptions.HeaderMinimumCharacters, displayWrapOptions);
 
     private void OpenComparison()
     {

@@ -74,7 +74,9 @@ public sealed partial class VisualComparisonForm
 
         private void PaintByteRulerAndGuides(object? sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (rulerRow < 0 || e.RowIndex < rulerRow || e.ColumnIndex < 1 || e.Graphics is not { } graphics || e.CellStyle is not { } style) return;
+            if (e.ColumnIndex < 1 || e.RowIndex < 0 || e.Graphics is not { } graphics || e.CellStyle is not { } style) return;
+            if (e.RowIndex >= metadataRows) PaintComparisonValue(e);
+            if (rulerRow < 0 || e.RowIndex < rulerRow) return;
             if (e.RowIndex == rulerRow)
             {
                 e.Paint(e.ClipBounds, e.PaintParts & ~DataGridViewPaintParts.ContentForeground);

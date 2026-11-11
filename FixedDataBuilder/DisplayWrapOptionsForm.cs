@@ -34,7 +34,7 @@ public sealed class DisplayWrapOptionsForm : Form
         var headerMinimumLabel = new Label { Text = "列の最小幅（半角文字数）", AutoSize = true, Location = new Point(20, 232) };
         var headerHelp = new Label
         {
-            Text = "項目名の折り返しに使う幅です。10は全角で約5文字分。\r\nデータが長い列は広がります。折り返し表示がオフでも設定できます。\r\n比較画面には、次に開くときに引き継ぎます。",
+            Text = "項目名の折り返しに使う幅です。10は全角で約5文字分。\r\nデータが長い列は広がります。折り返し表示がオフでも設定できます。\r\n比較画面には、折り返し設定とともに次に開くときに引き継ぎます。",
             Location = new Point(20, 266), Size = new Size(510, 54)
         };
         var help = new Label
