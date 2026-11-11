@@ -20,22 +20,52 @@ public sealed partial class MainForm
         return GridCaptureImageLayout.Create(columns, rows, CaptureBannerHeight + CaptureFooterHeight);
     }
 
-    private void CopyAllGridImage()
+    private void CopyAllGridImage() => CopyAllGridImageWith(Clipboard.SetImage);
+
+    private void CopyAllGridImageWith(Action<Image> clipboardWriter)
     {
         if (!grid.EndEdit()) return;
-        var previousWaitCursor = UseWaitCursor;
         try
         {
-            UseWaitCursor = true;
-            CopyAllGridImageTo(image =>
+            GridCaptureImageLayout? capture = null;
+            using var progress = new GridCaptureProgressForm(1, copying: true);
+            Exception? error = null;
+            var cancelled = false;
+            var copied = false;
+            progress.Shown += async (_, _) =>
             {
-                try { Clipboard.SetImage(image); }
-                catch (ExternalException ex)
+                try
                 {
-                    throw new InvalidOperationException("クリップボードへ画像をコピーできませんでした。\r\n"
-                        + "他のアプリが使用している可能性があります。少し待ってから、もう一度実行してください。", ex);
+                    await Task.Yield();
+                    progress.Token.ThrowIfCancellationRequested();
+                    capture = BuildClipboardImageLayout();
+                    progress.Token.ThrowIfCancellationRequested();
+                    var cellCount = checked(capture.Columns.Slices.Count * capture.Rows.Slices.Count);
+                    progress.SetCopyTotal(cellCount);
+                    var label = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}  一覧の全範囲（1枚）";
+                    using var bitmap = await RenderGridCapturePageAsync(capture.Columns, capture.Rows, label,
+                        progress.Token, progress.ReportCells);
+                    progress.Token.ThrowIfCancellationRequested();
+                    progress.BeginClipboardTransfer();
+                    await WriteClipboardImageAsync(bitmap, image =>
+                    {
+                        try { clipboardWriter(image); }
+                        catch (ExternalException ex)
+                        {
+                            throw new InvalidOperationException("クリップボードへ画像をコピーできませんでした。\r\n"
+                                + "他のアプリが使用している可能性があります。少し待ってから、もう一度実行してください。", ex);
+                        }
+                    });
+                    copied = true;
                 }
-            });
+                catch (OperationCanceledException) { cancelled = true; }
+                catch (Exception ex) { error = ex; }
+                finally { progress.Finish(); }
+            };
+            progress.ShowDialog(this);
+            if (error is not null) throw error;
+            if (cancelled) SetStatus("画像コピーを中止しました。");
+            else if (copied && capture is not null) SetStatus($"一覧の全範囲を画像コピーしました（{capture.ImageSize.Width:N0} × {capture.ImageSize.Height:N0} ピクセル）。Excelなどへ貼り付けできます。");
         }
         catch (OutOfMemoryException)
         {
@@ -47,7 +77,57 @@ public sealed partial class MainForm
         {
             MessageBox.Show(this, ex.Message, "画像コピーエラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally { UseWaitCursor = previousWaitCursor; }
+    }
+
+    private async Task<Bitmap> RenderGridCapturePageAsync(GridCaptureAxisPage columns, GridCaptureAxisPage rows,
+        string pageLabel, CancellationToken cancellation, Action<int> report)
+    {
+        // Let the progress dialog paint before allocating and drawing the bitmap.
+        await Task.Yield();
+        cancellation.ThrowIfCancellationRequested();
+        var bitmap = CreateGridCaptureCanvas(columns, rows, pageLabel);
+        var completed = 0;
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            foreach (var row in rows.Slices)
+            {
+                for (var first = 0; first < columns.Slices.Count; first += 8)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    var end = Math.Min(first + 8, columns.Slices.Count);
+                    using (var graphics = Graphics.FromImage(bitmap))
+                    {
+                        for (var index = first; index < end; index++)
+                            PaintGridCaptureSlice(graphics, columns.Slices[index], row);
+                    }
+                    completed += end - first;
+                    if (timer.ElapsedMilliseconds >= 40)
+                    {
+                        report(completed);
+                        await Task.Delay(1);
+                        timer.Restart();
+                    }
+                }
+            }
+            report(completed);
+            cancellation.ThrowIfCancellationRequested();
+            return bitmap;
+        }
+        catch { bitmap.Dispose(); throw; }
+    }
+
+    private static Task WriteClipboardImageAsync(Image bitmap, Action<Image> writeImage)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try { writeImage(bitmap); completion.SetResult(); }
+            catch (Exception ex) { completion.SetException(ex); }
+        }) { IsBackground = true, Name = "ImageClipboardWriter" };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return completion.Task;
     }
 
     private void CopyAllGridImageTo(Action<Image> writeImage)

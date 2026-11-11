@@ -8,6 +8,71 @@ internal static partial class Program
 {
     private static void RunImageClipboardTests(string repo)
     {
+        Test("Progress rendering matches the existing image and yields to the UI", () =>
+        {
+            using var form = CreateCellDisplayForm(true);
+            var layout = (GridCaptureImageLayout)Invoke(form, "BuildClipboardImageLayout")!;
+            using var expected = (Bitmap)Invoke(form, "RenderGridCapturePage", layout.Columns, layout.Rows, "test")!;
+            var reports = new List<int>();
+            var uiPumped = false;
+            form.BeginInvoke((Action)(() => uiPumped = true));
+            var task = (Task<Bitmap>)Invoke(form, "RenderGridCapturePageAsync", layout.Columns, layout.Rows, "test",
+                CancellationToken.None, new Action<int>(reports.Add))!;
+            CompleteCaptureTask(task);
+            using var actual = task.Result;
+            Equal(true, uiPumped);
+            Equal(expected.Size, actual.Size);
+            Equal(layout.Columns.Slices.Count * layout.Rows.Slices.Count, reports[^1]);
+            for (var y = 0; y < expected.Height; y += 3)
+            for (var x = 0; x < expected.Width; x += 3)
+                Equal(expected.GetPixel(x, y), actual.GetPixel(x, y));
+        });
+        Test("Cancelling image creation stops before clipboard transfer", () =>
+        {
+            using var form = CreateCellDisplayForm(true);
+            var layout = (GridCaptureImageLayout)Invoke(form, "BuildClipboardImageLayout")!;
+            using var cancellation = new CancellationTokenSource();
+            var task = (Task<Bitmap>)Invoke(form, "RenderGridCapturePageAsync", layout.Columns, layout.Rows, "test",
+                cancellation.Token, new Action<int>(_ => cancellation.Cancel()))!;
+            Throws<OperationCanceledException>(() => CompleteCaptureTask(task));
+        });
+        Test("Clipboard transfer runs on an STA worker and propagates errors", () =>
+        {
+            using var bitmap = new Bitmap(4, 4);
+            var transfer = typeof(MainForm).GetMethod("WriteClipboardImageAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
+            var apartment = ApartmentState.Unknown;
+            var task = (Task)transfer.Invoke(null, [bitmap, new Action<Image>(_ => apartment = Thread.CurrentThread.GetApartmentState())])!;
+            CompleteCaptureTask(task);
+            Equal(ApartmentState.STA, apartment);
+            var failed = (Task)transfer.Invoke(null, [bitmap, new Action<Image>(_ => throw new ExternalException("test"))])!;
+            Throws<ExternalException>(() => CompleteCaptureTask(failed));
+        });
+        Test("The copy progress window remains responsive while clipboard transfer is pending", () =>
+        {
+            using var form = CreateCellDisplayForm(true);
+            using var entered = new ManualResetEventSlim();
+            using var released = new ManualResetEventSlim();
+            using var timer = new System.Windows.Forms.Timer { Interval = 20 };
+            var progressResponsive = false;
+            timer.Tick += (_, _) =>
+            {
+                if (!entered.IsSet) return;
+                progressResponsive = Application.OpenForms.Cast<Form>()
+                    .Any(open => open.Visible && open.Text == "一覧の全範囲を画像コピー");
+                released.Set();
+            };
+            var sink = new Action<Image>(_ =>
+            {
+                entered.Set();
+                if (!released.Wait(TimeSpan.FromSeconds(5)))
+                    throw new TimeoutException("The progress window did not process events during clipboard transfer.");
+            });
+            timer.Start();
+            Invoke(form, "CopyAllGridImageWith", sink);
+            timer.Stop();
+            Equal(true, progressResponsive);
+            Equal(true, Get<ToolStripStatusLabel>(form, "statusLabel").Text!.Contains("画像コピーしました"));
+        });
         Test("Single-image layout includes all columns and rows with headings exactly once", () =>
         {
             var image = GridCaptureImageLayout.Create([new(-1, 40, true), new(0, 120, true), new(1, 300, false), new(2, 300, false)],
@@ -38,7 +103,12 @@ internal static partial class Program
             foreach (var horizontal in new[] { false, true })
             {
                 using var form = CreateCaptureTestForm(horizontal);
+                form.ClientSize = new Size(780, 1000);
+                Application.DoEvents();
                 var grid = Get<DataGridView>(form, "grid");
+                if (!horizontal)
+                    foreach (DataGridViewRow gridRow in grid.Rows)
+                        if (!gridRow.Frozen) gridRow.Height = 300;
                 grid.CurrentCell = grid[horizontal ? 2 : 4, horizontal ? 7 : 1];
                 grid.FirstDisplayedScrollingRowIndex = horizontal ? 5 : 1;
                 grid.HorizontalScrollingOffset = 60;

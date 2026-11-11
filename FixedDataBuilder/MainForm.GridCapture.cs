@@ -175,10 +175,23 @@ public sealed partial class MainForm
 
     private Bitmap RenderGridCapturePage(GridCaptureAxisPage columns, GridCaptureAxisPage rows, string pageLabel)
     {
-        var bitmap = new Bitmap(Math.Max(640, columns.Length), rows.Length + CaptureBannerHeight + CaptureFooterHeight, PixelFormat.Format32bppArgb);
-        bitmap.SetResolution(grid.DeviceDpi, grid.DeviceDpi);
+        var bitmap = CreateGridCaptureCanvas(columns, rows, pageLabel);
         try
         {
+            using var graphics = Graphics.FromImage(bitmap);
+            foreach (var row in rows.Slices)
+                PaintGridCaptureRow(graphics, columns, row);
+            return bitmap;
+        }
+        catch { bitmap.Dispose(); throw; }
+    }
+
+    private Bitmap CreateGridCaptureCanvas(GridCaptureAxisPage columns, GridCaptureAxisPage rows, string pageLabel)
+    {
+        var bitmap = new Bitmap(Math.Max(640, columns.Length), rows.Length + CaptureBannerHeight + CaptureFooterHeight, PixelFormat.Format32bppArgb);
+        try
+        {
+            bitmap.SetResolution(grid.DeviceDpi, grid.DeviceDpi);
             using var graphics = Graphics.FromImage(bitmap);
             graphics.Clear(Color.White);
             using var headingFont = new Font(FontFamily.GenericSansSerif, 12f, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -189,25 +202,31 @@ public sealed partial class MainForm
                 separatorModeTextBox.Text, pageLabel };
             for (var line = 0; line < headings.Length; line++)
                 TextRenderer.DrawText(graphics, headings[line], headingFont, new Rectangle(4, line * 20, bitmap.Width - 8, 20), Color.Black, flags);
-            foreach (var row in rows.Slices)
-            foreach (var column in columns.Slices)
-            {
-                var bounds = new Rectangle(column.Position - column.Offset,
-                    CaptureBannerHeight + row.Position - row.Offset, column.FullLength, row.FullLength);
-                var clip = new Rectangle(column.Position, CaptureBannerHeight + row.Position, column.Length, row.Length);
-                var state = graphics.Save();
-                try
-                {
-                    graphics.SetClip(clip);
-                    PaintGridCaptureCell(graphics, column.Index, row.Index, bounds, clip);
-                }
-                finally { graphics.Restore(state); }
-            }
             TextRenderer.DrawText(graphics, pageLabel, headingFont,
                 new Rectangle(4, bitmap.Height - CaptureFooterHeight, bitmap.Width - 8, CaptureFooterHeight), Color.DimGray, flags);
             return bitmap;
         }
         catch { bitmap.Dispose(); throw; }
+    }
+
+    private void PaintGridCaptureRow(Graphics graphics, GridCaptureAxisPage columns, GridCaptureSlice row)
+    {
+        foreach (var column in columns.Slices)
+            PaintGridCaptureSlice(graphics, column, row);
+    }
+
+    private void PaintGridCaptureSlice(Graphics graphics, GridCaptureSlice column, GridCaptureSlice row)
+    {
+        var bounds = new Rectangle(column.Position - column.Offset,
+            CaptureBannerHeight + row.Position - row.Offset, column.FullLength, row.FullLength);
+        var clip = new Rectangle(column.Position, CaptureBannerHeight + row.Position, column.Length, row.Length);
+        var state = graphics.Save();
+        try
+        {
+            graphics.SetClip(clip);
+            PaintGridCaptureCell(graphics, column.Index, row.Index, bounds, clip);
+        }
+        finally { graphics.Restore(state); }
     }
 
     private void PaintGridCaptureCell(Graphics graphics, int column, int row, Rectangle bounds, Rectangle clip)
