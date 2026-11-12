@@ -95,6 +95,7 @@ public sealed partial class VisualComparisonForm : Form
         private readonly TextBox selectedValue = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, WordWrap = false, ScrollBars = ScrollBars.Both };
         private readonly ToolTip hints = new();
         private readonly Font ownedFont;
+        private readonly Font commentFont;
         private readonly int minimumHeaderCharacters;
         private readonly DisplayWrapOptions wrapOptions;
         private int metadataRows;
@@ -114,6 +115,7 @@ public sealed partial class VisualComparisonForm : Form
             Dock = DockStyle.Fill;
             Margin = Padding.Empty;
             ownedFont = dataFont is null ? new Font("MS Gothic", 10.5f) : (Font)dataFont.Clone();
+            commentFont = CommentDisplayStyle.CreateFont(ownedFont);
             grid.Font = ownedFont;
             grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
             grid.DefaultCellStyle.SelectionBackColor = SystemColors.Highlight;
@@ -222,6 +224,11 @@ public sealed partial class VisualComparisonForm : Form
                     grid.Rows[row].Height = row == 0 || row == commentRow ? Math.Max(38, ownedFont.Height * 2 + 6) : ownedFont.Height + 8;
                 }
                 if (rulerRow >= 0) grid.Rows[rulerRow].Height = ownedFont.Height * 2 + 8;
+                if (commentRow >= 0)
+                {
+                    grid.Rows[commentRow].DefaultCellStyle.Font = commentFont;
+                    grid.Rows[commentRow].DefaultCellStyle.ForeColor = CommentDisplayStyle.ForeColor;
+                }
                 AdjustMetadataRowHeights();
                 AdjustComparisonDataRows();
                 UpdateHeaderPinning();
@@ -364,7 +371,7 @@ public sealed partial class VisualComparisonForm : Form
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            if (disposing) { hints.Dispose(); ownedFont.Dispose(); }
+            if (disposing) { hints.Dispose(); commentFont.Dispose(); ownedFont.Dispose(); }
         }
     }
 }

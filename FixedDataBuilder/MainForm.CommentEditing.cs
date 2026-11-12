@@ -15,6 +15,29 @@ public sealed partial class MainForm
     private int selectedCommentFieldIndex = -1;
     private FieldDefinition? selectedCommentField;
     private bool updatingCommentEditor;
+    private Font? commentDisplayFont;
+
+    private void ApplyCommentDisplayFont()
+    {
+        var previous = commentDisplayFont;
+        commentDisplayFont = CommentDisplayStyle.CreateFont(grid.Font);
+        selectedCommentEditor.Font = commentDisplayFont;
+        selectedCommentEditor.ForeColor = CommentDisplayStyle.ForeColor;
+        if (layout == GridLayout.RecordRows && recordCommentRowIndex >= 0 && recordCommentRowIndex < grid.RowCount)
+        {
+            grid.Rows[recordCommentRowIndex].DefaultCellStyle.Font = commentDisplayFont;
+        }
+        if (grid.Columns.Contains("FieldComment"))
+        {
+            grid.Columns["FieldComment"].DefaultCellStyle.Font = commentDisplayFont;
+        }
+        if (grid.EditingControl is Control editor && grid.CurrentCell is { } cell && IsCommentCell(cell.RowIndex, cell.ColumnIndex))
+        {
+            editor.Font = commentDisplayFont;
+            editor.ForeColor = CommentDisplayStyle.ForeColor;
+        }
+        previous?.Dispose();
+    }
 
     private void AddCommentEditor(TableLayoutPanel panel)
     {
@@ -25,6 +48,7 @@ public sealed partial class MainForm
         var save = new Button { Name = "SaveCommentDefinition", Text = "定義を保存...", Dock = DockStyle.Fill, Margin = new Padding(6, 2, 0, 2) };
         save.Click += (_, _) => SaveCurrentDefinitionDialog();
         panel.Controls.Add(save, 2, 5);
+        Disposed += (_, _) => commentDisplayFont?.Dispose();
         selectedCommentEditor.TextChanged += (_, _) =>
         {
             if (updatingCommentEditor || selectedCommentEditor.ReadOnly || selectedCommentFieldIndex < 0

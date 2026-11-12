@@ -15,8 +15,10 @@ public sealed partial class MainForm
         row.Cells[0].ReadOnly = true;
         row.Frozen = true;
         row.DefaultCellStyle.BackColor = CommentHeaderBackColor;
+        row.DefaultCellStyle.Font = commentDisplayFont;
+        row.DefaultCellStyle.ForeColor = CommentDisplayStyle.ForeColor;
         row.DefaultCellStyle.SelectionBackColor = CommentHeaderBackColor;
-        row.DefaultCellStyle.SelectionForeColor = grid.ForeColor;
+        row.DefaultCellStyle.SelectionForeColor = CommentDisplayStyle.ForeColor;
         row.DefaultCellStyle.Alignment = DataGridViewContentAlignment.TopLeft;
         row.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
         row.DefaultCellStyle.Padding = new Padding(4, 3, 4, 3);

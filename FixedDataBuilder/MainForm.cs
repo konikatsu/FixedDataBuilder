@@ -831,6 +831,7 @@ public sealed partial class MainForm : Form
         grid.DefaultCellStyle.Font = displayFont;
         hexTextBox.Font = displayFont;
         if (grid.EditingControl is Control editor) editor.Font = displayFont;
+        ApplyCommentDisplayFont();
         zoomLabel.Text = $"{displayFont.SizeInPoints:0.#} pt（Ctrl＋ホイール）";
         RefreshGridSizing();
         SizeColumnsToFitData();
@@ -2683,6 +2684,8 @@ public sealed partial class MainForm : Form
             {
                 var commentColumn = CreateEditableColumn("FieldComment", "期待値・コメント", 240);
                 commentColumn.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+                commentColumn.DefaultCellStyle.Font = commentDisplayFont;
+                commentColumn.DefaultCellStyle.ForeColor = CommentDisplayStyle.ForeColor;
                 grid.Columns.Add(commentColumn);
             }
         }
