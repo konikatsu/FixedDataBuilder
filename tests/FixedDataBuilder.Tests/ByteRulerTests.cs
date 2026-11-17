@@ -4,7 +4,7 @@ internal static partial class Program
 {
     private static void RunByteRulerTests(string repo)
     {
-        Test("The seventeenth CSV field fits an eleven-digit value and the full byte ruler", () =>
+        Test("The seventeenth CSV field fits an eleven-digit value and the full display ruler", () =>
         {
             var definition = Path.Combine(temporaryDirectory, "ruler-17-definition.csv");
             var data = Path.Combine(temporaryDirectory, "ruler-17-data.csv");
@@ -25,14 +25,14 @@ internal static partial class Program
                 var ruler = Get<int>(form, "recordRulerRowIndex");
                 var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
                 Equal("01234567890", grid[17, start].Value);
-                Equal(ByteRulerText.Format(11, 11), grid[17, ruler].Value);
+                Equal(MainDisplayRuler(form, 17), grid[17, ruler].Value);
                 var cell = grid[17, start];
                 var textWidth = TextRenderer.MeasureText("01234567890", cell.InheritedStyle.Font ?? grid.Font,
                     Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
                 Equal(true, grid.Columns[17].Width >= textWidth + cell.InheritedStyle.Padding.Horizontal + 8);
             }
         });
-        Test("Long wrapped values do not force the byte ruler to make the column unreasonably wide", () =>
+        Test("Long wrapped values do not force the display ruler to make the column unreasonably wide", () =>
         {
             var definition = Path.Combine(temporaryDirectory, "ruler-wrapped-definition.csv");
             var data = Path.Combine(temporaryDirectory, "ruler-wrapped-data.csv");
@@ -46,25 +46,56 @@ internal static partial class Program
             var ruler = Get<int>(form, "recordRulerRowIndex");
             var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
             Equal(value, grid[1, start].Value);
-            Equal(true, grid[1, ruler].Value!.ToString()!.EndsWith("…"));
+            Equal(MainDisplayRuler(form, 1), grid[1, ruler].Value);
             var digitWidth = (float)Invoke(form, "ByteRulerDigitWidth")!;
             Equal(true, grid.Columns[1].Width < digitWidth * 100);
         });
-        Test("Byte ruler shows relative byte positions, five-byte labels and bounded continuation", () =>
+        Test("UTF32 national text wraps 100 bytes at 25 full-width characters without a 100-column ruler", () =>
         {
-            var lines = ByteRulerText.Format(22, 22).Split('\n');
+            var definition = Path.Combine(temporaryDirectory, "display-ruler-utf32-definition.csv");
+            var data = Path.Combine(temporaryDirectory, "display-ruler-utf32.dat");
+            DefinitionCsvWriter.Write(definition, [new("名称", "N(205)")]);
+            var fields = DefinitionCsvReader.Read(definition).Select(field => field with { NationalByteWidth = 4 }).ToArray();
+            var value = new string('漢', 205);
+            FixedLengthDataWriter.Write(data, fields, [[value]], RecordSeparatorMode.None,
+                DataEncodingProfile.Utf8WithNationalText, NationalTextEncoding.Utf32);
+            var before = File.ReadAllBytes(data);
+            using var font = new Font("MS Gothic", 12f);
+            using var form = new MainForm(["--definition", definition, "--data", data, "--separator", "none",
+                "--text-encoding", "utf8", "--national-encoding", "utf32", "--layout", "record"]);
+            var previousFont = Get<Font>(form, "displayFont");
+            typeof(MainForm).GetField("displayFont", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(form, font);
+            Invoke(form, "ApplyDisplayFont");
+            previousFont.Dispose();
+            Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 100, 100));
+            Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
+            var grid = Get<DataGridView>(form, "grid");
+            var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
+            var lines = (IReadOnlyList<string>)Invoke(form, "WrappedDisplayLines", start, 1)!;
+            Equal(9, lines.Count);
+            Equal(25, lines[0].Length);
+            Equal(value, string.Concat(lines));
+            var digitWidth = (float)Invoke(form, "ByteRulerDigitWidth")!;
+            Equal(true, grid.Columns[1].Width >= 50 * digitWidth);
+            Equal(true, grid.Columns[1].Width < 75 * digitWidth);
+            Equal(MainDisplayRuler(form, 1), grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
+            Equal(true, before.SequenceEqual(File.ReadAllBytes(data)));
+        });
+        Test("Display ruler shows screen positions, five-column labels and bounded continuation", () =>
+        {
+            var lines = DisplayRulerText.Format(22).Split('\n');
             Equal('5', lines[0][4]);
             Equal("10", lines[0].Substring(8, 2));
             Equal("15", lines[0].Substring(13, 2));
             Equal("20", lines[0].Substring(18, 2));
             Equal("1234567890123456789012", lines[1]);
-            Equal(true, ByteRulerText.Format(100, 100).Split('\n')[0].EndsWith("100"));
-            Equal(true, ByteRulerText.Format(1000, 12).EndsWith("…"));
-            Equal(true, ByteRulerText.Format(int.MaxValue, int.MaxValue).Length <= 4097);
-            Equal("0バイト", ByteRulerText.Format(0, 10));
-            Throws<ArgumentOutOfRangeException>(() => ByteRulerText.Format(-1, 10));
+            Equal(true, DisplayRulerText.Format(100).Split('\n')[0].EndsWith("100"));
+            Equal(true, DisplayRulerText.Format(3000).EndsWith("…"));
+            Equal(true, DisplayRulerText.Format(int.MaxValue).Length <= 4097);
+            Equal("0桁", DisplayRulerText.Format(0));
+            Throws<ArgumentOutOfRangeException>(() => DisplayRulerText.Format(-1));
         });
-        Test("Fixed ruler uses X, national and packed storage bytes while retaining edits, selection, HEX and Excel", () =>
+        Test("Display ruler is independent of national and packed storage while retaining edits, selection, HEX and Excel", () =>
         {
             foreach (var national in new[] { NationalTextEncoding.Utf16, NationalTextEncoding.Utf32 })
             {
@@ -87,11 +118,8 @@ internal static partial class Program
                 var menu = Get<ToolStripMenuItem>(form, "byteRulerButton");
                 Equal(false, menu.Checked);
                 menu.PerformClick();
-                var lengths = Get<Dictionary<int, int>>(form, "byteRulerLengths");
-                Equal(4, lengths[0]);
-                Equal(national == NationalTextEncoding.Utf32 ? 8 : 4, lengths[1]);
-                Equal(3, lengths[2]);
                 var ruler = Get<int>(form, "recordRulerRowIndex");
+                for (var column = 1; column < grid.ColumnCount; column++) Equal(MainDisplayRuler(form, column), grid[column, ruler].Value);
                 Equal(originalStart, ruler);
                 Equal(true, grid.Rows[ruler].Frozen && grid.Rows[ruler].ReadOnly);
                 Equal(originalStart + 1, grid.CurrentCell.RowIndex);
@@ -107,7 +135,7 @@ internal static partial class Program
                 Equal(1, Get<List<List<string>>>(form, "records").Count);
             }
         });
-        Test("CSV ruler follows actual UTF8 and MS932 bytes, edits, unencodable values and empty cells", () =>
+        Test("CSV ruler follows screen width independently of codec, edits and empty cells", () =>
         {
             var definition = Path.Combine(temporaryDirectory, "ruler-csv-definition.csv");
             var data = Path.Combine(temporaryDirectory, "ruler-csv-data.csv");
@@ -115,34 +143,31 @@ internal static partial class Program
             File.WriteAllText(data, "あA\r\nカタカナ\r\n");
             using var form = new MainForm(["--definition", definition, "--data", data, "--csv-encoding", "utf8", "--layout", "record"]);
             Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
-            var lengths = Get<Dictionary<int, int>>(form, "byteRulerLengths");
-            Equal(12, lengths[0]);
+            var grid = Get<DataGridView>(form, "grid");
+            Equal(MainDisplayRuler(form, 1), grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
             var path = Path.Combine(temporaryDirectory, "ruler-ms932.csv");
             Invoke(form, "WriteData", path, new DataSaveOptions(DataFileFormat.Csv, CsvTextEncoding.ShiftJis,
                 RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis));
-            Equal(8, lengths[0]);
-            var grid = Get<DataGridView>(form, "grid");
+            Equal(MainDisplayRuler(form, 1), grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
             var start = (int)Invoke(form, "RecordRowsDataStartIndex")!;
             grid[1, start + 1].Value = "B";
             Invoke(form, "UpdateRecordValue", start + 1, 1);
-            Equal(3, lengths[0]);
+            Equal(MainDisplayRuler(form, 1), grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
             grid[1, start].Value = "😀";
             Invoke(form, "UpdateRecordValue", start, 1);
-            Equal(true, Get<Dictionary<int, string>>(form, "byteRulerErrors").ContainsKey(0));
+            Equal(MainDisplayRuler(form, 1), grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
             Equal("😀", Get<List<List<string>>>(form, "records")[0][0]);
             Invoke(form, "WriteData", Path.Combine(temporaryDirectory, "ruler-utf8.csv"), new DataSaveOptions(DataFileFormat.Csv,
                 CsvTextEncoding.Utf8, RecordSeparatorMode.CrLfOrLf, NationalTextEncoding.ShiftJis));
-            Equal(4, lengths[0]);
-            Equal(0, Get<Dictionary<int, string>>(form, "byteRulerErrors").Count);
+            Equal(MainDisplayRuler(form, 1), grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
             foreach (var row in new[] { start, start + 1 })
             {
                 grid[1, row].Value = "";
                 Invoke(form, "UpdateRecordValue", row, 1);
             }
-            Equal(0, lengths[0]);
-            Equal("0バイト", grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
+            Equal(MainDisplayRuler(form, 1), grid[1, Get<int>(form, "recordRulerRowIndex")].Value);
         });
-        Test("Ruler resizes with columns and zoom without changing the byte count or display-wrapped data", () =>
+        Test("Ruler resizes with columns and zoom while preserving display-wrapped data", () =>
         {
             using var form = CreateCellDisplayForm(recordRows: true);
             Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
@@ -151,8 +176,7 @@ internal static partial class Program
             using var bitmap = RenderGrid(form);
             var values = Get<List<List<string>>>(form, "records").SelectMany(record => record).ToArray();
             grid.Columns[1].Width = 50;
-            Equal(true, grid[1, row].Value?.ToString()?.EndsWith("…") == true);
-            Equal(22, Get<Dictionary<int, int>>(form, "byteRulerLengths")[0]);
+            Equal(MainDisplayRuler(form, 1), grid[1, row].Value);
             Invoke(form, "ChangeZoomFromWheel", SystemInformation.MouseWheelScrollDelta);
             Equal(true, grid.Rows[row].Height >= grid.Font.Height * 2 + 8);
             Invoke(form, "ApplyDisplayWrapOptions", new DisplayWrapOptions(true, 1, 10, true, 5));
@@ -171,10 +195,10 @@ internal static partial class Program
             Equal(start + 1, Invoke(form, "RecordRowsDataStartIndex"));
             var grid = Get<DataGridView>(form, "grid");
             Equal("OCCURS", grid[0, Get<int>(form, "recordOccursRowIndex")].Value);
-            Equal("バイト目盛り", grid[0, Get<int>(form, "recordRulerRowIndex")].Value);
+            Equal("目盛り", grid[0, Get<int>(form, "recordRulerRowIndex")].Value);
             Get<HashSet<int>>(form, "hiddenFieldIndexes").Add(0);
             Invoke(form, "RefreshGrid");
-            Equal(false, Get<Dictionary<int, int>>(form, "byteRulerLengths").ContainsKey(0));
+            Equal(false, Get<List<int>>(form, "recordGridColumnFieldIndexes").Contains(0));
             Invoke(form, "SelectRecord", 0);
             Invoke(form, "SetSingleRecordView", true);
             Equal(false, menu.Enabled);
@@ -187,4 +211,13 @@ internal static partial class Program
             Equal(start, Invoke(form, "RecordRowsDataStartIndex"));
         });
     }
+    private static string MainDisplayRuler(MainForm form, int column)
+    {
+        var grid = Get<DataGridView>(form, "grid");
+        var row = Get<int>(form, "recordRulerRowIndex");
+        var padding = grid[column, row].InheritedStyle.Padding.Horizontal;
+        var width = (float)Invoke(form, "ByteRulerDigitWidth")!;
+        return DisplayRulerText.Format((int)Math.Floor(Math.Max(1, grid.Columns[column].Width - padding - 8) / width));
+    }
+
 }

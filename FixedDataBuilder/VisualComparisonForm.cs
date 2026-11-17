@@ -177,8 +177,6 @@ public sealed partial class VisualComparisonForm : Form
                 grid.Columns.Clear();
                 metadataRows = 0;
                 positionRow = commentRow = rulerRow = -1;
-                byteRulerLengths.Clear();
-                byteRulerErrors.Clear();
                 var data = DataSet;
                 title.Text = $"{Side}レコード一覧　{data?.Records.Count ?? 0:N0}件";
                 empty.Text = $"「{Side}を開く…」から、定義ファイルとデータを選んでください。";
@@ -201,7 +199,7 @@ public sealed partial class VisualComparisonForm : Form
                 if (data.Profile.Format == DataFileFormat.FixedLength) positionRow = metadataRows++;
                 if (data.Fields.Any(field => !string.IsNullOrEmpty(field.Comment))) commentRow = metadataRows++;
                 if (showByteRuler.Checked) rulerRow = metadataRows++;
-                var rowLabelWidth = Math.Max(72, TextRenderer.MeasureText("バイト目盛り", ownedFont, Size.Empty, TextFormatFlags.NoPadding).Width + 12);
+                var rowLabelWidth = Math.Max(72, TextRenderer.MeasureText("目盛り", ownedFont, Size.Empty, TextFormatFlags.NoPadding).Width + 12);
                 grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "RecordNumber", HeaderText = "行", Width = rowLabelWidth, Frozen = true, ReadOnly = true, FillWeight = 1, SortMode = DataGridViewColumnSortMode.NotSortable });
                 var minimumWidth = TextRenderer.MeasureText(new string('0', minimumHeaderCharacters), ownedFont, Size.Empty, TextFormatFlags.NoPadding).Width + 12;
                 for (var index = 0; index < data.Fields.Count; index++)
@@ -245,7 +243,7 @@ public sealed partial class VisualComparisonForm : Form
                 || row >= metadataRows + data.Records.Count) return null;
             if (row < metadataRows)
             {
-                if (row == rulerRow) return column == 0 ? "バイト目盛り" : ByteRulerValue(column - 1);
+                if (row == rulerRow) return column == 0 ? "目盛り" : ByteRulerValue(column - 1);
                 if (column == 0) return row == 0 ? "項目名" : row == 1 ? "型" : row == positionRow ? "位置" : "コメント";
                 var field = data.Fields[column - 1];
                 if (row == 0) return field.Name;

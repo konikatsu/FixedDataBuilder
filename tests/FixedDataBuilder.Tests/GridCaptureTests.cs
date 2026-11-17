@@ -247,12 +247,12 @@ internal static partial class Program
             Equal("error", manifest.RootElement.GetProperty("status").GetString());
             Equal(0, manifest.RootElement.GetProperty("saved_images").GetInt32());
         });
-        Test("Five-byte guides extend into data cells and ruler text is muted", () =>
+        Test("Five-column guides extend into data cells and ruler text is muted", () =>
         {
-            Equal("5,10,15,20", string.Join(',', ByteRulerText.GuidePositions(22, 100)));
-            Equal("5,10,15", string.Join(',', ByteRulerText.GuidePositions(100, 19)));
-            Equal(0, ByteRulerText.GuidePositions(4, 100).Count());
-            Equal(409, ByteRulerText.GuidePositions(int.MaxValue, int.MaxValue).Count());
+            Equal("5,10,15,20", string.Join(',', DisplayRulerText.GuidePositions(22)));
+            Equal("5,10,15", string.Join(',', DisplayRulerText.GuidePositions(19)));
+            Equal(0, DisplayRulerText.GuidePositions(4).Count());
+            Equal(409, DisplayRulerText.GuidePositions(int.MaxValue).Count());
             using var form = CreateCellDisplayForm(true);
             Get<ToolStripMenuItem>(form, "byteRulerButton").PerformClick();
             var grid = Get<DataGridView>(form, "grid");
@@ -299,7 +299,7 @@ internal static partial class Program
             Equal(false, Get<List<int>>(form, "recordGridColumnFieldIndexes").Contains(0));
             Equal(before, JsonSerializer.Serialize(Get<List<List<string>>>(form, "records")));
             var excel = (IReadOnlyList<IReadOnlyList<ExcelCell>>)Invoke(form, "BuildExcelRows")!;
-            Equal(false, excel.Any(row => row[0].Text == "バイト目盛り"));
+            Equal(false, excel.Any(row => row[0].Text == "目盛り"));
         });
         Test("Capture menu follows list mode and uses the original file name as prefix", () =>
         {

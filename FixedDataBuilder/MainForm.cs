@@ -657,7 +657,7 @@ public sealed partial class MainForm : Form
             if (recordCommentRowIndex >= 0 && column.Index == 0)
                 width = Math.Max(width, TextRenderer.MeasureText("コメント", grid.Font).Width + 10);
             if (recordRulerRowIndex >= 0 && column.Index == 0)
-                width = Math.Max(width, TextRenderer.MeasureText("バイト目盛り", grid.Font).Width + 10);
+                width = Math.Max(width, TextRenderer.MeasureText("目盛り", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
                 if (IsRecordAuxiliaryWidthRow(row.Index, column.Index)) continue;
@@ -676,7 +676,6 @@ public sealed partial class MainForm : Form
                     width = Math.Max(width, TextRenderer.MeasureText(line, cell.InheritedStyle.Font ?? grid.Font,
                         Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + cell.InheritedStyle.Padding.Horizontal + 8);
             }
-            width = Math.Max(width, MinimumColumnWidthForByteRuler(column));
             column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
         }
     }
@@ -2592,8 +2591,6 @@ public sealed partial class MainForm : Form
             recordRowsDataStartIndex = 3;
             recordCommentRowIndex = recordOccursRowIndex = -1;
             recordRulerRowIndex = -1;
-            byteRulerLengths.Clear();
-            byteRulerErrors.Clear();
             RebuildOccursDisplayInfos();
             UpdateLayoutButtons();
             grid.RowHeadersVisible = layout == GridLayout.FieldRows;
@@ -2635,7 +2632,7 @@ public sealed partial class MainForm : Form
             if (recordCommentRowIndex >= 0 && column.Index == 0)
                 width = Math.Max(width, TextRenderer.MeasureText("コメント", grid.Font).Width + 10);
             if (recordRulerRowIndex >= 0 && column.Index == 0)
-                width = Math.Max(width, TextRenderer.MeasureText("バイト目盛り", grid.Font).Width + 10);
+                width = Math.Max(width, TextRenderer.MeasureText("目盛り", grid.Font).Width + 10);
             foreach (DataGridViewRow row in grid.Rows)
             {
                 if (IsRecordAuxiliaryWidthRow(row.Index, column.Index)) continue;
@@ -2652,7 +2649,6 @@ public sealed partial class MainForm : Form
                     Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width;
                 width = Math.Max(width, textWidth + style.Padding.Horizontal + 8);
             }
-            width = Math.Max(width, MinimumColumnWidthForByteRuler(column));
             column.Width = Math.Clamp(width, column.MinimumWidth, 65536);
         }
         AdjustRecordItemNameHeight();

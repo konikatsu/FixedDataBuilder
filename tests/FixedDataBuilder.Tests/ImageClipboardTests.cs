@@ -8,6 +8,27 @@ internal static partial class Program
 {
     private static void RunImageClipboardTests(string repo)
     {
+        Test("Switching from record rows to field rows copies the visible field-row layout through the production path", () =>
+        {
+            using var form = CreateCellDisplayForm(true);
+            Get<ToolStripMenuItem>(form, "fieldRowsButton").PerformClick();
+            var grid = Get<DataGridView>(form, "grid");
+            Equal(true, Get<ToolStripMenuItem>(form, "fieldRowsButton").Checked);
+            Equal("Name", grid.Columns[0].Name);
+            Equal("Definition", grid.Columns[1].Name);
+            Equal(Get<List<List<string>>>(form, "records").Count + 2, grid.ColumnCount);
+            var layout = (GridCaptureImageLayout)Invoke(form, "BuildClipboardImageLayout")!;
+            using var expected = (Bitmap)Invoke(form, "RenderGridCapturePage", layout.Columns, layout.Rows, "test")!;
+            Bitmap? captured = null;
+            Invoke(form, "CopyAllGridImageWith", new Action<Image>(image => captured = new Bitmap(image)));
+            using var copied = captured!;
+            Equal(expected.Size, copied.Size);
+            for (var y = 100; y < copied.Height - 26; y += 3)
+            for (var x = 0; x < copied.Width; x += 3)
+                Equal(expected.GetPixel(x, y), copied.GetPixel(x, y));
+            Equal(true, Get<ToolStripMenuItem>(form, "fieldRowsButton").Checked);
+            Equal(true, Get<ToolStripStatusLabel>(form, "statusLabel").Text!.Contains("項目縦"));
+        });
         Test("Progress rendering matches the existing image and yields to the UI", () =>
         {
             using var form = CreateCellDisplayForm(true);

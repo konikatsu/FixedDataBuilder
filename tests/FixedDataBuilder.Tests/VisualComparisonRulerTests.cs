@@ -18,16 +18,16 @@ internal static partial class Program
             foreach (var pane in new[] { input, output })
             {
                 var toggle = Get<CheckBox>(pane, "showByteRuler");
-                Equal("バイト目盛り", toggle.Text); Equal("ShowByteRuler", toggle.Name); Equal(true, toggle.Checked);
+                Equal("目盛り", toggle.Text); Equal("ShowByteRuler", toggle.Name); Equal(true, toggle.Checked);
                 Equal(Get<int>(pane, "commentRow") + 1, Get<int>(pane, "rulerRow"));
                 Equal(Get<int>(pane, "metadataRows") - 1, Get<int>(pane, "rulerRow"));
-                Equal("バイト目盛り", VisualGrid(pane)[0, Get<int>(pane, "rulerRow")].Value);
+                Equal("目盛り", VisualGrid(pane)[0, Get<int>(pane, "rulerRow")].Value);
                 Equal(true, VisualGrid(pane).ReadOnly);
                 var format = new DataGridViewCellFormattingEventArgs(1, Get<int>(pane, "rulerRow"), "", typeof(string), new DataGridViewCellStyle());
                 Invoke(pane, "FormatCell", null, format);
                 Equal(Color.FromArgb(125, 132, 142), format.CellStyle!.ForeColor);
                 Equal(format.CellStyle.ForeColor, format.CellStyle.SelectionForeColor);
-                Equal(true, ((string)Invoke(pane, "CellToolTip", Get<int>(pane, "rulerRow"), 1)!).Contains("5バイト", StringComparison.Ordinal));
+                Equal(true, ((string)Invoke(pane, "CellToolTip", Get<int>(pane, "rulerRow"), 1)!).Contains("5桁", StringComparison.Ordinal));
             }
             var inputRows = VisualGrid(input).RowCount; var outputRows = VisualGrid(output).RowCount;
             Get<CheckBox>(input, "showByteRuler").Checked = false;
@@ -38,7 +38,7 @@ internal static partial class Program
             Get<CheckBox>(input, "showByteRuler").Checked = true;
             Equal(inputRows, VisualGrid(input).RowCount);
         });
-        Test("Comparison CSV rulers use the selected codec and maximum logical bytes including spaces", () =>
+        Test("Comparison CSV rulers use display width independently of codec and include empty columns", () =>
         {
             foreach (var codec in new[] { CsvTextEncoding.Utf8, CsvTextEncoding.ShiftJis, CsvTextEncoding.StrictShiftJis })
             {
@@ -50,15 +50,15 @@ internal static partial class Program
                 using var form = new VisualComparisonForm(data);
                 var pane = VisualPane(form, false); var grid = VisualGrid(pane); var row = Get<int>(pane, "rulerRow");
                 foreach (DataGridViewColumn column in grid.Columns) if (column.Index > 0) column.Width = 500;
-                Equal(ByteRulerText.Format(codec == CsvTextEncoding.Utf8 ? 12 : 8, 100), grid[1, row].Value);
-                Equal(ByteRulerText.Format(6, 100), grid[2, row].Value);
-                Equal(ByteRulerText.Format(4, 100), grid[3, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 1), grid[1, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 2), grid[2, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 3), grid[3, row].Value);
                 Get<CheckBox>(pane, "showSpaces").Checked = false;
-                Equal(ByteRulerText.Format(6, 100), grid[2, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 2), grid[2, row].Value);
                 Equal(before, JsonSerializer.Serialize(data.Records));
             }
         });
-        Test("Comparison fixed rulers count national and packed storage bytes rather than displayed characters", () =>
+        Test("Comparison fixed rulers do not depend on national or packed storage sizes", () =>
         {
             foreach (var nationalWidth in new[] { 2, 4 })
             {
@@ -70,10 +70,10 @@ internal static partial class Program
                 using var form = new VisualComparisonForm(data);
                 var pane = VisualPane(form, false); var grid = VisualGrid(pane); var row = Get<int>(pane, "rulerRow");
                 foreach (DataGridViewColumn column in grid.Columns) if (column.Index > 0) column.Width = 500;
-                Equal(ByteRulerText.Format(7, 100), grid[1, row].Value);
-                Equal(ByteRulerText.Format(nationalWidth * 3, 100), grid[2, row].Value);
-                Equal(ByteRulerText.Format(3, 100), grid[3, row].Value);
-                Equal(ByteRulerText.Format(3, 100), grid[4, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 1), grid[1, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 2), grid[2, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 3), grid[3, row].Value);
+                Equal(ComparisonDisplayRuler(pane, 4), grid[4, row].Value);
                 Equal(Get<int>(pane, "positionRow") + 1, row);
             }
         });
@@ -84,33 +84,33 @@ internal static partial class Program
                 new[] { new[] { "カタカナ" } }, new(DataFileFormat.Csv, CsvTextEncoding.Utf8)));
             var output = VisualPane(form, false); var grid = VisualGrid(output);
             grid.Columns[1].Width = 500;
-            Equal(ByteRulerText.Format(12, 100), grid[1, Get<int>(output, "rulerRow")].Value);
+            Equal(ComparisonDisplayRuler(output, 1), grid[1, Get<int>(output, "rulerRow")].Value);
             Invoke(form, "SetInputDataSet", ComparisonDataSet.FromRecords(fields, new[] { new[] { "ABCDE" } }, new(DataFileFormat.Csv)));
             var input = VisualPane(form, true); var inputValue = VisualGrid(input)[1, Get<int>(input, "metadataRows")].Value;
             Invoke(form, "SetOutputDataSet", ComparisonDataSet.FromRecords(fields, new[] { new[] { "カタカナ" } }, new(DataFileFormat.Csv, CsvTextEncoding.ShiftJis)));
             grid.Columns[1].Width = 500;
-            Equal(ByteRulerText.Format(8, 100), grid[1, Get<int>(output, "rulerRow")].Value);
+            Equal(ComparisonDisplayRuler(output, 1), grid[1, Get<int>(output, "rulerRow")].Value);
             Equal(inputValue, VisualGrid(input)[1, Get<int>(input, "metadataRows")].Value);
             Invoke(form, "SetOutputDataSet", ComparisonDataSet.FromRecords(fields, Array.Empty<string[]>(), new(DataFileFormat.Csv)));
-            Equal("0バイト", grid[1, Get<int>(output, "rulerRow")].Value);
+            Equal(ComparisonDisplayRuler(output, 1), grid[1, Get<int>(output, "rulerRow")].Value);
             Equal(Get<int>(output, "metadataRows"), grid.RowCount);
         });
-        Test("Comparison CSV ruler reports unencodable values without replacing data and recovers on reload", () =>
+        Test("Comparison CSV ruler does not require values to be encodable and never replaces data", () =>
         {
             FieldDefinition[] fields = [new("TEXT", FieldDataType.Text, 1), new("ASCII", FieldDataType.Text, 1)];
             string[][] records = [["😀", "ABCDE"]];
             using var form = new VisualComparisonForm(ComparisonDataSet.FromRecords(fields, records, new(DataFileFormat.Csv, CsvTextEncoding.ShiftJis)));
             var pane = VisualPane(form, false); var grid = VisualGrid(pane);
             foreach (DataGridViewColumn column in grid.Columns) if (column.Index > 0) column.Width = 500;
-            Equal("計測エラー", grid[1, Get<int>(pane, "rulerRow")].Value);
-            Equal(ByteRulerText.Format(5, 100), grid[2, Get<int>(pane, "rulerRow")].Value);
+            Equal(ComparisonDisplayRuler(pane, 1), grid[1, Get<int>(pane, "rulerRow")].Value);
+            Equal(ComparisonDisplayRuler(pane, 2), grid[2, Get<int>(pane, "rulerRow")].Value);
             Equal("😀", grid[1, Get<int>(pane, "metadataRows")].Value);
             Invoke(form, "SetOutputDataSet", ComparisonDataSet.FromRecords(fields, records, new(DataFileFormat.Csv, CsvTextEncoding.Utf8)));
             grid.Columns[1].Width = 500;
-            Equal(ByteRulerText.Format(4, 100), grid[1, Get<int>(pane, "rulerRow")].Value);
+            Equal(ComparisonDisplayRuler(pane, 1), grid[1, Get<int>(pane, "rulerRow")].Value);
             Equal("😀", records[0][0]);
         });
-        Test("Comparison CSV aliases have no fabricated physical byte ruler", () =>
+        Test("Comparison CSV aliases have no fabricated physical data ruler", () =>
         {
             var data = ComparisonDataSet.FromRecords(
                 [new("BASE", FieldDataType.Text, 5), new("ALIAS", FieldDataType.PlainNumber, 2, RedefinesName: "BASE")],
@@ -163,12 +163,12 @@ internal static partial class Program
             using var form = new VisualComparisonForm(data);
             var pane = VisualPane(form, false); var grid = VisualGrid(pane); var row = Get<int>(pane, "rulerRow");
             grid.Columns[1].Width = grid.Columns[1].MinimumWidth;
-            Equal(true, grid[1, row].Value!.ToString()!.EndsWith("…", StringComparison.Ordinal));
+            Equal(ComparisonDisplayRuler(pane, 1), grid[1, row].Value);
             grid.Columns[1].Width = 2000;
-            Equal(ByteRulerText.Format(80, 1000), grid[1, row].Value);
+            Equal(ComparisonDisplayRuler(pane, 1), grid[1, row].Value);
             Equal(value, data.Records[0][0]);
         });
-        Test("Comparison five-byte blue guides reach data cells and disappear with the ruler", () =>
+        Test("Comparison five-column blue guides reach data cells and disappear with the ruler", () =>
         {
             var data = ComparisonDataSet.FromRecords([new("TEXT", FieldDataType.Text, 40)],
                 new[] { new[] { new string('A', 40) } }, new(DataFileFormat.Csv));
@@ -203,4 +203,7 @@ internal static partial class Program
         }
         return false;
     }
+    private static string ComparisonDisplayRuler(Control pane, int column) =>
+        DisplayRulerText.Format((int)Invoke(pane, "RulerSlots", column)!);
+
 }

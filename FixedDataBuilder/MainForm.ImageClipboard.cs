@@ -27,6 +27,8 @@ public sealed partial class MainForm
         if (!grid.EndEdit()) return;
         try
         {
+            var sourceLayout = layout;
+            var sourceViewName = CaptureViewName();
             GridCaptureImageLayout? capture = null;
             using var progress = new GridCaptureProgressForm(1, copying: true);
             Exception? error = null;
@@ -38,6 +40,7 @@ public sealed partial class MainForm
                 {
                     await Task.Yield();
                     progress.Token.ThrowIfCancellationRequested();
+                    if (layout != sourceLayout) throw new InvalidOperationException("表示方向が変更されたため、コピーを中止しました。表示を確認してから、もう一度実行してください。");
                     capture = BuildClipboardImageLayout();
                     progress.Token.ThrowIfCancellationRequested();
                     var cellCount = checked(capture.Columns.Slices.Count * capture.Rows.Slices.Count);
@@ -46,6 +49,7 @@ public sealed partial class MainForm
                     using var bitmap = await RenderGridCapturePageAsync(capture.Columns, capture.Rows, label,
                         progress.Token, progress.ReportCells);
                     progress.Token.ThrowIfCancellationRequested();
+                    if (layout != sourceLayout) throw new InvalidOperationException("表示方向が変更されたため、コピーを中止しました。表示を確認してから、もう一度実行してください。");
                     progress.BeginClipboardTransfer();
                     await WriteClipboardImageAsync(bitmap, image =>
                     {
@@ -65,7 +69,7 @@ public sealed partial class MainForm
             progress.ShowDialog(this);
             if (error is not null) throw error;
             if (cancelled) SetStatus("画像コピーを中止しました。");
-            else if (copied && capture is not null) SetStatus($"一覧の全範囲を画像コピーしました（{capture.ImageSize.Width:N0} × {capture.ImageSize.Height:N0} ピクセル）。Excelなどへ貼り付けできます。");
+            else if (copied && capture is not null) SetStatus($"一覧の全範囲を画像コピーしました（{sourceViewName}、{capture.ImageSize.Width:N0} × {capture.ImageSize.Height:N0} ピクセル）。Excelなどへ貼り付けできます。");
         }
         catch (OutOfMemoryException)
         {

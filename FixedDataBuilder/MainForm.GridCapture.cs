@@ -10,6 +10,8 @@ public sealed partial class MainForm
     private const int CaptureBannerHeight = 100;
     private const int CaptureFooterHeight = 26;
 
+    private string CaptureViewName() => layout == GridLayout.FieldRows ? "項目縦" : "レコード縦";
+
     private sealed record GridCapturePlan(IReadOnlyList<GridCaptureAxisPage> Columns, IReadOnlyList<GridCaptureAxisPage> Rows)
     {
         public int Count => checked(Columns.Count * Rows.Count);
@@ -146,10 +148,10 @@ public sealed partial class MainForm
                 definition_file = definitionPathTextBox.Text, data_file = dataPathTextBox.Text,
                 data_format = separatorModeTextBox.Text, unsaved_changes = hasUnsavedChanges,
                 view = layout.ToString(), font = new { grid.Font.Name, grid.Font.Size, grid.Font.Style },
-                display_wrap = displayWrapOptions, byte_ruler = recordRulerRowIndex >= 0,
+                display_wrap = displayWrapOptions, ruler = recordRulerRowIndex >= 0, ruler_unit = "display-columns",
                 horizontal_pages = plan.Columns.Count, vertical_pages = plan.Rows.Count,
                 planned_images = plan.Count, saved_images = pages.Count,
-                note = "画面上の一覧表を描画。非表示項目、表示上限で省略された文字、ToolTipは含みません。青線はバイト目盛りの補助線です。",
+                note = "画面上の一覧表を描画。非表示項目、表示上限で省略された文字、ToolTipは含みません。青線は目盛りの補助線です。",
                 pages
             };
             using var output = new FileStream(Path.Combine(directory, "capture.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None);
@@ -197,7 +199,7 @@ public sealed partial class MainForm
             using var headingFont = new Font(FontFamily.GenericSansSerif, 12f, FontStyle.Regular, GraphicsUnit.Pixel);
             var flags = TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis
                 | TextFormatFlags.PreserveGraphicsClipping;
-            var headings = new[] { WindowTitle + (hasUnsavedChanges ? " 【未保存の編集を含む】" : ""),
+            var headings = new[] { WindowTitle + " / " + CaptureViewName() + (hasUnsavedChanges ? " 【未保存の編集を含む】" : ""),
                 "定義: " + definitionPathTextBox.Text, "データ: " + dataPathTextBox.Text,
                 separatorModeTextBox.Text, pageLabel };
             for (var line = 0; line < headings.Length; line++)

@@ -1,5 +1,4 @@
 using System.Drawing.Drawing2D;
-using System.Text;
 
 namespace FixedDataBuilder;
 
@@ -9,38 +8,14 @@ public sealed partial class VisualComparisonForm
     {
         private readonly CheckBox showByteRuler = new()
         {
-            Name = "ShowByteRuler", Text = "バイト目盛り", Checked = true, AutoSize = true,
+            Name = "ShowByteRuler", Text = "目盛り", Checked = true, AutoSize = true,
             Margin = new Padding(14, 7, 3, 0)
         };
-        private readonly Dictionary<int, int> byteRulerLengths = new();
-        private readonly Dictionary<int, string> byteRulerErrors = new();
         private int rulerRow = -1;
         private bool sizingMetadata;
         private Font? rulerMetricsFont;
         private int rulerMetricsDpi;
         private float rulerDigitWidth;
-
-        private int? ByteRulerLength(int field)
-        {
-            if (DataSet is not { } data || field < 0 || field >= data.Fields.Count) return null;
-            if (data.Profile.Format == DataFileFormat.Csv && data.Fields[field].IsRedefines) return null;
-            if (byteRulerLengths.TryGetValue(field, out var cached)) return cached;
-            if (byteRulerErrors.ContainsKey(field)) return null;
-            try
-            {
-                var encoding = data.Profile.Format == DataFileFormat.Csv ? JapaneseEncodings.ForCsv(data.Profile.CsvEncoding) : null;
-                var length = data.Profile.Format == DataFileFormat.Csv
-                    ? data.Records.Select(record => encoding!.GetByteCount(record[field])).DefaultIfEmpty(0).Max()
-                    : data.Fields[field].PhysicalByteLength;
-                byteRulerLengths[field] = length;
-                return length;
-            }
-            catch (EncoderFallbackException)
-            {
-                byteRulerErrors[field] = "選択した文字コードで表せない値があるため、最大バイト長を計測できません。";
-                return null;
-            }
-        }
 
         private float ByteRulerDigitWidth()
         {
@@ -51,25 +26,21 @@ public sealed partial class VisualComparisonForm
                 digit.ToString(), grid.Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width));
         }
 
-        private int RulerSlots(int column) => Math.Clamp((int)Math.Floor(Math.Max(1,
-            grid.Columns[column].Width - grid.DefaultCellStyle.Padding.Horizontal - 8) / ByteRulerDigitWidth()), 1, 2048);
+        private int RulerSlots(int column) => Math.Max(0, (int)Math.Floor(Math.Max(1,
+            grid.Columns[column].Width - grid.DefaultCellStyle.Padding.Horizontal - 8) / ByteRulerDigitWidth()));
 
         private string ByteRulerValue(int field)
         {
             if (DataSet is not { } data) return "";
             if (data.Profile.Format == DataFileFormat.Csv && data.Fields[field].IsRedefines) return "（CSV列なし）";
-            return ByteRulerLength(field) is { } length ? ByteRulerText.Format(length, RulerSlots(field + 1)) : "計測エラー";
+            return DisplayRulerText.Format(RulerSlots(field + 1));
         }
 
         private string ByteRulerToolTip(int field)
         {
             if (DataSet is not { } data) return "";
             if (data.Profile.Format == DataFileFormat.Csv && data.Fields[field].IsRedefines) return "REDEFINESの別名項目にはCSVの物理列がありません。";
-            var length = ByteRulerLength(field);
-            if (length is null) return byteRulerErrors.GetValueOrDefault(field, "計測できません。");
-            return $"項目先頭=1 / {(data.Profile.Format == DataFileFormat.Csv ? "読み込んだデータの最大" : "固定長の格納長")} {length} バイト。\r\n"
-                + (data.Profile.Format == DataFileFormat.Csv ? $"文字コード: {JapaneseEncodings.Name(data.Profile.CsvEncoding)}。" : "型N・COMP-3は実際の格納バイト数です。")
-                + "5バイトごとに数字と青い破線を表示します。文字の画面幅や折り返し後の位置とは別の単位です。…は目盛りの続きです。";
+            return DisplayRulerText.Description;
         }
 
         private void PaintByteRulerAndGuides(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -103,16 +74,15 @@ public sealed partial class VisualComparisonForm
                 finally { graphics.Restore(state); }
                 e.Handled = true;
             }
-            if (ByteRulerLength(e.ColumnIndex - 1) is not { } length || length < 5) return;
+            if (DataSet is not { } data || (data.Profile.Format == DataFileFormat.Csv && data.Fields[e.ColumnIndex - 1].IsRedefines)) return;
             if (!e.Handled) { e.Paint(e.ClipBounds, e.PaintParts); e.Handled = true; }
             var slots = RulerSlots(e.ColumnIndex);
-            if (length > slots) slots--;
             using var pen = new Pen(Color.FromArgb(135, 70, 125, 205)) { DashStyle = DashStyle.Dash };
             var saved = graphics.Save();
             try
             {
                 graphics.SetClip(Rectangle.Intersect(e.ClipBounds, e.CellBounds), CombineMode.Intersect);
-                foreach (var position in ByteRulerText.GuidePositions(length, slots))
+                foreach (var position in DisplayRulerText.GuidePositions(slots))
                 {
                     var x = e.CellBounds.Left + style.Padding.Left + 4 + (int)Math.Round(position * ByteRulerDigitWidth());
                     graphics.DrawLine(pen, x, e.CellBounds.Top + 1, x, e.CellBounds.Bottom - 2);
