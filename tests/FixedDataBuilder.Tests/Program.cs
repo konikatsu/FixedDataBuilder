@@ -26,6 +26,12 @@ internal static partial class Program
         try
         {
             var repo = Path.GetFullPath(args[0]);
+            if (args.Length == 2 && args[1] == "--test-multi-layout")
+            {
+                RunMultiLayoutTests(repo);
+                Console.WriteLine($"PASS: {passed} tests");
+                return 0;
+            }
             if (args.Length == 2 && args[1] == "--test-comparison-display")
             {
                 RunComparisonDisplayTests(repo);
@@ -254,6 +260,7 @@ internal static partial class Program
             RunVisualComparisonTests(repo);
             RunVisualComparisonRulerTests(repo);
             RunComparisonDisplayTests(repo);
+            RunMultiLayoutTests(repo);
 
             if (args.Length >= 4 && args[1] == "--capture-csv")
                 CaptureCsv(repo, args[2], args[3]);

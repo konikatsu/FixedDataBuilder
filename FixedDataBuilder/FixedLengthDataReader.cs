@@ -99,7 +99,7 @@ public static class FixedLengthDataReader
         return records;
     }
 
-    private static List<string> DecodeRecord(byte[] recordBytes, IReadOnlyList<FieldDefinition> fields, Encoding encoding, NationalTextEncoding nationalTextEncoding)
+    internal static List<string> DecodeRecord(byte[] recordBytes, IReadOnlyList<FieldDefinition> fields, Encoding encoding, NationalTextEncoding nationalTextEncoding)
     {
         var values = new List<string>(fields.Count);
         var offset = 0;

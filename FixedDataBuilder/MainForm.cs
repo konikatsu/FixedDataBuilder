@@ -493,6 +493,7 @@ public sealed partial class MainForm : Form
             generateTestDataMenu,
             generationReportMenu,
             comparisonMenu,
+            CreateMenuItem("ヘッダー・明細を表示...", (_, _) => OpenMultiLayoutView()),
             new ToolStripSeparator(),
             CreateMenuItem("検証", (_, _) => ValidateRecords(showSuccess: true))));
         RefreshRecentFileItems();
