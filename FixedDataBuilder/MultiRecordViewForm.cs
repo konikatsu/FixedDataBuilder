@@ -3,7 +3,8 @@ namespace FixedDataBuilder;
 public sealed partial class MultiRecordViewForm : Form
 {
     private sealed record ViewRow(string Label, string Kind, IReadOnlyList<string> Values, string? Warning = null,
-        IReadOnlyList<FieldDefinition>? Fields = null, IReadOnlyDictionary<int, string>? FieldWarnings = null, int? RecordNo = null);
+        IReadOnlyList<FieldDefinition>? Fields = null, IReadOnlyDictionary<int, string>? FieldWarnings = null, int? RecordNo = null,
+        string? Details = null);
     private readonly TextBox definitionPath = new() { Name = "MultiDefinitionPath", Dock = DockStyle.Fill };
     private readonly TextBox dataPath = new() { Name = "MultiDataPath", Dock = DockStyle.Fill };
     private readonly NumericUpDown kindPosition = new() { Name = "MultiKindPosition", Minimum = 1, Maximum = 1000000, Value = 4, Width = 75 };
@@ -96,13 +97,13 @@ public sealed partial class MultiRecordViewForm : Form
             e.ToolTipText = e.ColumnIndex >= 2 && row.FieldWarnings?.TryGetValue(e.ColumnIndex - 2, out var issue) == true ? issue : row.Warning ?? (e.ColumnIndex >= 2 && row.Fields is { } fields && e.ColumnIndex - 2 < fields.Count
                 ? fields[e.ColumnIndex - 2].Comment : "");
         };
-        grid.SelectionChanged += (_, _) =>
+        grid.CurrentCellChanged += (_, _) =>
         {
             if (grid.CurrentCell is not { RowIndex: >= 0, ColumnIndex: >= 2 } cell || cell.RowIndex >= rows.Count)
             { selectedComment.Text = ""; return; }
             var selected = rows[cell.RowIndex];
             if (selected.Warning is not null && selected.Fields is null)
-            { selectedComment.Text = selected.Warning + "\r\n" + string.Join(" ", selected.Values); return; }
+            { selectedComment.Text = selected.Warning + "\r\n" + (selected.Details ?? string.Join(" ", selected.Values)); return; }
             if (selected.Fields is not { } fields || cell.ColumnIndex - 2 >= fields.Count)
             { selectedComment.Text = ""; return; }
             var field = fields[cell.ColumnIndex - 2];
@@ -170,7 +171,9 @@ public sealed partial class MultiRecordViewForm : Form
             if (record.Kind == '2') { Headings("BODY", definition.Detail, !detailGroupShown, ref detailHeadingShown, ref detailCommentShown); detailGroupShown = true; }
             var name = record.Kind switch { '1' => "HEAD", '2' => "BODY", _ => "不明" };
             var fields = record.Kind == '1' ? definition.Header : record.Kind == '2' ? definition.Detail : null;
-            result.Add(new(name, "value", record.Values, record.Warning, fields, record.FieldWarnings, record.FileRow));
+            var values = record.Kind == '?' ? new[] { "不明" } : record.Values;
+            var details = record.Kind == '?' ? string.Join(" ", record.Values) : null;
+            result.Add(new(name, "value", values, record.Warning, fields, record.FieldWarnings, record.FileRow, details));
         }
         grid.RowCount = 0; grid.Columns.Clear(); rows = result;
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "RecordNumber", Width = 80, Frozen = true, SortMode = DataGridViewColumnSortMode.NotSortable });
@@ -230,7 +233,8 @@ public sealed partial class MultiRecordViewForm : Form
         foreach (var fields in new[] { definition.Header, definition.Detail })
             for (var i = 0; i < fields.Count; i++) { Include(i, fields[i].Name); Include(i, fields[i].DisplayDefinition); }
         foreach (var record in data.Records)
-            for (var i = 0; i < record.Values.Count && i < count; i++) Include(i, record.Values[i]);
+            if (record.Kind != '?')
+                for (var i = 0; i < record.Values.Count && i < count; i++) Include(i, record.Values[i]);
         return widths;
     }
 

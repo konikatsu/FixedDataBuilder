@@ -79,6 +79,9 @@ internal static partial class Program
             var measure = typeof(MultiRecordViewForm).GetMethod("MeasureColumnWidths", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
             var widths = (int[])measure.Invoke(null, [layout, data, font, 96])!;
             Equal(true, widths[0] > 150); Equal(true, widths[1] > 500);
+            var withUnknown = data with { Records = data.Records.Append(new MultiRecord(3, '?', [new string('F', 256)], "不明な区分" )).ToArray() };
+            var unknownWidths = (int[])measure.Invoke(null, [layout, withUnknown, font, 96])!;
+            Equal(true, widths.SequenceEqual(unknownWidths));
             var workerWidths = Task.Run(() => (int[])measure.Invoke(null, [layout, data, font, 96])!).GetAwaiter().GetResult();
             Equal(true, widths.SequenceEqual(workerWidths));
         });
@@ -106,6 +109,11 @@ internal static partial class Program
             Equal("1?2", string.Concat(result.Records.Select(x => x.Kind)));
             Equal("303141394641494C", result.Records[1].Values[0]);
             Equal(true, result.Records[1].Warning!.Contains("39")); Equal("NEXT", result.Records[2].Values[3]);
+            using var form = new MultiRecordViewForm(); Invoke(form, "Populate", definition, result);
+            var grid = Get<DataGridView>(form, "grid"); form.CreateControl(); grid.CreateControl();
+            Equal("2", grid[0, 4].Value); Equal("不明", grid[1, 4].Value); Equal("不明", grid[2, 4].Value);
+            grid.CurrentCell = grid[2, 4];
+            Equal(true, Get<TextBox>(form, "selectedComment").Text.Contains("303141394641494C"));
         });
         Test("Invalid numeric fields stay visible with a warning and later records remain available", () =>
         {
@@ -185,6 +193,11 @@ internal static partial class Program
                 Equal(151, result.Records.Count); Equal(null, result.IncompleteReason);
                 Equal('1', result.Records[143].Kind);
                 Equal(true, result.Records[143].FieldWarnings!.Values.Any(x => x.Contains("銀行コード")));
+                Equal('?', result.Records[149].Kind);
+                using var font = new Font("MS Gothic", 10f);
+                var measure = typeof(MultiRecordViewForm).GetMethod("MeasureColumnWidths", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+                var widths = (int[])measure.Invoke(null, [realDefinition, result, font, 96])!;
+                Equal(true, widths[0] < 200);
                 Equal(true, before.SequenceEqual(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(realDataPath))));
             });
         }
