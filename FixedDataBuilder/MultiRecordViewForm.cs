@@ -3,7 +3,7 @@ namespace FixedDataBuilder;
 public sealed class MultiRecordViewForm : Form
 {
     private sealed record ViewRow(string Label, string Kind, IReadOnlyList<string> Values, string? Warning = null,
-        IReadOnlyList<FieldDefinition>? Fields = null);
+        IReadOnlyList<FieldDefinition>? Fields = null, IReadOnlyDictionary<int, string>? FieldWarnings = null);
     private readonly TextBox definitionPath = new() { Name = "MultiDefinitionPath", Dock = DockStyle.Fill };
     private readonly TextBox dataPath = new() { Name = "MultiDataPath", Dock = DockStyle.Fill };
     private readonly NumericUpDown kindPosition = new() { Name = "MultiKindPosition", Minimum = 1, Maximum = 1000000, Value = 4, Width = 75 };
@@ -69,7 +69,9 @@ public sealed class MultiRecordViewForm : Form
             if (e.RowIndex < 0 || e.RowIndex >= rows.Count || e.CellStyle is not { } style) return;
             var row = rows[e.RowIndex];
             style.Alignment = DataGridViewContentAlignment.TopLeft;
-            if (row.Warning is not null) style.BackColor = Color.FromArgb(255, 220, 190);
+            if (e.ColumnIndex > 0 && row.FieldWarnings?.ContainsKey(e.ColumnIndex - 1) == true)
+            { style.BackColor = Color.FromArgb(255, 190, 170); style.ForeColor = Color.DarkRed; }
+            else if (row.Warning is not null) style.BackColor = Color.FromArgb(255, 235, 210);
             else if (row.Kind == "heading") style.BackColor = Color.FromArgb(204, 232, 204);
             else if (row.Kind == "type") style.BackColor = Color.FromArgb(226, 242, 226);
             else if (row.Kind == "comment") { style.BackColor = Color.FromArgb(225, 242, 252); style.ForeColor = CommentDisplayStyle.ForeColor; style.Font = commentFont; }
@@ -79,7 +81,7 @@ public sealed class MultiRecordViewForm : Form
         {
             if (e.RowIndex < 0 || e.RowIndex >= rows.Count) return;
             var row = rows[e.RowIndex];
-            e.ToolTipText = row.Warning ?? (e.ColumnIndex > 0 && row.Fields is { } fields && e.ColumnIndex <= fields.Count
+            e.ToolTipText = e.ColumnIndex > 0 && row.FieldWarnings?.TryGetValue(e.ColumnIndex - 1, out var issue) == true ? issue : row.Warning ?? (e.ColumnIndex > 0 && row.Fields is { } fields && e.ColumnIndex <= fields.Count
                 ? fields[e.ColumnIndex - 1].Comment : "");
         };
         grid.SelectionChanged += (_, _) =>
@@ -92,7 +94,8 @@ public sealed class MultiRecordViewForm : Form
             if (selected.Fields is not { } fields || cell.ColumnIndex > fields.Count)
             { selectedComment.Text = ""; return; }
             var field = fields[cell.ColumnIndex - 1];
-            selectedComment.Text = $"{field.Name} / {field.DisplayDefinition} の備考\r\n{field.Comment}";
+            var warning = selected.FieldWarnings?.GetValueOrDefault(cell.ColumnIndex - 1);
+            selectedComment.Text = (warning is null ? "" : "⚠ " + warning + "\r\n") + $"{field.Name} / {field.DisplayDefinition} の備考\r\n{field.Comment}";
         };
     }
 
@@ -140,7 +143,7 @@ public sealed class MultiRecordViewForm : Form
             if (record.Kind == '2' && !detailHeadingShown) { Headings("明細", definition.Detail); detailHeadingShown = true; }
             var name = record.Kind switch { '1' => "ヘッダー", '2' => "明細", _ => "不明" };
             var fields = record.Kind == '1' ? definition.Header : record.Kind == '2' ? definition.Detail : null;
-            result.Add(new($"{name} {record.FileRow}", "value", record.Values, record.Warning, fields));
+            result.Add(new($"{name} {record.FileRow}", "value", record.Values, record.Warning, fields, record.FieldWarnings));
         }
         grid.RowCount = 0; grid.Columns.Clear(); rows = result;
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Kind", Width = 130, Frozen = true, SortMode = DataGridViewColumnSortMode.NotSortable });

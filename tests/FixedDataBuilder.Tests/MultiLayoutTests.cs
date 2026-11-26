@@ -42,6 +42,37 @@ internal static partial class Program
             Equal("303141394641494C", result.Records[1].Values[0]);
             Equal(true, result.Records[1].Warning!.Contains("39")); Equal("NEXT", result.Records[2].Values[3]);
         });
+        Test("Invalid numeric fields stay visible with a warning and later records remain available", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "multi-invalid-number.dat");
+            File.WriteAllText(path, "01A1HEAD\r\nXXA2FAIL\r\n01A2NEXT\r\n");
+            var result = MultiRecordReader.Read(path, definition, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+            Equal("122", string.Concat(result.Records.Select(x => x.Kind)));
+            Equal("XX", result.Records[1].Values[0]);
+            Equal(true, result.Records[1].FieldWarnings![0].Contains("5858"));
+            Equal("FAIL", result.Records[1].Values[3]); Equal("NEXT", result.Records[2].Values[3]);
+            using var form = new MultiRecordViewForm();
+            Invoke(form, "Populate", definition, result);
+            var grid = Get<DataGridView>(form, "grid");
+            Equal("XX", grid[1, 7].Value);
+        });
+        Test("Invalid packed field shows its raw bytes and later records remain available", () =>
+        {
+            var packed = new MultiRecordDefinition([new("prefix", FieldDataType.Text, 4), new("packed", FieldDataType.PackedSigned, 1)],
+                [new("prefix", FieldDataType.Text, 4), new("packed", FieldDataType.PackedSigned, 1)]);
+            var path = Path.Combine(temporaryDirectory, "multi-invalid-packed.dat");
+            File.WriteAllBytes(path, [0x30,0x31,0x41,0x31,0x0a,0x0d,0x0a,0x30,0x31,0x41,0x32,0x1c,0x0d,0x0a]);
+            var result = MultiRecordReader.Read(path, packed, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+            Equal("[HEX:0A]", result.Records[0].Values[1]);
+            Equal(true, result.Records[0].FieldWarnings!.ContainsKey(1)); Equal(2, result.Records.Count);
+        });
+        Test("Blank numeric display fields remain blank instead of being changed to zero", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "multi-blank-number.dat");
+            File.WriteAllText(path, "  A1HEAD\r\n");
+            var result = MultiRecordReader.Read(path, definition, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+            Equal("  ", result.Records[0].Values[0]);
+        });
         Test("Unknown variable-length record stops safely and retains a visible warning", () =>
         {
             var different = definition with { Detail = definition.Detail.Append(new FieldDefinition("追加", FieldDataType.Text, 1)).ToArray() };
@@ -66,6 +97,21 @@ internal static partial class Program
             var result = MultiRecordReader.Read(path, packed, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
             Equal(1, result.Records.Count); Equal('1', result.Records[0].Kind);
         });
+        var realDefinitionPath = Environment.GetEnvironmentVariable("FDB_MULTI_LAYOUT_TEST_DEFINITION");
+        var realDataPath = Environment.GetEnvironmentVariable("FDB_MULTI_LAYOUT_TEST_DATA");
+        if (!string.IsNullOrWhiteSpace(realDefinitionPath) && !string.IsNullOrWhiteSpace(realDataPath))
+        {
+            Test("Provided header-detail data stays visible through invalid numeric values", () =>
+            {
+                var before = System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(realDataPath));
+                var realDefinition = MultiRecordDefinition.Read(realDefinitionPath).WithNationalEncoding(NationalTextEncoding.ShiftJis);
+                var result = MultiRecordReader.Read(realDataPath, realDefinition, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+                Equal(151, result.Records.Count); Equal(null, result.IncompleteReason);
+                Equal('1', result.Records[143].Kind);
+                Equal(true, result.Records[143].FieldWarnings!.Values.Any(x => x.Contains("銀行コード")));
+                Equal(true, before.SequenceEqual(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(realDataPath))));
+            });
+        }
         _ = repo;
     }
 }

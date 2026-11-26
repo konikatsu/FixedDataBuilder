@@ -49,7 +49,8 @@ public sealed record MultiRecordDefinition(IReadOnlyList<FieldDefinition> Header
     }
 }
 
-public sealed record MultiRecord(int FileRow, char Kind, IReadOnlyList<string> Values, string? Warning = null);
+public sealed record MultiRecord(int FileRow, char Kind, IReadOnlyList<string> Values, string? Warning = null,
+    IReadOnlyDictionary<int, string>? FieldWarnings = null);
 public sealed record MultiRecordReadResult(IReadOnlyList<MultiRecord> Records, string? IncompleteReason);
 
 public static class MultiRecordReader
@@ -100,25 +101,46 @@ public static class MultiRecordReader
             var length = kind == '1' ? headerLength : detailLength;
             if (input.Length - offset < length) throw new InvalidDataException($"{number}レコード目: {length}バイトに満たないデータです。");
             var raw = input.AsSpan(offset, length).ToArray();
-            List<string> values;
-            try { values = FixedLengthDataReader.DecodeRecord(raw, fields, encoding, nationalEncoding); }
-            catch (Exception ex) when (ex is InvalidDataException or ArgumentException or DecoderFallbackException)
-            { throw new InvalidDataException($"{number}レコード目（区分{kind}）: {ex.Message}", ex); }
-            // Preserve physical spaces in the viewer, including fixed-width padding.
+            var values = new List<string>(fields.Count);
+            var fieldWarnings = new Dictionary<int, string>();
+            // Decode fields independently, so invalid test values do not hide other fields or records.
             var position = 0;
             for (var field = 0; field < fields.Count; field++)
             {
                 var item = fields[field];
                 if (item.IsRedefines) throw new InvalidDataException("マルチレイアウトのREDEFINESには対応していません。");
-                if (item.Type is FieldDataType.Text or FieldDataType.HalfWidthText)
-                    values[field] = encoding.GetString(raw, position, item.PhysicalByteLength);
-                else if (item.Type == FieldDataType.FullWidthText)
-                    values[field] = NationalTextEncodingHelper.GetEncoding(nationalEncoding).GetString(raw, position, item.PhysicalByteLength);
+                var fieldBytes = raw.AsSpan(position, item.PhysicalByteLength).ToArray();
+                try
+                {
+                    // Preserve physical spaces in text fields, including fixed-width padding.
+                    var value = item.Type switch
+                    {
+                        FieldDataType.Text or FieldDataType.HalfWidthText => encoding.GetString(fieldBytes),
+                        FieldDataType.FullWidthText => NationalTextEncodingHelper.GetEncoding(nationalEncoding).GetString(fieldBytes),
+                        _ => FixedLengthDataReader.DecodeRecord(fieldBytes, [item], encoding, nationalEncoding)[0]
+                    };
+                    // For ordinary integer fields show the original bytes; blank values must not turn into zeroes.
+                    if (item.Type == FieldDataType.PlainNumber && item.DecimalScale == 0) value = encoding.GetString(fieldBytes);
+                    values.Add(value);
+                }
+                catch (Exception ex) when (ex is InvalidDataException or ArgumentException or DecoderFallbackException)
+                {
+                    var hex = Convert.ToHexString(fieldBytes);
+                    fieldWarnings[field] = $"{number}レコード目（区分{kind}）/ {item.Name}: {ex.Message}　実バイト（16進）: {hex}";
+                    if (item.Type is FieldDataType.PackedSigned or FieldDataType.PackedUnsigned) values.Add($"[HEX:{hex}]");
+                    else
+                    {
+                        try { values.Add(encoding.GetString(fieldBytes)); }
+                        catch (DecoderFallbackException) { values.Add($"[HEX:{hex}]"); }
+                    }
+                }
                 position += item.StorageByteLength;
             }
             if (kind == '1') hasHeader = true;
-            var warning = kind == '2' && !hasHeader ? "ヘッダーより前の明細です。" : null;
-            records.Add(new(number, kind, values, warning));
+            var warnings = new List<string>();
+            if (kind == '2' && !hasHeader) warnings.Add("ヘッダーより前の明細です。");
+            if (fieldWarnings.Count > 0) warnings.Add($"{fieldWarnings.Count}項目に不正な値があります。該当セルを選ぶと内容を確認できます。");
+            records.Add(new(number, kind, values, warnings.Count == 0 ? null : string.Join(" ", warnings), fieldWarnings));
             offset += length;
             if (separator == RecordSeparatorMode.CrLfOrLf && offset < input.Length)
             {
