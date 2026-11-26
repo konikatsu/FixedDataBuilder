@@ -25,6 +25,7 @@ internal static partial class Program
             Equal("H  1", data.Records[0].Values[3]); Equal("D  3", data.Records[4].Values[3]);
             Equal(true, original.SequenceEqual(File.ReadAllBytes(path))); Equal(null, data.IncompleteReason);
             using var form = new MultiRecordViewForm();
+            Equal(true, form.Text.Contains("FixedDataBuilder v" + typeof(MainForm).Assembly.GetName().Version!.ToString(3)));
             Invoke(form, "Populate", definition, data);
             var grid = Get<DataGridView>(form, "grid");
             Equal(6, grid.ColumnCount);
@@ -33,16 +34,22 @@ internal static partial class Program
             Equal("備考", grid[1, 2].Value); Equal("ヘッダー備考", grid[5, 2].Value);
             var headingStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 0, 1, headingStyle);
             var commentStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 2, 1, commentStyle);
-            Equal(Color.FromArgb(220, 240, 250), headingStyle.BackColor);
+            Equal(Color.FromArgb(204, 232, 204), headingStyle.BackColor);
             Equal(Color.FromArgb(255, 248, 220), commentStyle.BackColor);
+            var headStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 3, 2, headStyle);
+            var bodyStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 7, 2, bodyStyle);
+            Equal(Color.FromArgb(220, 240, 250), headStyle.BackColor);
+            Equal(Color.Empty, bodyStyle.BackColor);
             Equal("1", grid[0, 3].Value); Equal("HEAD", grid[1, 3].Value);
             Equal("BODY 見出し", grid[1, 4].Value); Equal("明細名", grid[5, 4].Value);
             Equal("明細\r\n備考", grid[5, 6].Value); Equal("2", grid[0, 7].Value);
             Equal("3", grid[0, 10].Value); Equal("4", grid[0, 13].Value); Equal("5", grid[0, 14].Value);
             Equal("HEAD 見出し", grid[1, 8].Value); Equal("BODY 見出し", grid[1, 11].Value);
             Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            grid.Columns[2].Width = 217;
             var mode = Get<ComboBox>(form, "commentMode");
             mode.SelectedIndex = 0;
+            Equal(217, grid.Columns[2].Width);
             Equal(4, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
             Equal("3", grid[0, 11].Value); Equal("5", grid[0, 16].Value);
             mode.SelectedIndex = 1;
@@ -62,6 +69,18 @@ internal static partial class Program
             Equal(0, Enumerable.Range(0, grid.RowCount).Count(i => Convert.ToString(grid[1, i].Value)!.EndsWith(" 見出し")));
             Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
             headings.SelectedIndex = 0;
+        });
+        Test("Header-detail column widths include the widest heading and every record", () =>
+        {
+            var fields = new[] { new FieldDefinition(new string('漢', 25), FieldDataType.Text, 1), new FieldDefinition("値", FieldDataType.Text, 1) };
+            var layout = new MultiRecordDefinition(fields, fields);
+            var data = new MultiRecordReadResult([new(1, '1', ["A", "short"]), new(2, '2', ["B", new string('X', 100) + "  "])], null);
+            using var font = new Font("MS Gothic", 10f);
+            var measure = typeof(MultiRecordViewForm).GetMethod("MeasureColumnWidths", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            var widths = (int[])measure.Invoke(null, [layout, data, font, 96])!;
+            Equal(true, widths[0] > 150); Equal(true, widths[1] > 500);
+            var workerWidths = Task.Run(() => (int[])measure.Invoke(null, [layout, data, font, 96])!).GetAwaiter().GetResult();
+            Equal(true, widths.SequenceEqual(workerWidths));
         });
         Test("Header-detail capture paints data spaces and retains original values", () =>
         {
@@ -111,6 +130,17 @@ internal static partial class Program
             var result = MultiRecordReader.Read(path, packed, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
             Equal("[HEX:0A]", result.Records[0].Values[1]);
             Equal(true, result.Records[0].FieldWarnings!.ContainsKey(1)); Equal(2, result.Records.Count);
+        });
+        Test("Invalid HEAD values retain warning color while the rest of the record stays blue", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "multi-invalid-head.dat");
+            File.WriteAllText(path, "XXA1HEAD\r\n");
+            var result = MultiRecordReader.Read(path, definition, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+            using var form = new MultiRecordViewForm(); Invoke(form, "Populate", definition, result);
+            var bad = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 3, 2, bad);
+            var good = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 3, 3, good);
+            Equal(Color.FromArgb(255, 190, 170), bad.BackColor);
+            Equal(Color.FromArgb(220, 240, 250), good.BackColor);
         });
         Test("Blank numeric display fields remain blank instead of being changed to zero", () =>
         {

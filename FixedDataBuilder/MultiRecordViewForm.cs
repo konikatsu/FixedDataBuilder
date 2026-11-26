@@ -30,12 +30,13 @@ public sealed partial class MultiRecordViewForm : Form
     private IReadOnlyList<ViewRow> rows = [];
     private MultiRecordDefinition? loadedDefinition;
     private MultiRecordReadResult? loadedData;
+    private int[]? fieldColumnWidths;
     private readonly Font dataFont;
     private readonly Font commentFont;
 
     public MultiRecordViewForm(Font? font = null)
     {
-        Text = "ヘッダー・明細表示（確認用）"; StartPosition = FormStartPosition.CenterParent;
+        Text = $"ヘッダー・明細表示（確認用） - FixedDataBuilder v{typeof(MainForm).Assembly.GetName().Version?.ToString(3)}"; StartPosition = FormStartPosition.CenterParent;
         Size = new Size(1400, 850); MinimumSize = new Size(800, 500);
         dataFont = font is null ? new Font("MS Gothic", 10f) : (Font)font.Clone();
         commentFont = CommentDisplayStyle.CreateFont(dataFont);
@@ -122,13 +123,17 @@ public sealed partial class MultiRecordViewForm : Form
         try
         {
             status.Text = "読み込んでいます...";
+            using var measurementFont = (Font)dataFont.Clone();
+            var dpi = grid.DeviceDpi;
             var result = await Task.Run(() =>
             {
                 var definition = MultiRecordDefinition.Read(defPath, defEncoding).WithNationalEncoding(national);
                 var data = MultiRecordReader.Read(filePath, definition, position, recordSeparator, encoding, national);
-                return (definition, data);
+                var widths = MeasureColumnWidths(definition, data, measurementFont, dpi);
+                return (definition, data, widths);
             });
             if (IsDisposed) return;
+            fieldColumnWidths = result.widths;
             Populate(result.definition, result.data);
             var warnings = result.data.Records.Count(r => r.Warning is not null);
             status.Text = $"{result.data.Records.Count:N0}レコード / ヘッダー {result.data.Records.Count(r => r.Kind == '1'):N0}件 / 明細 {result.data.Records.Count(r => r.Kind == '2'):N0}件 / 警告 {warnings:N0}件"
@@ -171,7 +176,7 @@ public sealed partial class MultiRecordViewForm : Form
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "RecordNumber", Width = 80, Frozen = true, SortMode = DataGridViewColumnSortMode.NotSortable });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Kind", Width = 130, Frozen = true, SortMode = DataGridViewColumnSortMode.NotSortable });
         var count = Math.Max(definition.Header.Count, definition.Detail.Count);
-        for (var i = 0; i < count; i++) grid.Columns.Add(new DataGridViewTextBoxColumn { Name = $"Field{i + 1}", Width = 150, SortMode = DataGridViewColumnSortMode.NotSortable });
+        for (var i = 0; i < count; i++) grid.Columns.Add(new DataGridViewTextBoxColumn { Name = $"Field{i + 1}", Width = fieldColumnWidths is { } widths && i < widths.Length ? widths[i] : 150, SortMode = DataGridViewColumnSortMode.NotSortable });
         grid.RowCount = rows.Count;
         copyImage.Enabled = saveImages.Enabled = rows.Count > 0;
         for (var i = 0; i < rows.Count; i++)
@@ -189,14 +194,45 @@ public sealed partial class MultiRecordViewForm : Form
         style.Alignment = DataGridViewContentAlignment.TopLeft;
         if (columnIndex >= 2 && row.FieldWarnings?.ContainsKey(columnIndex - 2) == true)
         { style.BackColor = Color.FromArgb(255, 190, 170); style.ForeColor = Color.DarkRed; }
-        else if (row.Warning is not null) style.BackColor = Color.FromArgb(255, 235, 210);
-        else if (row.Kind == "heading") style.BackColor = Color.FromArgb(220, 240, 250);
+        else if (row.Warning is not null && (row.FieldWarnings is null || columnIndex < 2)) style.BackColor = Color.FromArgb(255, 235, 210);
+        else if (row.Kind == "value" && row.Label == "HEAD") style.BackColor = Color.FromArgb(220, 240, 250);
+        else if (row.Kind == "heading") style.BackColor = Color.FromArgb(204, 232, 204);
         else if (row.Kind == "type") style.BackColor = Color.FromArgb(226, 242, 226);
         else if (row.Kind == "comment") { style.BackColor = Color.FromArgb(255, 248, 220); style.ForeColor = CommentDisplayStyle.ForeColor; style.Font = commentFont; }
         else if (columnIndex < 2) style.BackColor = Color.FromArgb(226, 242, 226);
     }
 
     internal static string ShowSpaces(string value) => value.Replace(' ', '\uFF65').Replace('\u3000', '\u25A1');
+
+    private static int[] MeasureColumnWidths(MultiRecordDefinition definition, MultiRecordReadResult data, Font font, int dpi)
+    {
+        var count = Math.Max(definition.Header.Count, definition.Detail.Count);
+        var widths = Enumerable.Repeat(80, count).ToArray();
+        using var bitmap = new Bitmap(1, 1);
+        bitmap.SetResolution(dpi, dpi);
+        using var graphics = Graphics.FromImage(bitmap);
+        var flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
+        var cache = new Dictionary<string, int>();
+        void Include(int index, string text)
+        {
+            if (index >= widths.Length || widths[index] >= 65536) return;
+            var visible = ShowSpaces(text);
+            foreach (var line in visible.Split(['\r', '\n']))
+            {
+                if (!cache.TryGetValue(line, out var width))
+                {
+                    width = line.Length == 0 ? 0 : TextRenderer.MeasureText(graphics, line, font, Size.Empty, flags).Width;
+                    if (cache.Count < 4096 && line.Length < 256) cache[line] = width;
+                }
+                widths[index] = (int)Math.Min(65536L, Math.Max(widths[index], (long)width + 16));
+            }
+        }
+        foreach (var fields in new[] { definition.Header, definition.Detail })
+            for (var i = 0; i < fields.Count; i++) { Include(i, fields[i].Name); Include(i, fields[i].DisplayDefinition); }
+        foreach (var record in data.Records)
+            for (var i = 0; i < record.Values.Count && i < count; i++) Include(i, record.Values[i]);
+        return widths;
+    }
 
     private void PaintVisibleSpaces(object? sender, DataGridViewCellPaintingEventArgs e)
     {
@@ -244,7 +280,9 @@ public sealed partial class MultiRecordViewForm : Form
         var first = grid.FirstDisplayedScrollingRowIndex;
         var record = first >= 0 ? rows.Skip(first).Select(r => r.RecordNo).FirstOrDefault(n => n.HasValue) : null;
         var horizontal = grid.HorizontalScrollingOffset;
+        var widths = grid.Columns.Cast<DataGridViewColumn>().Select(c => c.Width).ToArray();
         Populate(loadedDefinition, loadedData);
+        for (var i = 0; i < Math.Min(widths.Length, grid.ColumnCount); i++) grid.Columns[i].Width = widths[i];
         if (record is not null)
         {
             var newRow = rows.ToList().FindIndex(r => r.RecordNo == record);

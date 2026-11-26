@@ -99,7 +99,7 @@ public sealed partial class MultiRecordViewForm
             bitmap.SetResolution(grid.DeviceDpi, grid.DeviceDpi);
             using var graphics = Graphics.FromImage(bitmap); graphics.Clear(Color.White);
             var flags = TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
-            TextRenderer.DrawText(graphics, "ヘッダー・明細表示 / " + label, Font, new Rectangle(4, 1, bitmap.Width - 8, 20), Color.Black, flags);
+            TextRenderer.DrawText(graphics, Text + " / " + label, Font, new Rectangle(4, 1, bitmap.Width - 8, 20), Color.Black, flags);
             TextRenderer.DrawText(graphics, "定義: " + definitionPath.Text, Font, new Rectangle(4, 21, bitmap.Width - 8, 20), Color.Black, flags);
             TextRenderer.DrawText(graphics, "データ: " + dataPath.Text, Font, new Rectangle(4, 41, bitmap.Width - 8, 20), Color.Black, flags);
             var completed = 0;
