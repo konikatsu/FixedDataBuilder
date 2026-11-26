@@ -116,7 +116,7 @@ public sealed partial class MultiRecordViewForm
                         cell.State & ~DataGridViewElementStates.Selected, cell.Value, cell.FormattedValue, cell.ErrorText, style,
                         grid.AdvancedCellBorderStyle, DataGridViewPaintParts.All & ~(DataGridViewPaintParts.Focus | DataGridViewPaintParts.SelectionBackground));
                     var state = graphics.Save();
-                    try { graphics.SetClip(clip); PaintVisibleSpaces(grid, args); if (!args.Handled) args.Paint(clip, args.PaintParts); }
+                    try { graphics.SetClip(clip); PaintGroupCell(grid, args); if (!args.Handled) args.Paint(clip, args.PaintParts); }
                     finally { graphics.Restore(state); }
                 }
                 completed++; report?.Invoke(completed);

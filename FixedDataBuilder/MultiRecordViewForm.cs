@@ -4,7 +4,7 @@ public sealed partial class MultiRecordViewForm : Form
 {
     private sealed record ViewRow(string Label, string Kind, IReadOnlyList<string> Values, string? Warning = null,
         IReadOnlyList<FieldDefinition>? Fields = null, IReadOnlyDictionary<int, string>? FieldWarnings = null, int? RecordNo = null,
-        string? Details = null);
+        string? Details = null, int FieldOffset = 0, int? GroupNumber = null, bool GroupStart = false);
     private readonly TextBox definitionPath = new() { Name = "MultiDefinitionPath", Dock = DockStyle.Fill };
     private readonly TextBox dataPath = new() { Name = "MultiDataPath", Dock = DockStyle.Fill };
     private readonly NumericUpDown kindPosition = new() { Name = "MultiKindPosition", Minimum = 1, Maximum = 1000000, Value = 4, Width = 75 };
@@ -14,6 +14,7 @@ public sealed partial class MultiRecordViewForm : Form
     private readonly ComboBox separator = new() { Name = "MultiSeparator", DropDownStyle = ComboBoxStyle.DropDownList, Width = 125 };
     private readonly ComboBox commentMode = new() { Name = "MultiCommentMode", DropDownStyle = ComboBoxStyle.DropDownList, Width = 130 };
     private readonly ComboBox headingMode = new() { Name = "MultiHeadingMode", DropDownStyle = ComboBoxStyle.DropDownList, Width = 130 };
+    private readonly CheckBox indentBody = new() { Name = "MultiIndentBody", Text = "明細を1列右に表示", Checked = true, AutoSize = true, Margin = new Padding(8, 7, 3, 0) };
     private readonly Button load = new() { Name = "LoadMultiRecords", Text = "表示", AutoSize = true };
     private readonly Button copyImage = new() { Name = "MultiCopyImage", Text = "全範囲を画像コピー", AutoSize = true, Enabled = false };
     private readonly Button saveImages = new() { Name = "MultiSaveImages", Text = "全範囲を画像保存...", AutoSize = true, Enabled = false };
@@ -32,6 +33,8 @@ public sealed partial class MultiRecordViewForm : Form
     private MultiRecordDefinition? loadedDefinition;
     private MultiRecordReadResult? loadedData;
     private int[]? fieldColumnWidths;
+    private int[]? alignedWidths;
+    private int[]? indentedWidths;
     private readonly Font dataFont;
     private readonly Font commentFont;
 
@@ -66,13 +69,23 @@ public sealed partial class MultiRecordViewForm : Form
         void Labelled(string label, Control control) { options.Controls.Add(new Label { Text = label, AutoSize = true, Margin = new Padding(8, 8, 3, 0) }); options.Controls.Add(control); }
         Labelled("定義文字コード", definitionEncoding); Labelled("X文字コード", textEncoding); Labelled("N文字コード", nationalEncoding);
         Labelled("区切り", separator); Labelled("区分の位置（1始まり・バイト）", kindPosition); options.Controls.Add(load);
-        Labelled("見出し表示", headingMode); Labelled("備考表示", commentMode); options.Controls.Add(copyImage); options.Controls.Add(saveImages);
+        Labelled("見出し表示", headingMode); Labelled("備考表示", commentMode); options.Controls.Add(indentBody); options.Controls.Add(copyImage); options.Controls.Add(saveImages);
         main.Controls.Add(options, 0, 2); main.Controls.Add(grid, 0, 3); main.Controls.Add(selectedComment, 0, 4); main.Controls.Add(status, 0, 5); Controls.Add(main);
         load.Click += async (_, _) => await LoadRecordsAsync();
         copyImage.Click += (_, _) => CopyAllImages();
         saveImages.Click += (_, _) => SaveAllImages();
         commentMode.SelectedIndexChanged += (_, _) => RefreshCommentDisplay();
         headingMode.SelectedIndexChanged += (_, _) => RefreshCommentDisplay();
+        indentBody.CheckedChanged += (_, _) =>
+        {
+            if (loadedData is not null && grid.Columns.Count >= 2)
+            {
+                var previous = grid.Columns.Cast<DataGridViewColumn>().Skip(2).Select(c => c.Width).ToArray();
+                if (indentBody.Checked) alignedWidths = previous; else indentedWidths = previous;
+            }
+            fieldColumnWidths = indentBody.Checked ? indentedWidths : alignedWidths;
+            RefreshCommentDisplay(false);
+        };
         grid.CellValueNeeded += (_, e) =>
         {
             if (e.RowIndex < 0 || e.RowIndex >= rows.Count || e.ColumnIndex < 0) return;
@@ -80,8 +93,9 @@ public sealed partial class MultiRecordViewForm : Form
             e.Value = e.ColumnIndex switch
             {
                 0 => row.Kind == "heading" ? "行番号" : row.RecordNo?.ToString() ?? "",
-                1 => row.Label,
-                _ => e.ColumnIndex - 2 < row.Values.Count ? row.Values[e.ColumnIndex - 2] : ""
+                1 => row.Kind == "value" && row.Label is "HEAD" or "BODY" ?
+                    row.GroupNumber is int number ? $"{number}組 {row.Label}" : "親不明 BODY" : row.Label,
+                _ => e.ColumnIndex - 2 - row.FieldOffset is var index && index >= 0 && index < row.Values.Count ? row.Values[index] : ""
             };
         };
         grid.CellFormatting += (_, e) =>
@@ -89,13 +103,14 @@ public sealed partial class MultiRecordViewForm : Form
             if (e.RowIndex < 0 || e.RowIndex >= rows.Count || e.CellStyle is not { } style) return;
             ApplyRowStyle(e.RowIndex, e.ColumnIndex, style);
         };
-        grid.CellPainting += PaintVisibleSpaces;
+        grid.CellPainting += PaintGroupCell;
         grid.CellToolTipTextNeeded += (_, e) =>
         {
             if (e.RowIndex < 0 || e.RowIndex >= rows.Count) return;
             var row = rows[e.RowIndex];
-            e.ToolTipText = e.ColumnIndex >= 2 && row.FieldWarnings?.TryGetValue(e.ColumnIndex - 2, out var issue) == true ? issue : row.Warning ?? (e.ColumnIndex >= 2 && row.Fields is { } fields && e.ColumnIndex - 2 < fields.Count
-                ? fields[e.ColumnIndex - 2].Comment : "");
+            var index = e.ColumnIndex - 2 - row.FieldOffset;
+            e.ToolTipText = index >= 0 && row.FieldWarnings?.TryGetValue(index, out var issue) == true ? issue : row.Warning ?? (index >= 0 && row.Fields is { } fields && index < fields.Count
+                ? fields[index].Comment : "");
         };
         grid.CurrentCellChanged += (_, _) =>
         {
@@ -104,10 +119,11 @@ public sealed partial class MultiRecordViewForm : Form
             var selected = rows[cell.RowIndex];
             if (selected.Warning is not null && selected.Fields is null)
             { selectedComment.Text = selected.Warning + "\r\n" + (selected.Details ?? string.Join(" ", selected.Values)); return; }
-            if (selected.Fields is not { } fields || cell.ColumnIndex - 2 >= fields.Count)
+            var index = cell.ColumnIndex - 2 - selected.FieldOffset;
+            if (selected.Fields is not { } fields || index < 0 || index >= fields.Count)
             { selectedComment.Text = ""; return; }
-            var field = fields[cell.ColumnIndex - 2];
-            var warning = selected.FieldWarnings?.GetValueOrDefault(cell.ColumnIndex - 2);
+            var field = fields[index];
+            var warning = selected.FieldWarnings?.GetValueOrDefault(index);
             selectedComment.Text = (warning is null ? "" : "⚠ " + warning + "\r\n") + $"{field.Name} / {field.DisplayDefinition} の備考\r\n{field.Comment}";
         };
     }
@@ -130,13 +146,15 @@ public sealed partial class MultiRecordViewForm : Form
             {
                 var definition = MultiRecordDefinition.Read(defPath, defEncoding).WithNationalEncoding(national);
                 var data = MultiRecordReader.Read(filePath, definition, position, recordSeparator, encoding, national);
-                var widths = MeasureColumnWidths(definition, data, measurementFont, dpi);
-                return (definition, data, widths);
+                var aligned = MeasureColumnWidths(definition, data, measurementFont, dpi);
+                var indented = MeasureColumnWidthsForLayout(definition, data, measurementFont, dpi, true);
+                return (definition, data, aligned, indented);
             });
             if (IsDisposed) return;
-            fieldColumnWidths = result.widths;
+            alignedWidths = result.aligned; indentedWidths = result.indented;
+            fieldColumnWidths = indentBody.Checked ? indentedWidths : alignedWidths;
             Populate(result.definition, result.data);
-            var warnings = result.data.Records.Count(r => r.Warning is not null);
+            var warnings = rows.Count(r => r.Kind == "value" && r.Warning is not null);
             status.Text = $"{result.data.Records.Count:N0}レコード / ヘッダー {result.data.Records.Count(r => r.Kind == '1'):N0}件 / 明細 {result.data.Records.Count(r => r.Kind == '2'):N0}件 / 警告 {warnings:N0}件"
                 + (result.data.IncompleteReason is null ? "" : "　⚠ " + result.data.IncompleteReason);
         }
@@ -148,37 +166,43 @@ public sealed partial class MultiRecordViewForm : Form
     private void Populate(MultiRecordDefinition definition, MultiRecordReadResult data)
     {
         loadedDefinition = definition; loadedData = data;
-        var result = new List<ViewRow>(); var detailGroupShown = false;
+        var result = new List<ViewRow>(); var detailGroupShown = false; var groupCount = 0; int? currentGroup = null;
         var headerCommentShown = false; var detailCommentShown = false;
         var headerHeadingShown = false; var detailHeadingShown = false;
-        void Headings(string label, IReadOnlyList<FieldDefinition> fields, bool groupStart, ref bool headingShown, ref bool commentShown)
+        void Headings(string label, IReadOnlyList<FieldDefinition> fields, bool groupStart, int offset, ref bool headingShown, ref bool commentShown)
         {
             if (headingMode.SelectedIndex == 1 || headingMode.SelectedIndex == 0 && groupStart || headingMode.SelectedIndex == 2 && !headingShown)
             {
-                result.Add(new(label + " 見出し", "heading", fields.Select(f => f.Name).ToArray(), Fields: fields));
-                result.Add(new("型", "type", fields.Select(f => f.DisplayDefinition).ToArray(), Fields: fields));
+                result.Add(new(label + " 見出し", "heading", fields.Select(f => f.Name).ToArray(), Fields: fields, FieldOffset: offset));
+                result.Add(new("型", "type", fields.Select(f => f.DisplayDefinition).ToArray(), Fields: fields, FieldOffset: offset));
                 headingShown = true;
             }
             if ((commentMode.SelectedIndex == 1 || commentMode.SelectedIndex == 0 && groupStart || commentMode.SelectedIndex == 2 && !commentShown) && fields.Any(f => !string.IsNullOrEmpty(f.Comment)))
             {
-                result.Add(new("備考", "comment", fields.Select(f => f.Comment).ToArray(), Fields: fields));
+                result.Add(new("備考", "comment", fields.Select(f => f.Comment).ToArray(), Fields: fields, FieldOffset: offset));
                 commentShown = true;
             }
         }
         foreach (var record in data.Records)
         {
-            if (record.Kind == '1') { Headings("HEAD", definition.Header, true, ref headerHeadingShown, ref headerCommentShown); detailGroupShown = false; }
-            if (record.Kind == '2') { Headings("BODY", definition.Detail, !detailGroupShown, ref detailHeadingShown, ref detailCommentShown); detailGroupShown = true; }
+            var start = result.Count;
+            if (record.Kind == '1') { currentGroup = ++groupCount; Headings("HEAD", definition.Header, true, 0, ref headerHeadingShown, ref headerCommentShown); detailGroupShown = false; }
+            if (record.Kind == '2') { Headings("BODY", definition.Detail, !detailGroupShown, indentBody.Checked ? 1 : 0, ref detailHeadingShown, ref detailCommentShown); detailGroupShown = true; }
+            if (record.Kind == '?') { currentGroup = null; detailGroupShown = false; }
             var name = record.Kind switch { '1' => "HEAD", '2' => "BODY", _ => "不明" };
             var fields = record.Kind == '1' ? definition.Header : record.Kind == '2' ? definition.Detail : null;
             var values = record.Kind == '?' ? new[] { "不明" } : record.Values;
             var details = record.Kind == '?' ? string.Join(" ", record.Values) : null;
-            result.Add(new(name, "value", values, record.Warning, fields, record.FieldWarnings, record.FileRow, details));
+            var warning = record.Warning;
+            if (record.Kind == '2' && currentGroup is null && warning is null) warning = "対応するHEADが確認できません。";
+            var offset = record.Kind == '2' && indentBody.Checked ? 1 : 0;
+            result.Add(new(name, "value", values, warning, fields, record.FieldWarnings, record.FileRow, details, offset, currentGroup));
+            if (record.Kind == '1') result[start] = result[start] with { GroupStart = true };
         }
         grid.RowCount = 0; grid.Columns.Clear(); rows = result;
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "RecordNumber", Width = 80, Frozen = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-        grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Kind", Width = 130, Frozen = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-        var count = Math.Max(definition.Header.Count, definition.Detail.Count);
+        grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Kind", Width = 160, Frozen = true, SortMode = DataGridViewColumnSortMode.NotSortable });
+        var count = Math.Max(definition.Header.Count, definition.Detail.Count + (indentBody.Checked ? 1 : 0));
         for (var i = 0; i < count; i++) grid.Columns.Add(new DataGridViewTextBoxColumn { Name = $"Field{i + 1}", Width = fieldColumnWidths is { } widths && i < widths.Length ? widths[i] : 150, SortMode = DataGridViewColumnSortMode.NotSortable });
         grid.RowCount = rows.Count;
         copyImage.Enabled = saveImages.Enabled = rows.Count > 0;
@@ -195,7 +219,7 @@ public sealed partial class MultiRecordViewForm : Form
     {
         var row = rows[rowIndex];
         style.Alignment = DataGridViewContentAlignment.TopLeft;
-        if (columnIndex >= 2 && row.FieldWarnings?.ContainsKey(columnIndex - 2) == true)
+        if (columnIndex >= 2 && row.FieldWarnings?.ContainsKey(columnIndex - 2 - row.FieldOffset) == true)
         { style.BackColor = Color.FromArgb(255, 190, 170); style.ForeColor = Color.DarkRed; }
         else if (row.Warning is not null && (row.FieldWarnings is null || columnIndex < 2)) style.BackColor = Color.FromArgb(255, 235, 210);
         else if (row.Kind == "value" && row.Label == "HEAD") style.BackColor = Color.FromArgb(220, 240, 250);
@@ -208,8 +232,11 @@ public sealed partial class MultiRecordViewForm : Form
     internal static string ShowSpaces(string value) => value.Replace(' ', '\uFF65').Replace('\u3000', '\u25A1');
 
     private static int[] MeasureColumnWidths(MultiRecordDefinition definition, MultiRecordReadResult data, Font font, int dpi)
+        => MeasureColumnWidthsForLayout(definition, data, font, dpi, false);
+
+    private static int[] MeasureColumnWidthsForLayout(MultiRecordDefinition definition, MultiRecordReadResult data, Font font, int dpi, bool indent)
     {
-        var count = Math.Max(definition.Header.Count, definition.Detail.Count);
+        var count = Math.Max(definition.Header.Count, definition.Detail.Count + (indent ? 1 : 0));
         var widths = Enumerable.Repeat(80, count).ToArray();
         using var bitmap = new Bitmap(1, 1);
         bitmap.SetResolution(dpi, dpi);
@@ -230,12 +257,22 @@ public sealed partial class MultiRecordViewForm : Form
                 widths[index] = (int)Math.Min(65536L, Math.Max(widths[index], (long)width + 16));
             }
         }
-        foreach (var fields in new[] { definition.Header, definition.Detail })
-            for (var i = 0; i < fields.Count; i++) { Include(i, fields[i].Name); Include(i, fields[i].DisplayDefinition); }
+        for (var i = 0; i < definition.Header.Count; i++) { Include(i, definition.Header[i].Name); Include(i, definition.Header[i].DisplayDefinition); }
+        for (var i = 0; i < definition.Detail.Count; i++) { var index = i + (indent ? 1 : 0); Include(index, definition.Detail[i].Name); Include(index, definition.Detail[i].DisplayDefinition); }
         foreach (var record in data.Records)
             if (record.Kind != '?')
-                for (var i = 0; i < record.Values.Count && i < count; i++) Include(i, record.Values[i]);
+                for (var i = 0; i < record.Values.Count; i++) Include(i + (indent && record.Kind == '2' ? 1 : 0), record.Values[i]);
         return widths;
+    }
+
+    private void PaintGroupCell(object? sender, DataGridViewCellPaintingEventArgs e)
+    {
+        PaintVisibleSpaces(sender, e);
+        if (e.RowIndex < 0 || e.RowIndex >= rows.Count || !rows[e.RowIndex].GroupStart || e.Graphics is not { } graphics) return;
+        if (!e.Handled) e.Paint(e.ClipBounds, e.PaintParts);
+        using var pen = new Pen(Color.FromArgb(70, 105, 140), 2);
+        graphics.DrawLine(pen, e.CellBounds.Left, e.CellBounds.Top + 1, e.CellBounds.Right, e.CellBounds.Top + 1);
+        e.Handled = true;
     }
 
     private void PaintVisibleSpaces(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -278,16 +315,27 @@ public sealed partial class MultiRecordViewForm : Form
         e.Handled = true;
     }
 
-    private void RefreshCommentDisplay()
+    private void RefreshCommentDisplay(bool preserveWidths = true)
     {
         if (loadedDefinition is null || loadedData is null) return;
         var first = grid.FirstDisplayedScrollingRowIndex;
         var record = first >= 0 ? rows.Skip(first).Select(r => r.RecordNo).FirstOrDefault(n => n.HasValue) : null;
         var horizontal = grid.HorizontalScrollingOffset;
+        var selectedRow = grid.CurrentCell?.RowIndex ?? -1;
+        var selectedColumn = grid.CurrentCell?.ColumnIndex ?? -1;
+        var selectedField = selectedRow >= 0 && selectedRow < rows.Count && selectedColumn >= 2
+            ? selectedColumn - 2 - rows[selectedRow].FieldOffset : -1;
         var widths = grid.Columns.Cast<DataGridViewColumn>().Select(c => c.Width).ToArray();
         Populate(loadedDefinition, loadedData);
-        for (var i = 0; i < Math.Min(widths.Length, grid.ColumnCount); i++) grid.Columns[i].Width = widths[i];
-        if (record is not null)
+        for (var i = 0; i < Math.Min(preserveWidths ? widths.Length : 2, grid.ColumnCount); i++) grid.Columns[i].Width = widths[i];
+        if (!preserveWidths && selectedRow >= 0 && selectedRow < rows.Count && selectedColumn >= 0)
+        {
+            var targetColumn = selectedColumn < 2 ? selectedColumn : selectedField >= 0 ? selectedField + 2 + rows[selectedRow].FieldOffset : 1;
+            if (targetColumn < grid.ColumnCount) grid.CurrentCell = grid[targetColumn, selectedRow];
+        }
+        if (!preserveWidths && first >= 0 && first < grid.RowCount)
+            grid.FirstDisplayedScrollingRowIndex = first;
+        else if (record is not null)
         {
             var newRow = rows.ToList().FindIndex(r => r.RecordNo == record);
             if (newRow >= 0) grid.FirstDisplayedScrollingRowIndex = newRow;

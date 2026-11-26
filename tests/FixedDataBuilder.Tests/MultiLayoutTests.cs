@@ -26,6 +26,7 @@ internal static partial class Program
             Equal(true, original.SequenceEqual(File.ReadAllBytes(path))); Equal(null, data.IncompleteReason);
             using var form = new MultiRecordViewForm();
             Equal(true, form.Text.Contains("FixedDataBuilder v" + typeof(MainForm).Assembly.GetName().Version!.ToString(3)));
+            Get<CheckBox>(form, "indentBody").Checked = false;
             Invoke(form, "Populate", definition, data);
             var grid = Get<DataGridView>(form, "grid");
             Equal(6, grid.ColumnCount);
@@ -40,7 +41,7 @@ internal static partial class Program
             var bodyStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 7, 2, bodyStyle);
             Equal(Color.FromArgb(220, 240, 250), headStyle.BackColor);
             Equal(Color.Empty, bodyStyle.BackColor);
-            Equal("1", grid[0, 3].Value); Equal("HEAD", grid[1, 3].Value);
+            Equal("1", grid[0, 3].Value); Equal("1組 HEAD", grid[1, 3].Value);
             Equal("BODY 見出し", grid[1, 4].Value); Equal("明細名", grid[5, 4].Value);
             Equal("明細\r\n備考", grid[5, 6].Value); Equal("2", grid[0, 7].Value);
             Equal("3", grid[0, 10].Value); Equal("4", grid[0, 13].Value); Equal("5", grid[0, 14].Value);
@@ -70,6 +71,34 @@ internal static partial class Program
             Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
             headings.SelectedIndex = 0;
         });
+        Test("Indented BODY fields, notes and values stay aligned and toggle safely", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "multi-indent.dat");
+            File.WriteAllText(path, "01A1HEAD\r\nXXA2FAIL\r\n01A2NEXT\r\n01A1HEAD\r\n");
+            var result = MultiRecordReader.Read(path, definition, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+            using var form = new MultiRecordViewForm(); Invoke(form, "Populate", definition, result);
+            var grid = Get<DataGridView>(form, "grid");
+            Equal(7, grid.ColumnCount); Equal("1組 HEAD", grid[1, 3].Value);
+            Equal("BODY 見出し", grid[1, 4].Value); Equal("", grid[2, 4].Value); Equal("区分", grid[3, 4].Value);
+            Equal("明細名", grid[6, 4].Value); Equal("明細\r\n備考", grid[6, 6].Value);
+            Equal("1組 BODY", grid[1, 7].Value); Equal("", grid[2, 7].Value); Equal("XX", grid[3, 7].Value); Equal("FAIL", grid[6, 7].Value);
+            Equal("2組 HEAD", grid[1, 11].Value);
+            var warningStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 7, 3, warningStyle);
+            Equal(Color.FromArgb(255, 190, 170), warningStyle.BackColor);
+            form.CreateControl(); grid.CreateControl(); grid.CurrentCell = grid[6, 7];
+            Equal(true, Get<TextBox>(form, "selectedComment").Text.Contains("明細\r\n備考"));
+            grid.Columns[0].Width = 95; grid.Columns[3].Width = 250;
+            Get<CheckBox>(form, "indentBody").Checked = false;
+            Equal(6, grid.ColumnCount); Equal("区分", grid[2, 4].Value); Equal("FAIL", grid[5, 7].Value);
+            Equal(5, grid.CurrentCell!.ColumnIndex); Equal(true, Get<TextBox>(form, "selectedComment").Text.Contains("明細\r\n備考"));
+            Equal(95, grid.Columns[0].Width); grid.Columns[2].Width = 210;
+            Get<CheckBox>(form, "indentBody").Checked = true;
+            Equal(7, grid.ColumnCount); Equal("FAIL", grid[6, 7].Value);
+            Equal(6, grid.CurrentCell!.ColumnIndex);
+            Equal(95, grid.Columns[0].Width); Equal(250, grid.Columns[3].Width);
+            Get<CheckBox>(form, "indentBody").Checked = false;
+            Equal(210, grid.Columns[2].Width);
+        });
         Test("Header-detail column widths include the widest heading and every record", () =>
         {
             var fields = new[] { new FieldDefinition(new string('漢', 25), FieldDataType.Text, 1), new FieldDefinition("値", FieldDataType.Text, 1) };
@@ -84,6 +113,9 @@ internal static partial class Program
             Equal(true, widths.SequenceEqual(unknownWidths));
             var workerWidths = Task.Run(() => (int[])measure.Invoke(null, [layout, data, font, 96])!).GetAwaiter().GetResult();
             Equal(true, widths.SequenceEqual(workerWidths));
+            var shifted = typeof(MultiRecordViewForm).GetMethod("MeasureColumnWidthsForLayout", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            var shiftedWidths = (int[])shifted.Invoke(null, [layout, data, font, 96, true])!;
+            Equal(3, shiftedWidths.Length); Equal(true, shiftedWidths[2] > 500);
         });
         Test("Header-detail capture paints data spaces and retains original values", () =>
         {
@@ -114,6 +146,7 @@ internal static partial class Program
             Equal("2", grid[0, 4].Value); Equal("不明", grid[1, 4].Value); Equal("不明", grid[2, 4].Value);
             grid.CurrentCell = grid[2, 4];
             Equal(true, Get<TextBox>(form, "selectedComment").Text.Contains("303141394641494C"));
+            Equal("親不明 BODY", grid[1, 8].Value);
         });
         Test("Invalid numeric fields stay visible with a warning and later records remain available", () =>
         {
@@ -127,7 +160,7 @@ internal static partial class Program
             using var form = new MultiRecordViewForm();
             Invoke(form, "Populate", definition, result);
             var grid = Get<DataGridView>(form, "grid");
-            Equal("XX", grid[2, 7].Value); Equal("2", grid[0, 7].Value);
+            Equal("XX", grid[3, 7].Value); Equal("2", grid[0, 7].Value);
         });
         Test("Invalid packed field shows its raw bytes and later records remain available", () =>
         {
