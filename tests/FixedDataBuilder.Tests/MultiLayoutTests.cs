@@ -40,7 +40,10 @@ internal static partial class Program
             var headStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 3, 2, headStyle);
             var bodyStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 7, 2, bodyStyle);
             Equal(Color.FromArgb(220, 240, 250), headStyle.BackColor);
-            Equal(Color.Empty, bodyStyle.BackColor);
+            Equal(Color.White, bodyStyle.BackColor);
+            var bodyNumberStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 7, 0, bodyNumberStyle);
+            var bodyKindStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 7, 1, bodyKindStyle);
+            Equal(Color.White, bodyNumberStyle.BackColor); Equal(Color.White, bodyKindStyle.BackColor);
             Equal("1", grid[0, 3].Value); Equal("1組 HEAD", grid[1, 3].Value);
             Equal("BODY 見出し", grid[1, 4].Value); Equal("明細名", grid[5, 4].Value);
             Equal("明細\r\n備考", grid[5, 6].Value); Equal("2", grid[0, 7].Value);
@@ -98,6 +101,26 @@ internal static partial class Program
             Equal(95, grid.Columns[0].Width); Equal(250, grid.Columns[3].Width);
             Get<CheckBox>(form, "indentBody").Checked = false;
             Equal(210, grid.Columns[2].Width);
+        });
+        Test("First-only headings appear HEAD then BODY before all records even when BODY is first", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "multi-body-first.dat");
+            File.WriteAllText(path, "01A2BODY\r\n01A1HEAD\r\n01A2NEXT\r\n");
+            var result = MultiRecordReader.Read(path, definition, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+            using var form = new MultiRecordViewForm();
+            Get<ComboBox>(form, "headingMode").SelectedIndex = 2;
+            Invoke(form, "Populate", definition, result);
+            var grid = Get<DataGridView>(form, "grid");
+            Equal("HEAD 見出し", grid[1, 0].Value); Equal("ヘッダー名", grid[5, 0].Value);
+            Equal("備考", grid[1, 2].Value); Equal("ヘッダー備考", grid[5, 2].Value);
+            Equal("BODY 見出し", grid[1, 3].Value); Equal("", grid[2, 3].Value); Equal("明細名", grid[6, 3].Value);
+            Equal("備考", grid[1, 5].Value); Equal("明細\r\n備考", grid[6, 5].Value);
+            Equal("1", grid[0, 6].Value); Equal("親不明 BODY", grid[1, 6].Value); Equal("BODY", grid[6, 6].Value);
+            Equal("2", grid[0, 7].Value); Equal("1組 HEAD", grid[1, 7].Value); Equal("HEAD", grid[5, 7].Value);
+            Equal("3", grid[0, 8].Value); Equal("1組 BODY", grid[1, 8].Value); Equal("NEXT", grid[6, 8].Value);
+            var allRows = ((System.Collections.IEnumerable)form.GetType().GetField("rows", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(form)!).Cast<object>().ToArray();
+            bool StartsGroup(int row) => (bool)allRows[row].GetType().GetProperty("GroupStart")!.GetValue(allRows[row])!;
+            Equal(false, StartsGroup(0)); Equal(false, StartsGroup(3)); Equal(true, StartsGroup(7));
         });
         Test("Header-detail column widths include the widest heading and every record", () =>
         {

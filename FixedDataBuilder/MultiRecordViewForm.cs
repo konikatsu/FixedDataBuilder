@@ -183,6 +183,22 @@ public sealed partial class MultiRecordViewForm : Form
                 commentShown = true;
             }
         }
+        if (headingMode.SelectedIndex == 2)
+        {
+            void InitialHeadings(string label, IReadOnlyList<FieldDefinition> fields, int offset, ref bool headingShown, ref bool commentShown)
+            {
+                result.Add(new(label + " 見出し", "heading", fields.Select(f => f.Name).ToArray(), Fields: fields, FieldOffset: offset));
+                result.Add(new("型", "type", fields.Select(f => f.DisplayDefinition).ToArray(), Fields: fields, FieldOffset: offset));
+                headingShown = true;
+                if (commentMode.SelectedIndex == 2 && fields.Any(f => !string.IsNullOrEmpty(f.Comment)))
+                {
+                    result.Add(new("備考", "comment", fields.Select(f => f.Comment).ToArray(), Fields: fields, FieldOffset: offset));
+                    commentShown = true;
+                }
+            }
+            InitialHeadings("HEAD", definition.Header, 0, ref headerHeadingShown, ref headerCommentShown);
+            InitialHeadings("BODY", definition.Detail, indentBody.Checked ? 1 : 0, ref detailHeadingShown, ref detailCommentShown);
+        }
         foreach (var record in data.Records)
         {
             var start = result.Count;
@@ -223,6 +239,7 @@ public sealed partial class MultiRecordViewForm : Form
         { style.BackColor = Color.FromArgb(255, 190, 170); style.ForeColor = Color.DarkRed; }
         else if (row.Warning is not null && (row.FieldWarnings is null || columnIndex < 2)) style.BackColor = Color.FromArgb(255, 235, 210);
         else if (row.Kind == "value" && row.Label == "HEAD") style.BackColor = Color.FromArgb(220, 240, 250);
+        else if (row.Kind == "value" && row.Label == "BODY") style.BackColor = Color.White;
         else if (row.Kind == "heading") style.BackColor = Color.FromArgb(204, 232, 204);
         else if (row.Kind == "type") style.BackColor = Color.FromArgb(226, 242, 226);
         else if (row.Kind == "comment") { style.BackColor = Color.FromArgb(255, 248, 220); style.ForeColor = CommentDisplayStyle.ForeColor; style.Font = commentFont; }
