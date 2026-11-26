@@ -27,11 +27,53 @@ internal static partial class Program
             using var form = new MultiRecordViewForm();
             Invoke(form, "Populate", definition, data);
             var grid = Get<DataGridView>(form, "grid");
-            Equal(5, grid.ColumnCount);
-            Equal("ヘッダー 見出し", grid[0, 0].Value); Equal("ヘッダー名", grid[4, 0].Value);
-            Equal("備考", grid[0, 2].Value); Equal("ヘッダー備考", grid[4, 2].Value);
-            Equal("明細 見出し", grid[0, 4].Value); Equal("明細名", grid[4, 4].Value);
-            Equal("明細\r\n備考", grid[4, 6].Value);
+            Equal(6, grid.ColumnCount);
+            Equal(true, grid.Columns[0].Frozen); Equal(true, grid.Columns[1].Frozen);
+            Equal("行番号", grid[0, 0].Value); Equal("HEAD 見出し", grid[1, 0].Value); Equal("ヘッダー名", grid[5, 0].Value);
+            Equal("備考", grid[1, 2].Value); Equal("ヘッダー備考", grid[5, 2].Value);
+            Equal("1", grid[0, 3].Value); Equal("HEAD", grid[1, 3].Value);
+            Equal("BODY 見出し", grid[1, 4].Value); Equal("明細名", grid[5, 4].Value);
+            Equal("明細\r\n備考", grid[5, 6].Value); Equal("2", grid[0, 7].Value);
+            Equal("3", grid[0, 10].Value); Equal("4", grid[0, 13].Value); Equal("5", grid[0, 14].Value);
+            Equal("HEAD 見出し", grid[1, 8].Value); Equal("BODY 見出し", grid[1, 11].Value);
+            Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            var mode = Get<ComboBox>(form, "commentMode");
+            mode.SelectedIndex = 0;
+            Equal(4, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            Equal("3", grid[0, 11].Value); Equal("5", grid[0, 16].Value);
+            mode.SelectedIndex = 1;
+            Equal(5, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            mode.SelectedIndex = 3;
+            Equal(0, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            Equal("1", grid[0, 2].Value); Equal("5", grid[0, 12].Value);
+            mode.SelectedIndex = 2;
+            Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            var headings = Get<ComboBox>(form, "headingMode");
+            headings.SelectedIndex = 1;
+            Equal(5, Enumerable.Range(0, grid.RowCount).Count(i => Convert.ToString(grid[1, i].Value)!.EndsWith(" 見出し")));
+            headings.SelectedIndex = 2;
+            Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Convert.ToString(grid[1, i].Value)!.EndsWith(" 見出し")));
+            Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            headings.SelectedIndex = 3;
+            Equal(0, Enumerable.Range(0, grid.RowCount).Count(i => Convert.ToString(grid[1, i].Value)!.EndsWith(" 見出し")));
+            Equal(2, Enumerable.Range(0, grid.RowCount).Count(i => Equals("備考", grid[1, i].Value)));
+            headings.SelectedIndex = 0;
+        });
+        Test("Header-detail capture paints data spaces and retains original values", () =>
+        {
+            var path = Path.Combine(temporaryDirectory, "multi-capture.dat");
+            File.WriteAllText(path, "01A1H  1\r\n");
+            var data = MultiRecordReader.Read(path, definition, 4, RecordSeparatorMode.CrLfOrLf, DataEncodingProfile.ShiftJis, NationalTextEncoding.ShiftJis);
+            using var form = new MultiRecordViewForm(); Invoke(form, "Populate", definition, data);
+            var grid = Get<DataGridView>(form, "grid"); form.CreateControl(); grid.CreateControl();
+            var cols = GridCapturePagination.Paginate(grid.Columns.Cast<DataGridViewColumn>().Select(c => new GridCaptureBand(c.Index, c.Width, false)).ToArray(), 1200)[0];
+            var rowPage = GridCapturePagination.Paginate(Enumerable.Range(0, grid.RowCount).Select(i => new GridCaptureBand(i, grid.Rows[i].Height, false)).ToArray(), 1000)[0];
+            using var bitmap = ((Task<Bitmap>)Invoke(form, "RenderCaptureAsync", cols, rowPage, "test", CancellationToken.None, null)!).GetAwaiter().GetResult();
+            var yellowFound = false;
+            for (var y = 0; y < bitmap.Height && !yellowFound; y++)
+                for (var x = 0; x < bitmap.Width; x++) if (bitmap.GetPixel(x, y).ToArgb() == Color.FromArgb(255, 250, 205).ToArgb()) { yellowFound = true; break; }
+            Equal(true, yellowFound); Equal("H  1", data.Records[0].Values[3]);
+            Equal("H  1", grid[5, 3].Value);
         });
         Test("Unknown equal-length record is highlighted and the following record is retained", () =>
         {
@@ -54,7 +96,7 @@ internal static partial class Program
             using var form = new MultiRecordViewForm();
             Invoke(form, "Populate", definition, result);
             var grid = Get<DataGridView>(form, "grid");
-            Equal("XX", grid[1, 7].Value);
+            Equal("XX", grid[2, 7].Value); Equal("2", grid[0, 7].Value);
         });
         Test("Invalid packed field shows its raw bytes and later records remain available", () =>
         {
