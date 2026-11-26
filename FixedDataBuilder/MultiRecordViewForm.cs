@@ -190,9 +190,9 @@ public sealed partial class MultiRecordViewForm : Form
         if (columnIndex >= 2 && row.FieldWarnings?.ContainsKey(columnIndex - 2) == true)
         { style.BackColor = Color.FromArgb(255, 190, 170); style.ForeColor = Color.DarkRed; }
         else if (row.Warning is not null) style.BackColor = Color.FromArgb(255, 235, 210);
-        else if (row.Kind == "heading") style.BackColor = Color.FromArgb(204, 232, 204);
+        else if (row.Kind == "heading") style.BackColor = Color.FromArgb(220, 240, 250);
         else if (row.Kind == "type") style.BackColor = Color.FromArgb(226, 242, 226);
-        else if (row.Kind == "comment") { style.BackColor = Color.FromArgb(225, 242, 252); style.ForeColor = CommentDisplayStyle.ForeColor; style.Font = commentFont; }
+        else if (row.Kind == "comment") { style.BackColor = Color.FromArgb(255, 248, 220); style.ForeColor = CommentDisplayStyle.ForeColor; style.Font = commentFont; }
         else if (columnIndex < 2) style.BackColor = Color.FromArgb(226, 242, 226);
     }
 

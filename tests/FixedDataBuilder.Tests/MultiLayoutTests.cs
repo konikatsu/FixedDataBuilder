@@ -31,6 +31,10 @@ internal static partial class Program
             Equal(true, grid.Columns[0].Frozen); Equal(true, grid.Columns[1].Frozen);
             Equal("行番号", grid[0, 0].Value); Equal("HEAD 見出し", grid[1, 0].Value); Equal("ヘッダー名", grid[5, 0].Value);
             Equal("備考", grid[1, 2].Value); Equal("ヘッダー備考", grid[5, 2].Value);
+            var headingStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 0, 1, headingStyle);
+            var commentStyle = new DataGridViewCellStyle(); Invoke(form, "ApplyRowStyle", 2, 1, commentStyle);
+            Equal(Color.FromArgb(220, 240, 250), headingStyle.BackColor);
+            Equal(Color.FromArgb(255, 248, 220), commentStyle.BackColor);
             Equal("1", grid[0, 3].Value); Equal("HEAD", grid[1, 3].Value);
             Equal("BODY 見出し", grid[1, 4].Value); Equal("明細名", grid[5, 4].Value);
             Equal("明細\r\n備考", grid[5, 6].Value); Equal("2", grid[0, 7].Value);
